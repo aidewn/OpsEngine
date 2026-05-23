@@ -2,7 +2,17 @@
   "permissions": {
     "allow": [
       "Bash(go version *)",
-      "Bash(go get *)"
+      "Bash(go get *)",
+      "Bash(where wails *)",
+      "Bash(wails version *)",
+      "Bash(npm --version)",
+      "Bash(rd /s /q web\\\\node_modules)",
+      "Bash(go mod *)",
+      "Bash(npm install *)",
+      "Bash(go build *)",
+      "Bash(wails dev *)",
+      "Bash(go vet *)",
+      "Bash(npx tsc *)"
     ]
   }
 }

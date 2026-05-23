@@ -5,13 +5,28 @@ import "time"
 type PortType string
 
 // ── 端口类型 ──────────────────────────────────────────────
+// Exec = 执行流，其余为数据流；Dynamic = 动态类型（由节点 config 决定）
 
 const (
+	PortTypeExec          PortType = "Exec"
+	PortTypeString        PortType = "String"
+	PortTypeDynamic       PortType = "Dynamic"
 	PortTypeLinuxSsh      PortType = "LinuxSshConnection"
 	PortTypeDockerContext PortType = "DockerContext"
 	PortTypeK8sContext    PortType = "K8sContext"
 	PortTypeNginxInstance PortType = "NginxInstance"
-	PortTypeFlowSignal    PortType = "FlowSignal"
+)
+
+// ── 节点分类 ──────────────────────────────────────────────
+// 决定端口结构（有没有 exec 端口），与 UI 分组 category 不同
+
+type NodeKind string
+
+const (
+	NodeKindEvent       NodeKind = "event"        // 事件源：无 exec in，有 exec out
+	NodeKindAction      NodeKind = "action"       // 执行节点：exec in + exec out
+	NodeKindPure        NodeKind = "pure"          // 纯数据：无 exec 端口
+	NodeKindFlowControl NodeKind = "flow_control"  // 流程控制：exec in + 多个 exec out
 )
 
 // ── 节点状态 ──────────────────────────────────────────────

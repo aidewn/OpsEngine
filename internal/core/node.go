@@ -1,12 +1,11 @@
 package core
 
-import "github.com/google/uuid"
-
 // NodeTypeDef 节点类型定义（注册时确定，驱动前端渲染）
 type NodeTypeDef struct {
 	TypeID        string        `json:"type_id"`
 	DisplayName   string        `json:"display_name"`
 	Category      string        `json:"category"`
+	NodeKind      NodeKind      `json:"node_kind"` // event|action|pure|flow_control
 	Icon          string        `json:"icon"`
 	Description   string        `json:"description"`
 	InputPorts    []PortDef     `json:"input_ports"`
@@ -38,8 +37,9 @@ type FieldSchema struct {
 
 // NodeInstance 节点实例（工作流配置中的具体节点）
 // 注意：无 Stage 字段，生命周期阶段由可达性分析导出
+// InstanceID 使用 string 而非 uuid.UUID，避免 Wails 绑定生成 number[]
 type NodeInstance struct {
-	InstanceID uuid.UUID      `json:"instance_id" toml:"id"`
+	InstanceID string         `json:"instance_id" toml:"id"`
 	TypeID     string         `json:"type_id"     toml:"type"`
 	Config     map[string]any `json:"config"      toml:"config"`
 	State      NodeState      `json:"state"       toml:"-"`

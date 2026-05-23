@@ -1,8 +1,6 @@
 # 编译产物
-/ops-engine.exe
-/ops-agent.exe
-/agents/linux_amd64/ops-agent
-/agents/linux_arm64/ops-agent
+/build/bin/
+*.exe
 
 # 运行时数据
 /data/executions/
@@ -15,3 +13,11 @@
 # Go
 *.test
 *.out
+
+# 前端
+frontend/node_modules/
+frontend/dist/
+frontend/wailsjs/
+
+# Wails
+/OpsEngine
