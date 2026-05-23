@@ -29,11 +29,19 @@ export interface EdgeConfig {
   to: PortRef;
 }
 
+// VariableDef 工作流/集合内部变量定义
+export interface VariableDef {
+  name: string;
+  var_type: string; // 复用 PortType 字符串
+  default?: unknown;
+}
+
 // 工作流定义（顶层结构，与后端 core.WorkflowDef 对齐）
 export interface WorkflowDef {
   id: string;
   name: string;
   description: string;
+  variables: VariableDef[];
   nodes: NodeInstance[];
   edges: EdgeConfig[];
 }

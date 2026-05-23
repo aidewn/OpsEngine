@@ -1,4 +1,4 @@
-// system_ready 节点：工作流启动时触发一次，无输入端口，一个 exec 输出
+// system_ready 节点：工作流启动时触发一次
 import { Handle, Position, type NodeProps } from '@xyflow/react';
 import { BaseNode } from './BaseNode';
 import type { NodeInstance } from '@/types/workflow';
@@ -9,19 +9,19 @@ type Props = NodeProps & { data: NodeInstance };
 export function SystemReadyNode({ data, selected }: Props) {
   void data;
   return (
-    <>
-      <BaseNode
-        tone="ready"
-        selected={selected}
-        category="Event · Ready"
-        title="System Ready"
-        subtitle="工作流启动时触发一次"
-      />
+    <BaseNode
+      tone="ready"
+      selected={selected}
+      icon="🟢"
+      title="System Ready"
+    >
+      <div style={{ height: 20 }} />
       <Handle
         type="source"
         position={Position.Right}
         id="exec_out"
         style={{
+          top: 40,
           background: getPortColor('Exec'),
           width: 10,
           height: 10,
@@ -30,6 +30,6 @@ export function SystemReadyNode({ data, selected }: Props) {
         }}
         title="Exec Out"
       />
-    </>
+    </BaseNode>
   );
 }

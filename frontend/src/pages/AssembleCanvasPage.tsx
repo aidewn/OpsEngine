@@ -1,9 +1,9 @@
-// 工作流画布页：顶栏 + 中间画布 + 右侧详情 + 添加节点弹窗
+// 集合画布页：顶栏 + 中间画布 + 右侧详情 + 添加节点弹窗
 
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ReactFlowProvider } from '@xyflow/react';
-import { useUpdateWorkflow, useWorkflow } from '@/api/workflows';
+import { useAssemble, useUpdateAssemble } from '@/api/assembles';
 import {
   WorkflowCanvas,
   addNodeToGraph,
@@ -12,29 +12,27 @@ import {
 } from '@/features/workflow/WorkflowCanvas';
 import { NodeDetailPanel } from '@/features/workflow/NodeDetailPanel';
 import { AddNodeDialog } from '@/features/workflow/AddNodeDialog';
-import { WorkflowSidebar } from '@/features/workflow/WorkflowSidebar';
+import { AssembleSidebar } from '@/features/assemble/AssembleSidebar';
 import { Button } from '@/components/ui/Button';
-import type { WorkflowDef } from '@/types/workflow';
+import type { AssembleDef } from '@/types/assemble';
 import type { NodeTypeDef } from '@/types/nodeType';
 import { CenteredMessage } from '@/components/ui/CenteredMessage';
 import { TabBar } from '@/features/tabs/TabBar';
 import { useTabs } from '@/features/tabs/TabsContext';
 
-export function WorkflowCanvasPage() {
+export function AssembleCanvasPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { data: workflow, isLoading, error } = useWorkflow(id);
-  const update = useUpdateWorkflow();
+  const { data: assemble, isLoading, error } = useAssemble(id);
+  const update = useUpdateAssemble();
   const { openTab } = useTabs();
 
-  // 进入页面 / 切到该路由时 upsert 当前 tab
-  // 直接访问 URL 时先用 id 占位，doc 加载后用 name 覆盖
+  // 进入页面 / 切到该路由时 upsert tab
   useEffect(() => {
     if (!id) return;
-    openTab({ kind: 'workflow', id, name: workflow?.name ?? id });
-  }, [id, workflow?.name, openTab]);
+    openTab({ kind: 'assemble', id, name: assemble?.name ?? id });
+  }, [id, assemble?.name, openTab]);
 
-  // 双击集合调用节点 → openTab + 跳转
   const handleNodeDoubleClick = useCallback(
     (typeId: string) => {
       if (typeId.startsWith('assemble:')) {
@@ -51,8 +49,8 @@ export function WorkflowCanvasPage() {
   const [pendingConnection, setPendingConnection] =
     useState<PendingConnection | null>(null);
 
-  const handleWorkflowChange = useCallback(
-    (next: WorkflowDef) => {
+  const handleAssembleChange = useCallback(
+    (next: AssembleDef) => {
       update.mutate(next);
     },
     [update],
@@ -72,27 +70,27 @@ export function WorkflowCanvasPage() {
     typeDef: NodeTypeDef,
     matchedPortId: string | null,
   ) {
-    if (!workflow) return;
+    if (!assemble) return;
 
-    let result: { graph: WorkflowDef; nodeId: string };
+    let result: { graph: AssembleDef; nodeId: string };
 
     if (pendingConnection && matchedPortId) {
       result = addNodeWithEdge(
-        workflow,
+        assemble,
         typeDef.type_id,
         pendingConnection.position,
         pendingConnection,
         matchedPortId,
       );
     } else {
-      const offset = workflow.nodes.length * 20;
-      result = addNodeToGraph(workflow, typeDef.type_id, {
+      const offset = assemble.nodes.length * 20;
+      result = addNodeToGraph(assemble, typeDef.type_id, {
         x: 400 + offset,
         y: 200 + offset,
       });
     }
 
-    handleWorkflowChange(result.graph);
+    handleAssembleChange(result.graph);
     setSelectedNodeId(result.nodeId);
     setPendingConnection(null);
   }
@@ -104,8 +102,8 @@ export function WorkflowCanvasPage() {
         加载失败：{error.message}
       </CenteredMessage>
     );
-  if (!workflow)
-    return <CenteredMessage tone="error">工作流不存在</CenteredMessage>;
+  if (!assemble)
+    return <CenteredMessage tone="error">集合不存在</CenteredMessage>;
 
   return (
     <ReactFlowProvider>
@@ -131,22 +129,22 @@ export function WorkflowCanvasPage() {
         </header>
 
         <div className="flex flex-1 overflow-hidden">
-          <WorkflowSidebar
-            workflow={workflow}
-            onChange={handleWorkflowChange}
+          <AssembleSidebar
+            assemble={assemble}
+            onChange={handleAssembleChange}
           />
           <main className="flex-1">
             <WorkflowCanvas
-              graph={workflow}
+              graph={assemble}
               selectedNodeId={selectedNodeId}
               onSelectNode={setSelectedNodeId}
-              onGraphChange={handleWorkflowChange}
+              onGraphChange={handleAssembleChange}
               onPendingConnection={handlePendingConnection}
               onNodeDoubleClick={handleNodeDoubleClick}
             />
           </main>
           <NodeDetailPanel
-            graph={workflow}
+            graph={assemble}
             selectedNodeId={selectedNodeId}
           />
         </div>

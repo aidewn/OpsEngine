@@ -1,4 +1,5 @@
-// 工作流画布：节点拖动、连线、删除、拖线到空白创建节点
+// 通用画布组件：节点拖动、连线、删除、拖线到空白创建节点
+// 同时被工作流和集合编辑页复用
 
 import {
   ReactFlow,
@@ -7,6 +8,7 @@ import {
   MiniMap,
   useNodesState,
   useEdgesState,
+  useReactFlow,
   type Node as RfNode,
   type Connection,
   type Edge as RfEdge,
@@ -14,18 +16,20 @@ import {
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { useCallback, useEffect, useRef } from 'react';
-import type { WorkflowDef, EdgeConfig, NodeInstance } from '@/types/workflow';
+import type { EdgeConfig, NodeInstance } from '@/types/workflow';
 import type { PortType } from '@/types/nodeType';
 import { useNodeTypes } from '@/api/nodeTypes';
 import { nodeTypeMap } from './nodes/nodeTypeMap';
 import {
   mergeNodePositions,
+  type GraphDef,
   type RfNodeData,
-  workflowToRf,
+  graphToRf,
   toRfEdge,
 } from './canvasMapping';
 import { resolvePortType } from '@/types/nodeType';
 import { newUUID } from '@/lib/uuid';
+import { readDragPayload } from './dragNode';
 
 // 拖线到空白时记录的上下文信息
 export interface PendingConnection {
@@ -39,44 +43,49 @@ export interface PendingConnection {
   position: { x: number; y: number };
 }
 
-interface WorkflowCanvasProps {
-  workflow: WorkflowDef;
+// 画布接受任何含 nodes + edges 的结构
+interface CanvasProps<T extends GraphDef> {
+  graph: T;
   selectedNodeId: string | null;
   onSelectNode: (nodeId: string | null) => void;
-  onWorkflowChange: (workflow: WorkflowDef) => void;
+  onGraphChange: (graph: T) => void;
   // 拖线到空白处时触发，通知父组件弹出节点创建框
   onPendingConnection: (pending: PendingConnection) => void;
+  // 节点双击：用于集合调用节点跳转到集合编辑页
+  onNodeDoubleClick?: (typeId: string) => void;
 }
 
-export function WorkflowCanvas({
-  workflow,
+export function WorkflowCanvas<T extends GraphDef>({
+  graph,
   selectedNodeId,
   onSelectNode,
-  onWorkflowChange,
+  onGraphChange,
   onPendingConnection,
-}: WorkflowCanvasProps) {
+  onNodeDoubleClick,
+}: CanvasProps<T>) {
   const { data: nodeTypes } = useNodeTypes();
-  const initial = workflowToRf(workflow);
+  const rf = useReactFlow();
+  const initial = graphToRf(graph);
   const [nodes, setNodes, onNodesChange] = useNodesState<RfNode<RfNodeData>>(
     initial.nodes,
   );
   const [edges, setEdges, onEdgesChange] = useEdgesState(initial.edges);
 
-  // 最新 workflow 引用，供回调中使用
-  const workflowRef = useRef(workflow);
-  workflowRef.current = workflow;
+  // 最新 graph 引用，供回调中使用
+  const graphRef = useRef(graph);
+  graphRef.current = graph;
 
-  // 外部 workflow 变化时重置画布
-  const lastWorkflowKey = useRef<string>(buildKey(workflow));
+  // 外部 graph 变化时重置画布
+  const lastGraphKey = useRef<string>(buildKey(graph));
   useEffect(() => {
-    const key = buildKey(workflow);
-    if (key !== lastWorkflowKey.current) {
-      const next = workflowToRf(workflow);
+    const key = buildKey(graph);
+    if (key !== lastGraphKey.current) {
+      const next = graphToRf(graph);
       setNodes(next.nodes);
       setEdges(next.edges);
-      lastWorkflowKey.current = key;
+      lastGraphKey.current = key;
     }
-  }, [workflow, setNodes, setEdges]);
+  }, [graph, setNodes, setEdges]);
 
   // ── 连线校验 ──────────────────────────────────────────
   const isValidConnection = useCallback(
@@ -84,11 +93,11 @@ export function WorkflowCanvas({
       if (!nodeTypes || !connection.source || !connection.target) return false;
       if (connection.source === connection.target) return false;
 
-      const wf = workflowRef.current;
-      const sourceNode = wf.nodes.find(
+      const g = graphRef.current;
+      const sourceNode = g.nodes.find(
         (n) => n.instance_id === connection.source,
       );
-      const targetNode = wf.nodes.find(
+      const targetNode = g.nodes.find(
         (n) => n.instance_id === connection.target,
       );
       if (!sourceNode || !targetNode) return false;
@@ -128,8 +137,8 @@ export function WorkflowCanvas({
       };
 
       // 检查是否已存在相同连线
-      const wf = workflowRef.current;
-      const exists = wf.edges.some(
+      const g = graphRef.current;
+      const exists = g.edges.some(
         (e) =>
           e.from.node === newEdge.from.node &&
           e.from.port === newEdge.from.port &&
@@ -143,34 +152,28 @@ export function WorkflowCanvas({
       setEdges((prev) => [...prev, rfEdge]);
 
       // 持久化
-      const updated: WorkflowDef = {
-        ...wf,
-        edges: [...wf.edges, newEdge],
-      };
-      onWorkflowChange(updated);
+      onGraphChange({ ...g, edges: [...g.edges, newEdge] } as T);
     },
-    [setEdges, onWorkflowChange],
+    [setEdges, onGraphChange],
   );
 
   // ── 拖线到空白处 ──────────────────────────────────────
   const onConnectEnd: OnConnectEnd = useCallback(
     (event, connectionState) => {
-      // 只在松手时没连接到任何端口时触发
       if (connectionState.isValid) return;
 
       const fromNodeId = connectionState.fromNode?.id;
       const fromHandleId = connectionState.fromHandle?.id;
-      const fromHandleType = connectionState.fromHandle?.type; // 'source' | 'target'
+      const fromHandleType = connectionState.fromHandle?.type;
       if (!fromNodeId || !fromHandleId || !fromHandleType || !nodeTypes) return;
 
-      const wf = workflowRef.current;
-      const fromNode = wf.nodes.find((n) => n.instance_id === fromNodeId);
+      const g = graphRef.current;
+      const fromNode = g.nodes.find((n) => n.instance_id === fromNodeId);
       if (!fromNode) return;
 
       const fromDef = nodeTypes.find((t) => t.type_id === fromNode.type_id);
       if (!fromDef) return;
 
-      // 确定拖出端口的类型
       const isOutput = fromHandleType === 'source';
       const portList = isOutput ? fromDef.output_ports : fromDef.input_ports;
       const portDef = portList.find((p) => p.id === fromHandleId);
@@ -178,13 +181,11 @@ export function WorkflowCanvas({
 
       const realType = resolvePortType(portDef, fromNode.config);
 
-      // 计算松手位置的画布坐标
       const reactFlowBounds = (
         event.target as HTMLElement
       ).closest('.react-flow')?.getBoundingClientRect();
       if (!reactFlowBounds) return;
 
-      // 区分 MouseEvent 和 TouchEvent
       let clientX: number;
       let clientY: number;
       if ('changedTouches' in event) {
@@ -215,36 +216,64 @@ export function WorkflowCanvas({
   const onNodesDelete = useCallback(
     (deleted: RfNode<RfNodeData>[]) => {
       const deletedIds = new Set(deleted.map((n) => n.id));
-      const wf = workflowRef.current;
+      const g = graphRef.current;
 
-      const updated: WorkflowDef = {
-        ...wf,
-        nodes: wf.nodes.filter((n) => !deletedIds.has(n.instance_id)),
-        edges: wf.edges.filter(
+      onGraphChange({
+        ...g,
+        nodes: g.nodes.filter((n) => !deletedIds.has(n.instance_id)),
+        edges: g.edges.filter(
           (e) => !deletedIds.has(e.from.node) && !deletedIds.has(e.to.node),
         ),
-      };
-      onWorkflowChange(updated);
+      } as T);
     },
-    [onWorkflowChange],
+    [onGraphChange],
+  );
+
+  // ── 拖到画布：从左侧栏列表项拖入 ────────────────────────
+  const onDragOver = useCallback((event: React.DragEvent) => {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'copy';
+  }, []);
+
+  const onDrop = useCallback(
+    (event: React.DragEvent) => {
+      event.preventDefault();
+      const payload = readDragPayload(event.nativeEvent);
+      if (!payload) return;
+
+      // 屏幕坐标 → 画布坐标
+      const position = rf.screenToFlowPosition({
+        x: event.clientX,
+        y: event.clientY,
+      });
+
+      const g = graphRef.current;
+      const node: NodeInstance = {
+        instance_id: newUUID(),
+        type_id: payload.type_id,
+        config: payload.config,
+        position,
+      };
+      onGraphChange({ ...g, nodes: [...g.nodes, node] } as T);
+    },
+    [rf, onGraphChange],
   );
 
   // ── 删除连线 ──────────────────────────────────────────
   const onEdgesDelete = useCallback(
     (deleted: RfEdge[]) => {
       const deletedIds = new Set(deleted.map((e) => e.id));
-      const wf = workflowRef.current;
+      const g = graphRef.current;
 
-      const updated: WorkflowDef = {
-        ...wf,
-        edges: wf.edges.filter((e) => {
+      onGraphChange({
+        ...g,
+        edges: g.edges.filter((e) => {
           const rfId = `${e.from.node}:${e.from.port}->${e.to.node}:${e.to.port}`;
           return !deletedIds.has(rfId);
         }),
-      };
-      onWorkflowChange(updated);
+      } as T);
     },
-    [onWorkflowChange],
+    [onGraphChange],
   );
 
   return (
@@ -258,10 +287,18 @@ export function WorkflowCanvas({
       onNodesDelete={onNodesDelete}
       onEdgesDelete={onEdgesDelete}
       isValidConnection={isValidConnection}
+      onDrop={onDrop}
+      onDragOver={onDragOver}
       onNodeClick={(_, n) => onSelectNode(n.id)}
+      onNodeDoubleClick={(_, n) => {
+        const node = graphRef.current.nodes.find(
+          (gn) => gn.instance_id === n.id,
+        );
+        if (node && onNodeDoubleClick) onNodeDoubleClick(node.type_id);
+      }}
       onPaneClick={() => onSelectNode(null)}
       onNodeDragStop={() => {
-        onWorkflowChange(mergeNodePositions(workflowRef.current, nodes));
+        onGraphChange(mergeNodePositions(graphRef.current, nodes));
       }}
       nodeTypes={nodeTypeMap}
       deleteKeyCode={['Backspace', 'Delete']}
@@ -281,45 +318,42 @@ export function WorkflowCanvas({
   );
 }
 
-// ── 辅助：添加节点（供父组件调用） ─────────────────────────
-// 创建节点后同步更新画布和 workflow
-export function addNodeToWorkflow(
-  workflow: WorkflowDef,
+// ── 辅助：向图中添加节点 ────────────────────────────────────
+export function addNodeToGraph<T extends GraphDef>(
+  graph: T,
   typeId: string,
   position: { x: number; y: number },
-): { workflow: WorkflowDef; nodeId: string } {
+  config: Record<string, unknown> = {},
+): { graph: T; nodeId: string } {
   const node: NodeInstance = {
     instance_id: newUUID(),
     type_id: typeId,
-    config: {},
+    config,
     position,
   };
   return {
-    workflow: {
-      ...workflow,
-      nodes: [...workflow.nodes, node],
-    },
+    graph: { ...graph, nodes: [...graph.nodes, node] } as T,
     nodeId: node.instance_id,
   };
 }
 
 // ── 辅助：添加节点并自动连线 ─────────────────────────────
-export function addNodeWithEdge(
-  workflow: WorkflowDef,
+export function addNodeWithEdge<T extends GraphDef>(
+  graph: T,
   typeId: string,
   position: { x: number; y: number },
   pending: PendingConnection,
   targetPortId: string,
-): { workflow: WorkflowDef; nodeId: string } {
+  config: Record<string, unknown> = {},
+): { graph: T; nodeId: string } {
   const nodeId = newUUID();
   const node: NodeInstance = {
     instance_id: nodeId,
     type_id: typeId,
-    config: {},
+    config,
     position,
   };
 
-  // 根据拖线方向确定 edge 的 from/to
   const edge: EdgeConfig =
     pending.sourceDirection === 'output'
       ? {
@@ -332,11 +366,11 @@ export function addNodeWithEdge(
         };
 
   return {
-    workflow: {
-      ...workflow,
-      nodes: [...workflow.nodes, node],
-      edges: [...workflow.edges, edge],
-    },
+    graph: {
+      ...graph,
+      nodes: [...graph.nodes, node],
+      edges: [...graph.edges, edge],
+    } as T,
     nodeId,
   };
 }
@@ -367,11 +401,11 @@ function SyncSelection({
   return null;
 }
 
-// 简单 key：节点/边 id 拼接，用于检测工作流数据变化
-function buildKey(workflow: WorkflowDef): string {
-  const nodeKeys = workflow.nodes.map((n) => n.instance_id).join(',');
-  const edgeKeys = workflow.edges
+// 简单 key：节点/边 id 拼接，用于检测数据变化
+function buildKey(graph: GraphDef): string {
+  const nodeKeys = graph.nodes.map((n) => n.instance_id).join(',');
+  const edgeKeys = graph.edges
     .map((e) => `${e.from.node}:${e.from.port}-${e.to.node}:${e.to.port}`)
     .join(',');
-  return `${workflow.id}|${nodeKeys}|${edgeKeys}`;
+  return `${nodeKeys}|${edgeKeys}`;
 }

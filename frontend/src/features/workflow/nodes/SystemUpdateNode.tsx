@@ -7,30 +7,21 @@ import { getPortColor } from '@/types/nodeType';
 type Props = NodeProps & { data: NodeInstance };
 
 export function SystemUpdateNode({ data, selected }: Props) {
-  const deltaType = (data.config?.delta_type as string) ?? 'manual';
-  const deltaSeconds = data.config?.delta_seconds as number | undefined;
-
-  const subtitle =
-    deltaType === 'interval' && deltaSeconds
-      ? `每 ${deltaSeconds} 秒触发`
-      : deltaType === 'cron'
-        ? `cron: ${(data.config?.cron_expr as string) ?? '(未配置)'}`
-        : '手动触发（只执行一次）';
-
+  void data;
   return (
-    <>
-      <BaseNode
-        tone="update"
-        selected={selected}
-        category="Event · Update"
-        title="System Update"
-        subtitle={subtitle}
-      />
+    <BaseNode
+      tone="update"
+      selected={selected}
+      icon="🔵"
+      title="System Update"
+    >
+      <div style={{ height: 20 }} />
       <Handle
         type="source"
         position={Position.Right}
         id="exec_out"
         style={{
+          top: 40,
           background: getPortColor('Exec'),
           width: 10,
           height: 10,
@@ -39,6 +30,6 @@ export function SystemUpdateNode({ data, selected }: Props) {
         }}
         title="Exec Out"
       />
-    </>
+    </BaseNode>
   );
 }

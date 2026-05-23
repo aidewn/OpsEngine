@@ -1,0 +1,30 @@
+id = "066e8608-f4ef-4347-b8e7-15d04efeec10"
+name = "nginx部署"
+description = ""
+params = []
+returns = []
+variables = []
+
+[[nodes]]
+  id = "29af7519-7f0d-49f7-83d5-c50c1aebd63e"
+  type = "assemble_start"
+  [nodes.config]
+  [nodes.position]
+    x = -286.62622496988706
+    y = 98.72309503442807
+
+[[nodes]]
+  id = "2e39b83a-0027-4587-a43a-550d64917ac9"
+  type = "assemble_end"
+  [nodes.config]
+  [nodes.position]
+    x = 674.4739433489746
+    y = 89.53350819445178
+
+[[edges]]
+  [edges.from]
+    node = "29af7519-7f0d-49f7-83d5-c50c1aebd63e"
+    port = "exec_out"
+  [edges.to]
+    node = "2e39b83a-0027-4587-a43a-550d64917ac9"
+    port = "exec_in"

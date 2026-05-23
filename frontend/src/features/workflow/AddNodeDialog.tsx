@@ -8,7 +8,7 @@ import { Dialog } from '@/components/ui/Dialog';
 import { Input } from '@/components/ui/Input';
 import { useNodeTypes } from '@/api/nodeTypes';
 import type { NodeTypeDef } from '@/types/nodeType';
-import { isSystemNodeType, resolvePortType } from '@/types/nodeType';
+import { isInternalNodeType, resolvePortType } from '@/types/nodeType';
 import type { PendingConnection } from './WorkflowCanvas';
 
 interface AddNodeDialogProps {
@@ -33,7 +33,7 @@ export function AddNodeDialog({
   const filtered = useMemo(() => {
     if (!nodeTypes) return [];
 
-    let types = nodeTypes.filter((t) => !isSystemNodeType(t.type_id));
+    let types = nodeTypes.filter((t) => !isInternalNodeType(t.type_id));
 
     // 搜索过滤
     if (search.trim()) {

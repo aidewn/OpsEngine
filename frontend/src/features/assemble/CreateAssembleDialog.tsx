@@ -1,5 +1,4 @@
-// 创建工作流弹窗
-// 流程：POST /api/workflows 创建空工作流 → PUT 写入默认 3 个事件源节点 → 跳转到画布
+// 创建集合弹窗
 
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -8,21 +7,21 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Label } from '@/components/ui/Label';
 import { Textarea } from '@/components/ui/Textarea';
-import { useCreateWorkflow, useUpdateWorkflow } from '@/api/workflows';
-import { createDefaultSystemNodes } from './systemNodes';
+import { useCreateAssemble, useUpdateAssemble } from '@/api/assembles';
+import { createDefaultAssembleNodes } from '@/features/workflow/systemNodes';
 
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
 
-export function CreateWorkflowDialog({ open, onOpenChange }: Props) {
+export function CreateAssembleDialog({ open, onOpenChange }: Props) {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [error, setError] = useState<string | null>(null);
 
-  const create = useCreateWorkflow();
-  const update = useUpdateWorkflow();
+  const create = useCreateAssemble();
+  const update = useUpdateAssemble();
   const navigate = useNavigate();
 
   const busy = create.isPending || update.isPending;
@@ -48,18 +47,20 @@ export function CreateWorkflowDialog({ open, onOpenChange }: Props) {
         name: trimmed,
         description: description.trim(),
       });
-      // 写入默认 3 个事件源节点（前端便利功能）
+      // 写入默认 Start + End 节点
       await update.mutateAsync({
         id,
         name: trimmed,
         description: description.trim(),
+        params: [],
+        returns: [],
         variables: [],
-        nodes: createDefaultSystemNodes(),
+        nodes: createDefaultAssembleNodes(),
         edges: [],
       });
       reset();
       onOpenChange(false);
-      navigate(`/workflows/${id}`);
+      navigate(`/assembles/${id}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : '创建失败');
     }
@@ -74,8 +75,8 @@ export function CreateWorkflowDialog({ open, onOpenChange }: Props) {
           onOpenChange(v);
         }
       }}
-      title="新建工作流"
-      description="创建一个空工作流，并自动放置 3 个事件源节点"
+      title="新建集合"
+      description="创建一个可复用的节点集合，并自动放置 Start / End 节点"
       footer={
         <>
           <Button
@@ -86,40 +87,36 @@ export function CreateWorkflowDialog({ open, onOpenChange }: Props) {
           >
             取消
           </Button>
-          <Button
-            type="submit"
-            form="create-workflow-form"
-            disabled={busy}
-          >
+          <Button type="submit" form="create-assemble-form" disabled={busy}>
             {busy ? '创建中...' : '创建'}
           </Button>
         </>
       }
     >
       <form
-        id="create-workflow-form"
+        id="create-assemble-form"
         onSubmit={handleSubmit}
         className="space-y-4"
       >
         <div className="space-y-1">
-          <Label htmlFor="workflow-name">名称</Label>
+          <Label htmlFor="assemble-name">名称</Label>
           <Input
-            id="workflow-name"
+            id="assemble-name"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="例：部署 Nginx"
+            placeholder="例：SSH 部署模块"
             autoFocus
             disabled={busy}
           />
         </div>
         <div className="space-y-1">
-          <Label htmlFor="workflow-desc">描述（可选）</Label>
+          <Label htmlFor="assemble-desc">描述（可选）</Label>
           <Textarea
-            id="workflow-desc"
+            id="assemble-desc"
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             rows={3}
-            placeholder="说明这个工作流的用途"
+            placeholder="说明这个集合的用途"
             disabled={busy}
           />
         </div>

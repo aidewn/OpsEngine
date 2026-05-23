@@ -54,17 +54,33 @@ export interface NodeTypeDef {
   execution_mode: ExecutionMode;
 }
 
-// ── 系统事件源节点 ────────────────────────────────────────
+// ── 系统事件源节点（仅出现在工作流中） ─────────────────────
 export const SYSTEM_READY = 'system_ready';
 export const SYSTEM_UPDATE = 'system_update';
 export const SYSTEM_OVER = 'system_over';
 
-export type SystemNodeType =
-  | typeof SYSTEM_READY
-  | typeof SYSTEM_UPDATE
-  | typeof SYSTEM_OVER;
+// ── 集合内部节点 ──────────────────────────────────────────
+export const ASSEMBLE_START = 'assemble_start';
+export const ASSEMBLE_END = 'assemble_end';
+export const ASSEMBLE_PARAM = 'assemble_param';
 
-export function isSystemNodeType(typeId: string): typeId is SystemNodeType {
+// 不可由用户在 AddNodeDialog 中手动添加的内置节点类型
+const INTERNAL_NODE_TYPES = new Set([
+  SYSTEM_READY,
+  SYSTEM_UPDATE,
+  SYSTEM_OVER,
+  ASSEMBLE_START,
+  ASSEMBLE_END,
+  ASSEMBLE_PARAM,
+]);
+
+// 判断是否为系统/内部节点类型（不可手动添加、不可删除）
+export function isInternalNodeType(typeId: string): boolean {
+  return INTERNAL_NODE_TYPES.has(typeId);
+}
+
+// 判断是否为工作流事件源节点
+export function isSystemNodeType(typeId: string): boolean {
   return (
     typeId === SYSTEM_READY ||
     typeId === SYSTEM_UPDATE ||
@@ -72,12 +88,27 @@ export function isSystemNodeType(typeId: string): typeId is SystemNodeType {
   );
 }
 
+// 判断是否为集合内部节点
+export function isAssembleNodeType(typeId: string): boolean {
+  return (
+    typeId === ASSEMBLE_START ||
+    typeId === ASSEMBLE_END ||
+    typeId === ASSEMBLE_PARAM
+  );
+}
+
 // ── 端口颜色映射 ──────────────────────────────────────────
 // 不同 PortType 用不同颜色，对齐 UE Blueprint 直觉
-const PORT_COLORS: Record<PortType, string> = {
+const PORT_COLORS: Record<string, string> = {
   Exec: '#e2e8f0',              // 白/浅灰（执行流）
+  // 基础类型
   String: '#22c55e',            // 绿色
-  Dynamic: '#a855f7',           // 紫色（动态类型）
+  Int: '#10b981',               // 翠绿
+  Float: '#0ea5e9',             // 天蓝
+  Bool: '#ef4444',              // 红色
+  // 动态类型
+  Dynamic: '#a855f7',           // 紫色
+  // 业务句柄
   LinuxSshConnection: '#3b82f6', // 蓝色
   DockerContext: '#8b5cf6',     // 紫蓝
   K8sContext: '#06b6d4',        // 青色
@@ -85,7 +116,7 @@ const PORT_COLORS: Record<PortType, string> = {
 };
 
 // 获取端口颜色，未知类型回退灰色
-export function getPortColor(portType: PortType): string {
+export function getPortColor(portType: string): string {
   return PORT_COLORS[portType] ?? '#94a3b8';
 }
 

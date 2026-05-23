@@ -1,84 +1,113 @@
 // 通用业务节点：根据 NodeTypeDef 动态渲染所有端口
-// 系统节点以外的所有节点都由此组件渲染
+// 布局：按行对齐 input/output，handle 在行的左/右边缘，label 内嵌
 
 import { Handle, Position, type NodeProps } from '@xyflow/react';
 import { BaseNode } from './BaseNode';
 import type { NodeInstance } from '@/types/workflow';
+import type { PortDef } from '@/types/nodeType';
 import { useNodeTypes } from '@/api/nodeTypes';
 import { getPortColor, resolvePortType } from '@/types/nodeType';
 
 type Props = NodeProps & { data: NodeInstance };
 
-// 端口纵向间距（px）
-const PORT_SPACING = 22;
-// 第一个端口的起始 top 偏移
-const PORT_START = 42;
+const ROW_HEIGHT = 20;
+// BaseNode 标题区高度 + body padding-top（用于 handle 定位）
+const HEADER_OFFSET = 30;
 
 export function GenericNode({ data, selected }: Props) {
   const { data: nodeTypes } = useNodeTypes();
   const def = nodeTypes?.find((t) => t.type_id === data.type_id);
 
-  // 分离 exec 端口和数据端口，exec 端口排在最上方
   const inputPorts = def?.input_ports ?? [];
   const outputPorts = def?.output_ports ?? [];
+  const rowCount = Math.max(inputPorts.length, outputPorts.length);
 
   return (
-    <>
-      {/* 左侧输入端口 */}
-      {inputPorts.map((port, idx) => {
-        const realType = resolvePortType(port, data.config);
-        const color = getPortColor(realType);
-        const isExec = realType === 'Exec';
+    <BaseNode
+      tone="neutral"
+      selected={selected}
+      icon={def?.icon}
+      title={def?.display_name ?? data.type_id}
+    >
+      {/* 端口行：每行最多一个 input + 一个 output；显示「类型」而非「名字」 */}
+      {Array.from({ length: rowCount }).map((_, idx) => {
+        const inputPort = inputPorts[idx];
+        const outputPort = outputPorts[idx];
+        const inputType = inputPort
+          ? resolvePortType(inputPort, data.config)
+          : null;
+        const outputType = outputPort
+          ? resolvePortType(outputPort, data.config)
+          : null;
         return (
-          <Handle
-            key={port.id}
-            type="target"
-            position={Position.Left}
-            id={port.id}
-            style={{
-              top: PORT_START + idx * PORT_SPACING,
-              background: color,
-              width: isExec ? 10 : 12,
-              height: isExec ? 10 : 12,
-              borderRadius: isExec ? 2 : 6,
-              border: '2px solid rgba(0,0,0,0.15)',
-            }}
-            title={`${port.label} (${realType})`}
-          />
+          <div
+            key={idx}
+            className="flex items-center justify-between text-[10px] text-slate-700"
+            style={{ height: ROW_HEIGHT }}
+          >
+            <span className="truncate pl-2.5 font-medium">
+              {inputType && inputType !== 'Exec' ? inputType : ''}
+            </span>
+            <span className="truncate pr-2.5 font-medium">
+              {outputType && outputType !== 'Exec' ? outputType : ''}
+            </span>
+          </div>
         );
       })}
 
-      <BaseNode
-        tone="neutral"
-        selected={selected}
-        category={def?.category ?? data.type_id}
-        title={def?.display_name ?? data.type_id}
-        subtitle={def?.description}
-      />
+      {/* Handles 绝对定位在每行的左右边缘 */}
+      {inputPorts.map((port, idx) => (
+        <PortHandle
+          key={`in-${port.id}`}
+          port={port}
+          config={data.config}
+          side="left"
+          rowIndex={idx}
+        />
+      ))}
+      {outputPorts.map((port, idx) => (
+        <PortHandle
+          key={`out-${port.id}`}
+          port={port}
+          config={data.config}
+          side="right"
+          rowIndex={idx}
+        />
+      ))}
+    </BaseNode>
+  );
+}
 
-      {/* 右侧输出端口 */}
-      {outputPorts.map((port, idx) => {
-        const realType = resolvePortType(port, data.config);
-        const color = getPortColor(realType);
-        const isExec = realType === 'Exec';
-        return (
-          <Handle
-            key={port.id}
-            type="source"
-            position={Position.Right}
-            id={port.id}
-            style={{
-              top: PORT_START + idx * PORT_SPACING,
-              background: color,
-              width: isExec ? 10 : 12,
-              height: isExec ? 10 : 12,
-              borderRadius: isExec ? 2 : 6,
-              border: '2px solid rgba(0,0,0,0.15)',
-            }}
-            title={`${port.label} (${realType})`}
-          />
-        );
-      })}
-    </>
+// 单个 handle，绝对定位到行的左/右边缘
+function PortHandle({
+  port,
+  config,
+  side,
+  rowIndex,
+}: {
+  port: PortDef;
+  config: Record<string, unknown>;
+  side: 'left' | 'right';
+  rowIndex: number;
+}) {
+  const realType = resolvePortType(port, config);
+  const color = getPortColor(realType);
+  const isExec = realType === 'Exec';
+
+  return (
+    <Handle
+      type={side === 'left' ? 'target' : 'source'}
+      position={side === 'left' ? Position.Left : Position.Right}
+      id={port.id}
+      style={{
+        top: HEADER_OFFSET + rowIndex * ROW_HEIGHT + ROW_HEIGHT / 2,
+        background: color,
+        width: isExec ? 10 : 11,
+        height: isExec ? 10 : 11,
+        borderRadius: isExec ? 2 : 6,
+        border: '2px solid rgba(0,0,0,0.15)',
+      }}
+      title={`${port.label} (${realType})`}
+    />
   );
 }

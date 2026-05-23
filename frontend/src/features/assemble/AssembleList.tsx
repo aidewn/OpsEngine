@@ -1,28 +1,34 @@
-// 工作流列表页
+// 集合列表（嵌入首页 tab 内容区）
 
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/Button';
 import { Dialog } from '@/components/ui/Dialog';
-import { useWorkflows, useDeleteWorkflow } from '@/api/workflows';
-import { CreateWorkflowDialog } from '@/features/workflow/CreateWorkflowDialog';
+import { useAssembles, useDeleteAssemble } from '@/api/assembles';
+import { CreateAssembleDialog } from './CreateAssembleDialog';
+import { useTabs } from '@/features/tabs/TabsContext';
 
-export function WorkflowListPage() {
+export function AssembleList() {
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; id: string; name: string } | null>(null);
-  const { data, isLoading, error } = useWorkflows();
-  const deleteWorkflow = useDeleteWorkflow();
+  const [deleteDialog, setDeleteDialog] = useState<{
+    open: boolean;
+    id: string;
+    name: string;
+  } | null>(null);
+  const { data, isLoading, error } = useAssembles();
+  const deleteAssemble = useDeleteAssemble();
+  const { closeTab } = useTabs();
 
   return (
-    <div className="mx-auto flex h-full max-w-5xl flex-col px-6 py-8">
+    <>
       <header className="mb-6 flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-slate-900">工作流</h1>
+          <h1 className="text-2xl font-semibold text-slate-900">集合</h1>
           <p className="mt-1 text-sm text-slate-500">
-            管理你的运维工作流
+            管理可复用的节点集合模块
           </p>
         </div>
-        <Button onClick={() => setDialogOpen(true)}>+ 新建工作流</Button>
+        <Button onClick={() => setDialogOpen(true)}>+ 新建集合</Button>
       </header>
 
       <main className="flex-1">
@@ -37,22 +43,19 @@ export function WorkflowListPage() {
         )}
         {data && data.length > 0 && (
           <ul className="divide-y divide-slate-200 rounded-lg border border-slate-200 bg-white">
-            {data.map((wf) => (
-              <li key={wf.id}>
+            {data.map((a) => (
+              <li key={a.id}>
                 <div className="flex items-center justify-between px-4 py-3 hover:bg-slate-50">
-                  <Link
-                    to={`/workflows/${wf.id}`}
-                    className="flex-1"
-                  >
+                  <Link to={`/assembles/${a.id}`} className="flex-1">
                     <div className="text-sm font-medium text-slate-900">
-                      {wf.name}
+                      {a.name}
                     </div>
                     <div className="mt-0.5 font-mono text-xs text-slate-500">
-                      {wf.id}
+                      {a.id}
                     </div>
-                    {wf.description && (
+                    {a.description && (
                       <div className="mt-1 text-xs text-slate-600">
-                        {wf.description}
+                        {a.description}
                       </div>
                     )}
                   </Link>
@@ -62,7 +65,11 @@ export function WorkflowListPage() {
                       size="sm"
                       onClick={(e) => {
                         e.preventDefault();
-                        setDeleteDialog({ open: true, id: wf.id, name: wf.name });
+                        setDeleteDialog({
+                          open: true,
+                          id: a.id,
+                          name: a.name,
+                        });
                       }}
                     >
                       删除
@@ -76,7 +83,8 @@ export function WorkflowListPage() {
         )}
       </main>
 
-      <CreateWorkflowDialog open={dialogOpen} onOpenChange={setDialogOpen} />
+      <CreateAssembleDialog open={dialogOpen} onOpenChange={setDialogOpen} />
+
       {deleteDialog && (
         <Dialog
           open={deleteDialog.open}
@@ -84,14 +92,14 @@ export function WorkflowListPage() {
             if (!open) setDeleteDialog(null);
           }}
           title="确认删除"
-          description={`确定要删除工作流「${deleteDialog.name}」吗？此操作不可恢复。`}
+          description={`确定要删除集合「${deleteDialog.name}」吗？此操作不可恢复。`}
           footer={
             <>
               <Button
                 type="button"
                 variant="secondary"
                 onClick={() => setDeleteDialog(null)}
-                disabled={deleteWorkflow.isPending}
+                disabled={deleteAssemble.isPending}
               >
                 取消
               </Button>
@@ -100,34 +108,35 @@ export function WorkflowListPage() {
                 variant="danger"
                 onClick={async () => {
                   try {
-                    await deleteWorkflow.mutateAsync(deleteDialog.id);
+                    await deleteAssemble.mutateAsync(deleteDialog.id);
+                    closeTab('assemble', deleteDialog.id);
                     setDeleteDialog(null);
                   } catch (err) {
                     console.error('删除失败:', err);
                   }
                 }}
-                disabled={deleteWorkflow.isPending}
+                disabled={deleteAssemble.isPending}
               >
-                {deleteWorkflow.isPending ? '删除中...' : '确认删除'}
+                {deleteAssemble.isPending ? '删除中...' : '确认删除'}
               </Button>
             </>
           }
         >
           <div className="text-sm text-slate-600">
-            工作流 ID: <span className="font-mono">{deleteDialog.id}</span>
+            集合 ID: <span className="font-mono">{deleteDialog.id}</span>
           </div>
         </Dialog>
       )}
-    </div>
+    </>
   );
 }
 
 function EmptyState({ onCreate }: { onCreate: () => void }) {
   return (
     <div className="rounded-lg border border-dashed border-slate-300 bg-white px-6 py-16 text-center">
-      <div className="text-sm text-slate-500">还没有工作流</div>
+      <div className="text-sm text-slate-500">还没有集合</div>
       <Button className="mt-4" onClick={onCreate}>
-        创建第一个工作流
+        创建第一个集合
       </Button>
     </div>
   );

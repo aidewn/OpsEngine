@@ -1,10 +1,17 @@
-// 创建工作流时前端自动放置 3 个事件源节点
+// 创建工作流/集合时前端自动放置默认节点
 // 这是纯前端便利功能，后端不感知
 
 import type { NodeInstance } from '@/types/workflow';
-import { SYSTEM_OVER, SYSTEM_READY, SYSTEM_UPDATE } from '@/types/nodeType';
+import {
+  SYSTEM_READY,
+  SYSTEM_UPDATE,
+  SYSTEM_OVER,
+  ASSEMBLE_START,
+  ASSEMBLE_END,
+} from '@/types/nodeType';
 import { newUUID } from '@/lib/uuid';
 
+// 工作流默认节点：3 个事件源
 export function createDefaultSystemNodes(): NodeInstance[] {
   return [
     {
@@ -24,6 +31,24 @@ export function createDefaultSystemNodes(): NodeInstance[] {
       type_id: SYSTEM_OVER,
       config: {},
       position: { x: 80, y: 480 },
+    },
+  ];
+}
+
+// 集合默认节点：Start + End
+export function createDefaultAssembleNodes(): NodeInstance[] {
+  return [
+    {
+      instance_id: newUUID(),
+      type_id: ASSEMBLE_START,
+      config: {},
+      position: { x: 80, y: 200 },
+    },
+    {
+      instance_id: newUUID(),
+      type_id: ASSEMBLE_END,
+      config: {},
+      position: { x: 600, y: 200 },
     },
   ];
 }

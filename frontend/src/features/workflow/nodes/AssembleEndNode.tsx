@@ -1,4 +1,4 @@
-// system_over 节点：工作流终止时触发一次
+// assemble_end 节点：集合执行出口
 import { Handle, Position, type NodeProps } from '@xyflow/react';
 import { BaseNode } from './BaseNode';
 import type { NodeInstance } from '@/types/workflow';
@@ -6,20 +6,14 @@ import { getPortColor } from '@/types/nodeType';
 
 type Props = NodeProps & { data: NodeInstance };
 
-export function SystemOverNode({ data, selected }: Props) {
-  void data;
+export function AssembleEndNode({ selected }: Props) {
   return (
-    <BaseNode
-      tone="over"
-      selected={selected}
-      icon="🔴"
-      title="System Over"
-    >
+    <BaseNode tone="over" selected={selected} icon="⏹️" title="End">
       <div style={{ height: 20 }} />
       <Handle
-        type="source"
-        position={Position.Right}
-        id="exec_out"
+        type="target"
+        position={Position.Left}
+        id="exec_in"
         style={{
           top: 40,
           background: getPortColor('Exec'),
@@ -28,7 +22,7 @@ export function SystemOverNode({ data, selected }: Props) {
           borderRadius: 2,
           border: '2px solid rgba(0,0,0,0.15)',
         }}
-        title="Exec Out"
+        title="Exec In"
       />
     </BaseNode>
   );

@@ -9,8 +9,14 @@ type PortType string
 
 const (
 	PortTypeExec          PortType = "Exec"
+	// 基础数据类型
 	PortTypeString        PortType = "String"
+	PortTypeInt           PortType = "Int"
+	PortTypeFloat         PortType = "Float"
+	PortTypeBool          PortType = "Bool"
+	// 动态类型（由节点 config 决定真实类型）
 	PortTypeDynamic       PortType = "Dynamic"
+	// 业务句柄类型
 	PortTypeLinuxSsh      PortType = "LinuxSshConnection"
 	PortTypeDockerContext PortType = "DockerContext"
 	PortTypeK8sContext    PortType = "K8sContext"

@@ -1,4 +1,4 @@
-// system_over 节点：工作流终止时触发一次
+// assemble_start 节点：集合执行入口
 import { Handle, Position, type NodeProps } from '@xyflow/react';
 import { BaseNode } from './BaseNode';
 import type { NodeInstance } from '@/types/workflow';
@@ -6,15 +6,9 @@ import { getPortColor } from '@/types/nodeType';
 
 type Props = NodeProps & { data: NodeInstance };
 
-export function SystemOverNode({ data, selected }: Props) {
-  void data;
+export function AssembleStartNode({ selected }: Props) {
   return (
-    <BaseNode
-      tone="over"
-      selected={selected}
-      icon="🔴"
-      title="System Over"
-    >
+    <BaseNode tone="ready" selected={selected} icon="▶️" title="Start">
       <div style={{ height: 20 }} />
       <Handle
         type="source"

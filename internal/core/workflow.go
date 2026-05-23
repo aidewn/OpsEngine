@@ -19,7 +19,14 @@ type PortRef struct {
 	Port string `json:"port" toml:"port"`
 }
 
-// 工作流定义（持久化到 TOML）
+// VariableDef 工作流/集合内部变量定义
+type VariableDef struct {
+	Name    string   `json:"name"     toml:"name"`
+	VarType PortType `json:"var_type" toml:"var_type"`
+	Default any      `json:"default,omitempty" toml:"default,omitempty"`
+}
+
+// WorkflowDef 工作流定义（持久化到 TOML）
 // 注意：
 //   - 无 UpdateConfig 字段（Delta 配置移到 system_update 节点的 Config 中）
 //   - 无 SubWorkflows 字段（子工作流通过 sub_workflow_call 节点表达）
@@ -27,6 +34,7 @@ type WorkflowDef struct {
 	ID          string         `json:"id"          toml:"id"`
 	Name        string         `json:"name"        toml:"name"`
 	Description string         `json:"description" toml:"description"`
+	Variables   []VariableDef  `json:"variables"   toml:"variables"`
 	Nodes       []NodeInstance `json:"nodes"       toml:"nodes"`
 	Edges       []EdgeConfig   `json:"edges"       toml:"edges"`
 }
