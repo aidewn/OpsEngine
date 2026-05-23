@@ -1,0 +1,30 @@
+id = "bb78c303-652e-4118-a864-5143d3b67d65"
+name = "test"
+description = "123"
+edges = []
+
+[[nodes]]
+  id = "34f13c16-05fd-4099-8e60-a29e7c5a32d8"
+  type = "system_ready"
+  [nodes.config]
+  [nodes.position]
+    x = 80.0
+    y = 80.0
+
+[[nodes]]
+  id = "a349f181-0ab0-45cb-94e4-85e30e23a548"
+  type = "system_update"
+  [nodes.config]
+    delta_seconds = 60.0
+    delta_type = "interval"
+  [nodes.position]
+    x = 80.0
+    y = 280.0
+
+[[nodes]]
+  id = "891d6c1d-bb85-4332-a77f-21c5c23aacd0"
+  type = "system_over"
+  [nodes.config]
+  [nodes.position]
+    x = 80.0
+    y = 480.0

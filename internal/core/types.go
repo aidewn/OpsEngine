@@ -1,0 +1,81 @@
+package core
+
+import "time"
+
+type PortType string
+
+// ── 端口类型 ──────────────────────────────────────────────
+
+const (
+	PortTypeLinuxSsh      PortType = "LinuxSshConnection"
+	PortTypeDockerContext PortType = "DockerContext"
+	PortTypeK8sContext    PortType = "K8sContext"
+	PortTypeNginxInstance PortType = "NginxInstance"
+	PortTypeFlowSignal    PortType = "FlowSignal"
+)
+
+// ── 节点状态 ──────────────────────────────────────────────
+
+type NodeState string
+
+const (
+	NodeStateIdle        NodeState = "Idle"
+	NodeStateConfiguring NodeState = "Configuring"
+	NodeStateChecking    NodeState = "Checking"
+	NodeStateCheckFailed NodeState = "CheckFailed"
+	NodeStateReady       NodeState = "Ready"
+	NodeStateExecuting   NodeState = "Executing"
+	NodeStateSuccess     NodeState = "Success"
+	NodeStateFailed      NodeState = "Failed"
+	NodeStateSkipped     NodeState = "Skipped"
+)
+
+// ── 节点不再带 Stage 字段 ─────────────────────────────────
+// 阶段归属由"被哪个事件源节点（system_ready / system_update / system_over）可达"导出
+// 详见技术设计文档 §5.1
+
+// ── 执行模式 ──────────────────────────────────────────────
+
+type ExecutionMode string
+
+const (
+	ExecutionModeRemoteCmd ExecutionMode = "remote_cmd"
+	ExecutionModeAgent     ExecutionMode = "agent"
+	ExecutionModeFlow      ExecutionMode = "flow"
+)
+
+// ── 工作流状态 ────────────────────────────────────────────
+
+type WorkflowStatus string
+
+const (
+	WorkflowStatusIdle       WorkflowStatus = "Idle"
+	WorkflowStatusRunning    WorkflowStatus = "Running"
+	WorkflowStatusTerminated WorkflowStatus = "Terminated"
+)
+
+type WorkflowPhase string
+
+const (
+	WorkflowPhaseReady  WorkflowPhase = "Ready"
+	WorkflowPhaseUpdate WorkflowPhase = "Update"
+	WorkflowPhaseOver   WorkflowPhase = "Over"
+)
+
+// ── 子工作流激活状态 ──────────────────────────────────────
+
+type ActivationStatus string
+
+const (
+	ActivationDormant     ActivationStatus = "Dormant"
+	ActivationActivating  ActivationStatus = "Activating"
+	ActivationActivated   ActivationStatus = "Activated"
+	ActivationRunningOver ActivationStatus = "RunningOver"
+)
+
+// ── 时间戳辅助 ────────────────────────────────────────────
+
+type TimeRange struct {
+	StartedAt  time.Time  `json:"started_at"`
+	FinishedAt *time.Time `json:"finished_at,omitempty"`
+}
