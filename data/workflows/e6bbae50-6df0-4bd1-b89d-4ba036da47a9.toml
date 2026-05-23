@@ -1,7 +1,6 @@
 id = "e6bbae50-6df0-4bd1-b89d-4ba036da47a9"
 name = "test"
 description = ""
-edges = []
 
 [[variables]]
   name = "1"
@@ -39,5 +38,35 @@ edges = []
   type = "assemble:066e8608-f4ef-4347-b8e7-15d04efeec10"
   [nodes.config]
   [nodes.position]
-    x = 428.1491505782218
-    y = 95.60851911340329
+    x = 523.5364563976544
+    y = -11.198511176858954
+
+[[nodes]]
+  id = "f6ea3b8e-1de6-448f-9676-fd5409a8cd77"
+  type = "print"
+  [nodes.config]
+  [nodes.position]
+    x = 292.545898848396
+    y = -4.945067601174118
+
+[[edges]]
+  [edges.from]
+    node = "3e688202-c715-4b7f-8718-e79a2d65f396"
+    port = "exec_out"
+  [edges.to]
+    node = "f6ea3b8e-1de6-448f-9676-fd5409a8cd77"
+    port = "exec_in"
+
+[[edges]]
+  [edges.from]
+    node = "f6ea3b8e-1de6-448f-9676-fd5409a8cd77"
+    port = "exec_out"
+  [edges.to]
+    node = "1f1dab13-0544-4bd7-9aae-73c6f7460191"
+    port = "exec_in"
+.from]
+    node = "f6ea3b8e-1de6-448f-9676-fd5409a8cd77"
+    port = "exec_out"
+  [edges.to]
+    node = "1f1dab13-0544-4bd7-9aae-73c6f7460191"
+    port = "exec_in"

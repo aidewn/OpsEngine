@@ -1,0 +1,45 @@
+// var_set 写入当前 frame 变量的值（Action 节点）
+// 输入端口 value 是 Dynamic，真实类型由 config.var_type 决定
+// Phase 2 实装
+
+package varset
+
+import (
+	"OpsEngine/internal/core"
+	"OpsEngine/internal/engine"
+)
+
+func init() { engine.Register(&Node{}) }
+
+// Node var_set 节点实现
+type Node struct{}
+
+// TypeDef 节点元信息
+func (Node) TypeDef() core.NodeTypeDef {
+	return core.NodeTypeDef{
+		TypeID:      "var_set",
+		DisplayName: "Set 变量",
+		Category:    "data",
+		NodeKind:    core.NodeKindAction,
+		Icon:        "📥",
+		Description: "设置工作流/集合变量的值",
+		InputPorts: []core.PortDef{
+			{ID: "exec_in", Label: "▶", PortType: core.PortTypeExec, Required: true},
+			{ID: "value", Label: "值", PortType: core.PortTypeDynamic},
+		},
+		OutputPorts: []core.PortDef{
+			{ID: "exec_out", Label: "▶", PortType: core.PortTypeExec},
+		},
+		ConfigSchema: []core.FieldSchema{
+			{Type: "text", ID: "var_name", Label: "变量名", Required: true},
+			{Type: "select", ID: "var_type", Label: "类型",
+				Options: engine.VarTypeOptions, Default: "String"},
+		},
+		ExecutionMode: core.ExecutionModeFlow,
+	}
+}
+
+// Execute Phase 0 暂时空实现，Phase 2 实装
+func (Node) Execute(ctx engine.ExecContext) (engine.Outputs, error) {
+	return nil, nil
+}

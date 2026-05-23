@@ -9,6 +9,8 @@ import (
 	"strings"
 
 	"OpsEngine/internal/core"
+	"OpsEngine/internal/engine"
+	_ "OpsEngine/internal/nodes" // 触发所有内置节点的 init() 注册
 	"OpsEngine/internal/store"
 
 	"github.com/google/uuid"
@@ -179,10 +181,9 @@ func (a *App) DeleteAssemble(id string) error {
 // ── 节点类型 ─────────────────────────────────────────────────
 
 // GetNodeTypes 获取所有可用的节点类型定义
-// 返回 = 内置节点 + 当前所有集合动态生成的节点类型
+// 返回 = engine 注册表中的内置节点 + 当前所有集合动态生成的节点类型
 func (a *App) GetNodeTypes() []core.NodeTypeDef {
-	types := make([]core.NodeTypeDef, 0, len(builtinNodeTypes))
-	types = append(types, builtinNodeTypes...)
+	types := engine.AllTypeDefs()
 
 	// 把每个已存在的集合转换成一个可调用的节点类型
 	if a.assembleStore != nil {
