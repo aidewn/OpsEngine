@@ -8,6 +8,7 @@ import (
 	_ "OpsEngine/internal/nodes/assemble_end"
 	_ "OpsEngine/internal/nodes/assemble_param"
 	_ "OpsEngine/internal/nodes/assemble_start"
+	_ "OpsEngine/internal/nodes/break_node"
 	_ "OpsEngine/internal/nodes/parallel"
 	_ "OpsEngine/internal/nodes/print"
 	_ "OpsEngine/internal/nodes/system_over"

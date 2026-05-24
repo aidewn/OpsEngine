@@ -21,3 +21,11 @@ body {
   background: #f8fafc;
   color: #0f172a;
 }
+
+/* 扩大 React Flow handle 的鼠标点击区域：在 handle 外加一圈透明区 */
+.react-flow__handle::before {
+  content: '';
+  position: absolute;
+  inset: -6px;
+  border-radius: inherit;
+}

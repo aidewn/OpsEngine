@@ -33,6 +33,9 @@ func ValidateWorkflow(wf core.WorkflowDef) error {
 	if err := validateExecOutSingle(wf.Edges); err != nil {
 		return err
 	}
+	if err := validateInputSingle(wf.Edges); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -42,6 +45,9 @@ func ValidateAssemble(asm core.AssembleDef) error {
 		return err
 	}
 	if err := validateExecOutSingle(asm.Edges); err != nil {
+		return err
+	}
+	if err := validateInputSingle(asm.Edges); err != nil {
 		return err
 	}
 	return nil
@@ -76,6 +82,20 @@ func validateExecOutSingle(edges []core.EdgeConfig) error {
 		counts[key]++
 		if counts[key] > 1 {
 			return fmt.Errorf("exec 输出端口 %s 只能连 1 条线", e.From.Port)
+		}
+	}
+	return nil
+}
+
+// validateInputSingle 每个输入端口至多 1 条入边
+// 适用所有 input（exec_in / 数据 input），参考 UE Blueprint 单入语义
+func validateInputSingle(edges []core.EdgeConfig) error {
+	counts := map[string]int{}
+	for _, e := range edges {
+		key := e.To.Node + ":" + e.To.Port
+		counts[key]++
+		if counts[key] > 1 {
+			return fmt.Errorf("输入端口 %s 只能接收 1 条边", e.To.Port)
 		}
 	}
 	return nil

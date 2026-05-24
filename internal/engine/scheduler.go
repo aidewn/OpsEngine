@@ -27,7 +27,12 @@ func newScheduler(rt *Runtime) *Scheduler {
 }
 
 // Start 找到 system_update 节点并按 config 启动周期触发
-// 返回 true 表示存在 system_update 节点（runtime 需要等用户停止才退出）
+// 返回 true 表示 update 调度已启用（runtime 需要等用户停止才退出）
+//
+// 启动条件（enabled 三态）：
+//   - off: 强制不启动
+//   - on:  强制启动
+//   - auto（默认）：仅当 exec_out 端口有连接时启动
 func (s *Scheduler) Start(ctx context.Context, nodes []core.NodeInstance, edges []core.EdgeConfig) bool {
 	var updateNode *core.NodeInstance
 	for i := range nodes {
@@ -39,6 +44,29 @@ func (s *Scheduler) Start(ctx context.Context, nodes []core.NodeInstance, edges 
 	if updateNode == nil {
 		return false
 	}
+
+	// 根据 enabled 字段决定是否启动
+	enabled, _ := updateNode.Config["enabled"].(string)
+	if enabled == "" {
+		enabled = "auto"
+	}
+	switch enabled {
+	case "off":
+		return false
+	case "auto":
+		// 检查 exec_out 是否有连接
+		hasDownstream := false
+		for _, e := range edges {
+			if e.From.Node == updateNode.InstanceID && e.From.Port == "exec_out" {
+				hasDownstream = true
+				break
+			}
+		}
+		if !hasDownstream {
+			return false
+		}
+	}
+	// enabled = "on" 或 auto + 有连接 → 继续往下启动
 
 	deltaType, _ := updateNode.Config["delta_type"].(string)
 	if deltaType == "" {

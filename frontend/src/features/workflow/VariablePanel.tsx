@@ -1,5 +1,6 @@
 // 变量/参数/返回值管理面板（左侧栏）
-// 支持内联新增、删除；同时可作为「参数」、「返回值」、「变量」三种用途
+// 支持新增、删除、编辑；同时可作为「参数」、「返回值」、「变量」三种用途
+// 点击列表项进入编辑模式
 
 import { useState } from 'react';
 import { Input } from '@/components/ui/Input';
@@ -48,14 +49,23 @@ export function VariablePanel<T extends VarItem>({
   dragPayload,
 }: Props<T>) {
   const [adding, setAdding] = useState(false);
+  const [editingIdx, setEditingIdx] = useState<number | null>(null);
 
   function handleAdd(item: T) {
     onChange([...items, item]);
     setAdding(false);
   }
 
+  function handleUpdate(idx: number, item: T) {
+    const next = [...items];
+    next[idx] = item;
+    onChange(next);
+    setEditingIdx(null);
+  }
+
   function handleDelete(index: number) {
     onChange(items.filter((_, i) => i !== index));
+    if (editingIdx === index) setEditingIdx(null);
   }
 
   return (
@@ -67,7 +77,10 @@ export function VariablePanel<T extends VarItem>({
         {!adding && (
           <button
             type="button"
-            onClick={() => setAdding(true)}
+            onClick={() => {
+              setAdding(true);
+              setEditingIdx(null);
+            }}
             className="text-xs text-blue-600 hover:text-blue-800"
           >
             + 添加
@@ -77,6 +90,21 @@ export function VariablePanel<T extends VarItem>({
 
       <ul className="px-2 pb-2">
         {items.map((item, idx) => {
+          if (editingIdx === idx) {
+            return (
+              <ItemForm
+                key={`edit-${idx}`}
+                initial={item}
+                showDefault={showDefault}
+                existingNames={items
+                  .filter((_, i) => i !== idx)
+                  .map((i) => i.name)}
+                factory={factory}
+                onCancel={() => setEditingIdx(null)}
+                onSubmit={(updated) => handleUpdate(idx, updated)}
+              />
+            );
+          }
           const payload = dragPayload ? dragPayload(item) : null;
           const draggable = !!payload;
           return (
@@ -86,11 +114,17 @@ export function VariablePanel<T extends VarItem>({
               onDragStart={(e) => {
                 if (payload) setDragPayload(e, payload);
               }}
+              onClick={(e) => {
+                // 点击非删除按钮区域 → 进入编辑模式
+                if ((e.target as HTMLElement).closest('button')) return;
+                setEditingIdx(idx);
+                setAdding(false);
+              }}
               className={cn(
-                'group flex items-center gap-2 rounded px-1.5 py-1 hover:bg-slate-50',
+                'group flex items-center gap-2 rounded px-1.5 py-1 hover:bg-slate-50 cursor-pointer',
                 draggable && 'cursor-grab active:cursor-grabbing',
               )}
-              title={draggable ? '拖到画布添加节点' : undefined}
+              title={draggable ? '点击编辑 / 拖到画布添加节点' : '点击编辑'}
             >
               <span
                 className="inline-block size-2.5 rounded-full"
@@ -103,7 +137,10 @@ export function VariablePanel<T extends VarItem>({
               <span className="text-[10px] text-slate-400">{item.var_type}</span>
               <button
                 type="button"
-                onClick={() => handleDelete(idx)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleDelete(idx);
+                }}
                 className="invisible text-xs text-red-500 group-hover:visible"
                 title="删除"
               >
@@ -117,7 +154,7 @@ export function VariablePanel<T extends VarItem>({
         )}
 
         {adding && (
-          <AddForm
+          <ItemForm
             showDefault={showDefault}
             existingNames={items.map((i) => i.name)}
             factory={factory}
@@ -130,23 +167,27 @@ export function VariablePanel<T extends VarItem>({
   );
 }
 
-// 内联添加表单
-function AddForm<T extends VarItem>({
+// 内联表单：支持「新增」（initial 为 undefined）和「编辑」（initial 传入当前值）两种模式
+function ItemForm<T extends VarItem>({
+  initial,
   showDefault,
   existingNames,
   factory,
   onSubmit,
   onCancel,
 }: {
+  initial?: T;
   showDefault: boolean;
   existingNames: string[];
   factory?: () => T;
   onSubmit: (item: T) => void;
   onCancel: () => void;
 }) {
-  const [name, setName] = useState('');
-  const [varType, setVarType] = useState('String');
-  const [defaultVal, setDefaultVal] = useState('');
+  const [name, setName] = useState(initial?.name ?? '');
+  const [varType, setVarType] = useState(initial?.var_type ?? 'String');
+  const [defaultVal, setDefaultVal] = useState(
+    typeof initial?.default === 'string' ? initial.default : '',
+  );
   const [error, setError] = useState<string | null>(null);
 
   function handleSubmit() {
@@ -163,8 +204,10 @@ function AddForm<T extends VarItem>({
     if (showDefault && defaultVal.trim()) {
       base.default = defaultVal.trim();
     }
-    const item = factory ? { ...factory(), ...base } : (base as T);
-    onSubmit(item as T);
+    const merged = factory
+      ? { ...factory(), ...base }
+      : { ...(initial ?? {}), ...base };
+    onSubmit(merged as T);
   }
 
   return (
@@ -204,7 +247,7 @@ function AddForm<T extends VarItem>({
       )}
       <div className="flex gap-1">
         <Button size="sm" onClick={handleSubmit} className="flex-1">
-          确定
+          {initial ? '保存' : '确定'}
         </Button>
         <Button size="sm" variant="secondary" onClick={onCancel}>
           取消

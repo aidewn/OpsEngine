@@ -49,6 +49,8 @@ const (
 	NodeStateSuccess     NodeState = "Success"
 	NodeStateFailed      NodeState = "Failed"
 	NodeStateSkipped     NodeState = "Skipped"
+	// NodeStateTerminated 节点被 break / Stop 中断（中断时正处于 Executing）
+	NodeStateTerminated NodeState = "Terminated"
 )
 
 // ── 节点不再带 Stage 字段 ─────────────────────────────────

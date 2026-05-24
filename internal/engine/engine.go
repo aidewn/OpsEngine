@@ -128,6 +128,10 @@ func (e *Engine) runMain(rt *Runtime) {
 	scheduler.Stop()
 	rt.wg.Wait()
 
+	// 把仍处于 Executing 的节点标记 Terminated
+	// 出现场景：用户 Stop / break 触发时被中断的并发分支或主流节点
+	rt.markRemainingTerminated()
+
 	// 跑 system_over 流（用独立 ctx，主 ctx 此时可能已 cancel）
 	runOver(rt, nodes, edges)
 

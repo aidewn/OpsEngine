@@ -104,7 +104,7 @@ func TestSystemOver_Triggered(t *testing.T) {
 		Nodes: []core.NodeInstance{
 			{InstanceID: "ready", TypeID: "system_ready"},
 			{InstanceID: "upd", TypeID: "system_update", Config: map[string]any{
-				"delta_type": "interval", "delta_seconds": int64(10),
+				"enabled": "on", "delta_type": "interval", "delta_seconds": int64(10),
 			}},
 			{InstanceID: "over", TypeID: "system_over"},
 			{InstanceID: "pmain", TypeID: "print"},

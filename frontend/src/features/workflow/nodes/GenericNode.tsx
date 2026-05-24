@@ -105,8 +105,8 @@ function PortHandle({
       style={{
         top: HEADER_OFFSET + rowIndex * ROW_HEIGHT + ROW_HEIGHT / 2,
         background: color,
-        width: isExec ? 10 : 11,
-        height: isExec ? 10 : 11,
+        width: isExec ? 12 : 14,
+        height: isExec ? 12 : 14,
         borderRadius: isExec ? 2 : 6,
         border: '2px solid rgba(0,0,0,0.15)',
       }}

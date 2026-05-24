@@ -113,6 +113,15 @@ func (r *Runtime) executeFlow(ctx context.Context, stack *FrameStack, nodes []co
 			continue
 		}
 
+		// ── 引擎特判：break（终止整个工作流） ─────────────
+		// 等同于用户点 Stop：cancel ctx → 跑 system_over → markTerminated
+		if node.TypeID == "break" {
+			r.setNodeState(cur, core.NodeStateSuccess, "")
+			r.appendLog(cur, "info", "Break 触发，工作流即将终止")
+			r.cancel()
+			return nil
+		}
+
 		// ── 通用：从注册表拿 Node 调用 Execute ────────────
 		n, ok := Lookup(node.TypeID)
 		if !ok {

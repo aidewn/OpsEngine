@@ -165,6 +165,31 @@ func (r *Runtime) appendLog(nodeID, level, msg string) {
 	})
 }
 
+// ── 终态收尾 ──────────────────────────────────────────────
+
+// markRemainingTerminated 把仍处于 Executing 的节点标记为 Terminated
+// 用于 break / Stop 中断时把"被打断"的节点状态从 Executing → Terminated
+// 推送对应事件让前端 UI 同步
+func (r *Runtime) markRemainingTerminated() {
+	r.mu.Lock()
+	var changed []string
+	for nodeID, state := range r.nodeStates {
+		if state == core.NodeStateExecuting {
+			r.nodeStates[nodeID] = core.NodeStateTerminated
+			changed = append(changed, nodeID)
+		}
+	}
+	r.mu.Unlock()
+
+	for _, nodeID := range changed {
+		r.emitter.Emit(EventNode, map[string]any{
+			"executionID": r.ID,
+			"nodeID":      nodeID,
+			"state":       core.NodeStateTerminated,
+		})
+	}
+}
+
 // ── 终态标记 ──────────────────────────────────────────────
 
 func (r *Runtime) markSuccess() {

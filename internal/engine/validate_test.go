@@ -66,6 +66,40 @@ func TestValidateWorkflow_ExecOutSingle(t *testing.T) {
 	}
 }
 
+// TestValidateWorkflow_InputSingle 验证 input 端口单连接
+func TestValidateWorkflow_InputSingle(t *testing.T) {
+	// 同一 input 端口被 2 条边连入 → 失败
+	wf := core.WorkflowDef{
+		Edges: []core.EdgeConfig{
+			{From: core.PortRef{Node: "n1", Port: "value"}, To: core.PortRef{Node: "n3", Port: "message"}},
+			{From: core.PortRef{Node: "n2", Port: "value"}, To: core.PortRef{Node: "n3", Port: "message"}},
+		},
+	}
+	if err := ValidateWorkflow(wf); err == nil {
+		t.Fatal("期望失败：同一 input 接收多条边")
+	} else if !strings.Contains(err.Error(), "message") {
+		t.Fatalf("错误信息应提到端口名，实际: %v", err)
+	}
+
+	// exec_in 也必须单入
+	wf.Edges = []core.EdgeConfig{
+		{From: core.PortRef{Node: "n1", Port: "exec_out"}, To: core.PortRef{Node: "n3", Port: "exec_in"}},
+		{From: core.PortRef{Node: "n2", Port: "exec_out"}, To: core.PortRef{Node: "n3", Port: "exec_in"}},
+	}
+	if err := ValidateWorkflow(wf); err == nil {
+		t.Fatal("期望失败：exec_in 接收多条边")
+	}
+
+	// output 一对多仍然允许
+	wf.Edges = []core.EdgeConfig{
+		{From: core.PortRef{Node: "n1", Port: "value"}, To: core.PortRef{Node: "n2", Port: "message"}},
+		{From: core.PortRef{Node: "n1", Port: "value"}, To: core.PortRef{Node: "n3", Port: "message"}},
+	}
+	if err := ValidateWorkflow(wf); err != nil {
+		t.Fatalf("output 一对多应允许，实际失败: %v", err)
+	}
+}
+
 // TestValidateAssemble_Singletons 集合的单例约束
 func TestValidateAssemble_Singletons(t *testing.T) {
 	asm := core.AssembleDef{

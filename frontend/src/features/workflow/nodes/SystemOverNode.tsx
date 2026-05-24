@@ -25,8 +25,8 @@ export function SystemOverNode({ data, selected }: Props) {
         style={{
           top: 40,
           background: getPortColor('Exec'),
-          width: 10,
-          height: 10,
+          width: 12,
+          height: 12,
           borderRadius: 2,
           border: '2px solid rgba(0,0,0,0.15)',
         }}

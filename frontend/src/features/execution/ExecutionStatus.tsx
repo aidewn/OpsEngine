@@ -24,6 +24,8 @@ export function toneOfNodeState(state: NodeState | undefined): Tone {
       return 'failed';
     case 'Skipped':
       return 'skipped';
+    case 'Terminated':
+      return 'terminated';
     default:
       return 'idle';
   }

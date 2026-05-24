@@ -50,8 +50,8 @@ export function AssembleEndNode({ data, selected }: Props) {
         style={{
           top: HEADER_OFFSET + ROW_HEIGHT / 2,
           background: getPortColor('Exec'),
-          width: 10,
-          height: 10,
+          width: 12,
+          height: 12,
           borderRadius: 2,
           border: '2px solid rgba(0,0,0,0.15)',
         }}
@@ -68,8 +68,8 @@ export function AssembleEndNode({ data, selected }: Props) {
           style={{
             top: HEADER_OFFSET + ROW_HEIGHT + idx * ROW_HEIGHT + ROW_HEIGHT / 2,
             background: getPortColor(r.var_type),
-            width: 11,
-            height: 11,
+            width: 14,
+            height: 14,
             borderRadius: 6,
             border: '2px solid rgba(0,0,0,0.15)',
           }}

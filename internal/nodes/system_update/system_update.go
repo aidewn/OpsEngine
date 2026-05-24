@@ -28,6 +28,9 @@ func (Node) TypeDef() core.NodeTypeDef {
 			{ID: "exec_out", Label: "▶", PortType: core.PortTypeExec},
 		},
 		ConfigSchema: []core.FieldSchema{
+			// enabled = auto：exec_out 有连接才启动；on：强制启动；off：强制不启动
+			{Type: "select", ID: "enabled", Label: "启用",
+				Options: []string{"auto", "on", "off"}, Default: "auto"},
 			{Type: "select", ID: "delta_type", Label: "触发方式",
 				Options: []string{"interval", "cron", "manual"}, Default: "interval"},
 			{Type: "number", ID: "delta_seconds", Label: "间隔（秒）", Default: int64(60)},

@@ -21,7 +21,8 @@ export type NodeState =
   | 'Executing'
   | 'Success'
   | 'Failed'
-  | 'Skipped';
+  | 'Skipped'
+  | 'Terminated';
 
 // 日志条目
 export interface LogEntry {

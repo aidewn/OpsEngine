@@ -126,25 +126,18 @@ export function WorkflowCanvas<T extends GraphDef>({
       const tgtType = resolvePortType(targetPort, targetNode.config);
       if (srcType !== tgtType) return false;
 
-      // exec 输出端口至多 1 条出边
-      if (srcType === 'Exec') {
-        const alreadyConnected = g.edges.some(
-          (e) =>
-            e.from.node === connection.source &&
-            e.from.port === connection.sourceHandle,
-        );
-        if (alreadyConnected) {
-          console.warn('exec 输出端口只能连一条线');
-          return false;
-        }
-      }
-
+      // exec_out 单出 / input 单入的「冲突自动断开旧线」逻辑放在 onConnect 中处理
+      // 这里允许通过（用户拖动时不显示拒绝色），保持静默体验
       return true;
     },
     [nodeTypes],
   );
 
   // ── 连线完成 ──────────────────────────────────────────
+  // 处理冲突边自动断开：
+  //   1. 如果是 exec 输出端口（前缀 "exec_"），删除其旧的出边（exec_out 单出）
+  //   2. 不管什么类型 input 端口，删除其旧的入边（input 单入）
+  // 然后追加新边
   const onConnect = useCallback(
     (connection: Connection) => {
       if (!connection.sourceHandle || !connection.targetHandle) return;
@@ -154,9 +147,30 @@ export function WorkflowCanvas<T extends GraphDef>({
         to: { node: connection.target, port: connection.targetHandle },
       };
 
-      // 检查是否已存在相同连线
       const g = graphRef.current;
-      const exists = g.edges.some(
+      const isExecSource = connection.sourceHandle.startsWith('exec_');
+
+      // 1. 删除 source 上的旧 exec 出边（仅 exec_out 单出）
+      // 2. 删除 target 上的旧入边（所有 input 单入）
+      const cleaned = g.edges.filter((e) => {
+        if (
+          isExecSource &&
+          e.from.node === connection.source &&
+          e.from.port === connection.sourceHandle
+        ) {
+          return false;
+        }
+        if (
+          e.to.node === connection.target &&
+          e.to.port === connection.targetHandle
+        ) {
+          return false;
+        }
+        return true;
+      });
+
+      // 防御性去重（理论上 cleaned 不会包含相同边）
+      const exists = cleaned.some(
         (e) =>
           e.from.node === newEdge.from.node &&
           e.from.port === newEdge.from.port &&
@@ -165,12 +179,13 @@ export function WorkflowCanvas<T extends GraphDef>({
       );
       if (exists) return;
 
-      // 更新画布
-      const rfEdge = toRfEdge(newEdge);
-      setEdges((prev) => [...prev, rfEdge]);
+      const finalEdges = [...cleaned, newEdge];
+
+      // 更新画布：RF edges 整体重置（旧边可能被删）
+      setEdges(() => finalEdges.map(toRfEdge));
 
       // 持久化
-      onGraphChange?.({ ...g, edges: [...g.edges, newEdge] } as T);
+      onGraphChange?.({ ...g, edges: finalEdges } as T);
     },
     [setEdges, onGraphChange],
   );
