@@ -25,6 +25,8 @@ type App struct {
 	ctx            context.Context
 	workflowStore  *store.WorkflowStore
 	assembleStore  *store.AssembleStore
+	executionStore *store.ExecutionStore
+	engine         *engine.Engine
 }
 
 // NewApp 创建应用实例
@@ -49,6 +51,13 @@ func (a *App) startup(ctx context.Context) {
 
 	a.workflowStore = store.NewWorkflowStore("data/workflows")
 	a.assembleStore = store.NewAssembleStore("data/assembles")
+	a.executionStore = store.NewExecutionStore("data/executions")
+	a.engine = engine.New(
+		a.workflowStore,
+		a.assembleStore,
+		a.executionStore,
+		engine.NewWailsEmitter(ctx),
+	)
 	zap.L().Info("OpsEngine 桌面应用启动完成")
 }
 
@@ -80,7 +89,11 @@ func (a *App) CreateWorkflow(name string, description string) (string, error) {
 }
 
 // UpdateWorkflow 整体覆盖更新工作流
+// 保存前校验：单例节点 + exec 输出端口单连接
 func (a *App) UpdateWorkflow(wf core.WorkflowDef) error {
+	if err := engine.ValidateWorkflow(wf); err != nil {
+		return err
+	}
 	return a.workflowStore.Save(wf)
 }
 
@@ -120,8 +133,11 @@ func (a *App) CreateAssemble(name string, description string) (string, error) {
 }
 
 // UpdateAssemble 整体覆盖更新集合
-// 保存前检查循环引用（直接或间接引用自身）
+// 保存前校验：结构合法性（单例 + exec_out 单连接） + 循环引用
 func (a *App) UpdateAssemble(a2 core.AssembleDef) error {
+	if err := engine.ValidateAssemble(a2); err != nil {
+		return err
+	}
 	if err := a.checkCircularRef(a2); err != nil {
 		return err
 	}
@@ -178,6 +194,44 @@ func (a *App) DeleteAssemble(id string) error {
 	return a.assembleStore.Delete(id)
 }
 
+// ── 执行 ─────────────────────────────────────────────────
+
+// RunWorkflow 启动一次工作流执行
+// 立即返回执行 ID；执行在后台 goroutine 中进行
+// 前端通过 Wails 事件订阅状态/日志变化
+func (a *App) RunWorkflow(workflowID string) (string, error) {
+	return a.engine.Run(workflowID)
+}
+
+// StopWorkflow 取消执行
+func (a *App) StopWorkflow(executionID string) error {
+	return a.engine.Stop(executionID)
+}
+
+// ListExecutions 列出所有执行（内存 + 持久化，按开始时间倒序）
+func (a *App) ListExecutions() []core.ExecutionSummary {
+	return a.engine.ListSummaries()
+}
+
+// ListExecutionsByWorkflow 列出某工作流的所有执行（含历史）
+func (a *App) ListExecutionsByWorkflow(workflowID string) []core.ExecutionSummary {
+	return a.engine.ListSummariesByWorkflow(workflowID)
+}
+
+// GetExecution 获取执行详情（内存优先，找不到回持久化）
+func (a *App) GetExecution(executionID string) (core.ExecutionRecord, error) {
+	rec, ok := a.engine.GetRecord(executionID)
+	if !ok {
+		return core.ExecutionRecord{}, fmt.Errorf("执行 %s 不存在", executionID)
+	}
+	return rec, nil
+}
+
+// DeleteExecution 从内存移除执行记录（仅终态可删）
+func (a *App) DeleteExecution(executionID string) error {
+	return a.engine.Remove(executionID)
+}
+
 // ── 节点类型 ─────────────────────────────────────────────────
 
 // GetNodeTypes 获取所有可用的节点类型定义
@@ -232,173 +286,3 @@ func assembleToNodeType(asm core.AssembleDef) core.NodeTypeDef {
 	}
 }
 
-// 内置节点类型定义
-var builtinNodeTypes = []core.NodeTypeDef{
-	// ── 事件源节点（Event）───────────────────────────
-	{
-		TypeID:      "system_ready",
-		DisplayName: "System Ready",
-		Category:    "event",
-		NodeKind:    core.NodeKindEvent,
-		Icon:        "🟢",
-		Description: "工作流启动时触发一次",
-		InputPorts:  []core.PortDef{},
-		OutputPorts: []core.PortDef{
-			{ID: "exec_out", Label: "▶", PortType: core.PortTypeExec},
-		},
-		ExecutionMode: core.ExecutionModeFlow,
-	},
-	{
-		TypeID:      "system_update",
-		DisplayName: "System Update",
-		Category:    "event",
-		NodeKind:    core.NodeKindEvent,
-		Icon:        "🔵",
-		Description: "按 delta 周期循环触发",
-		InputPorts:  []core.PortDef{},
-		OutputPorts: []core.PortDef{
-			{ID: "exec_out", Label: "▶", PortType: core.PortTypeExec},
-		},
-		ConfigSchema: []core.FieldSchema{
-			{Type: "select", ID: "delta_type", Label: "触发方式",
-				Options: []string{"interval", "cron", "manual"}, Default: "interval"},
-			{Type: "number", ID: "delta_seconds", Label: "间隔（秒）", Default: int64(60)},
-			{Type: "text", ID: "cron_expr", Label: "Cron 表达式", Placeholder: "0 */5 * * *"},
-		},
-		ExecutionMode: core.ExecutionModeFlow,
-	},
-	{
-		TypeID:      "system_over",
-		DisplayName: "System Over",
-		Category:    "event",
-		NodeKind:    core.NodeKindEvent,
-		Icon:        "🔴",
-		Description: "工作流终止时触发一次",
-		InputPorts:  []core.PortDef{},
-		OutputPorts: []core.PortDef{
-			{ID: "exec_out", Label: "▶", PortType: core.PortTypeExec},
-		},
-		ExecutionMode: core.ExecutionModeFlow,
-	},
-
-	// ── 调试节点（Action）───────────────────────────
-	{
-		TypeID:      "print",
-		DisplayName: "打印",
-		Category:    "debug",
-		NodeKind:    core.NodeKindAction,
-		Icon:        "📝",
-		Description: "打印消息到执行日志",
-		InputPorts: []core.PortDef{
-			{ID: "exec_in", Label: "▶", PortType: core.PortTypeExec, Required: true},
-			{ID: "message", Label: "消息", PortType: core.PortTypeString},
-		},
-		OutputPorts: []core.PortDef{
-			{ID: "exec_out", Label: "▶", PortType: core.PortTypeExec},
-		},
-		ConfigSchema: []core.FieldSchema{
-			{Type: "text", ID: "prefix", Label: "前缀", Placeholder: "[DEBUG]"},
-		},
-		ExecutionMode: core.ExecutionModeFlow,
-	},
-
-	// ── 变量节点 ────────────────────────────────────
-
-	// var_get 读取变量值（Pure，无执行流）
-	{
-		TypeID:      "var_get",
-		DisplayName: "Get 变量",
-		Category:    "data",
-		NodeKind:    core.NodeKindPure,
-		Icon:        "📤",
-		Description: "读取工作流/集合变量的当前值",
-		InputPorts:  []core.PortDef{},
-		OutputPorts: []core.PortDef{
-			{ID: "value", Label: "值", PortType: core.PortTypeDynamic},
-		},
-		ConfigSchema: []core.FieldSchema{
-			{Type: "text", ID: "var_name", Label: "变量名", Required: true},
-			{Type: "select", ID: "var_type", Label: "类型",
-				Options: []string{"String", "Int", "Float", "Bool", "LinuxSshConnection", "DockerContext", "K8sContext", "NginxInstance"},
-				Default: "String"},
-		},
-		ExecutionMode: core.ExecutionModeFlow,
-	},
-
-	// var_set 写入变量值（Action，有执行流）
-	{
-		TypeID:      "var_set",
-		DisplayName: "Set 变量",
-		Category:    "data",
-		NodeKind:    core.NodeKindAction,
-		Icon:        "📥",
-		Description: "设置工作流/集合变量的值",
-		InputPorts: []core.PortDef{
-			{ID: "exec_in", Label: "▶", PortType: core.PortTypeExec, Required: true},
-			{ID: "value", Label: "值", PortType: core.PortTypeDynamic},
-		},
-		OutputPorts: []core.PortDef{
-			{ID: "exec_out", Label: "▶", PortType: core.PortTypeExec},
-		},
-		ConfigSchema: []core.FieldSchema{
-			{Type: "text", ID: "var_name", Label: "变量名", Required: true},
-			{Type: "select", ID: "var_type", Label: "类型",
-				Options: []string{"String", "Int", "Float", "Bool", "LinuxSshConnection", "DockerContext", "K8sContext", "NginxInstance"},
-				Default: "String"},
-		},
-		ExecutionMode: core.ExecutionModeFlow,
-	},
-
-	// ── 集合内部节点 ────────────────────────────────
-
-	// assemble_start 集合执行入口
-	{
-		TypeID:      "assemble_start",
-		DisplayName: "Start",
-		Category:    "assemble",
-		NodeKind:    core.NodeKindEvent,
-		Icon:        "▶️",
-		Description: "集合执行入口",
-		InputPorts:  []core.PortDef{},
-		OutputPorts: []core.PortDef{
-			{ID: "exec_out", Label: "▶", PortType: core.PortTypeExec},
-		},
-		ExecutionMode: core.ExecutionModeFlow,
-	},
-
-	// assemble_end 集合执行出口
-	{
-		TypeID:      "assemble_end",
-		DisplayName: "End",
-		Category:    "assemble",
-		NodeKind:    core.NodeKindAction,
-		Icon:        "⏹️",
-		Description: "集合执行出口",
-		InputPorts: []core.PortDef{
-			{ID: "exec_in", Label: "▶", PortType: core.PortTypeExec, Required: true},
-		},
-		OutputPorts:   []core.PortDef{},
-		ExecutionMode: core.ExecutionModeFlow,
-	},
-
-	// assemble_param 集合参数输出（Pure，由左侧面板拖入）
-	{
-		TypeID:      "assemble_param",
-		DisplayName: "参数",
-		Category:    "assemble",
-		NodeKind:    core.NodeKindPure,
-		Icon:        "📎",
-		Description: "输出集合的一个参数值",
-		InputPorts:  []core.PortDef{},
-		OutputPorts: []core.PortDef{
-			{ID: "value", Label: "值", PortType: core.PortTypeDynamic},
-		},
-		ConfigSchema: []core.FieldSchema{
-			{Type: "text", ID: "param_name", Label: "参数名", Required: true},
-			{Type: "select", ID: "var_type", Label: "类型",
-				Options: []string{"String", "Int", "Float", "Bool", "LinuxSshConnection", "DockerContext", "K8sContext", "NginxInstance"},
-				Default: "String"},
-		},
-		ExecutionMode: core.ExecutionModeFlow,
-	},
-}

@@ -36,7 +36,14 @@ func (Node) TypeDef() core.NodeTypeDef {
 	}
 }
 
-// Execute Phase 0 暂时空实现，Phase 2 实装
+// Execute 把 message 输入打印到日志
+// prefix 配置作为日志前缀，未配置时用 "[INFO]"
 func (Node) Execute(ctx engine.ExecContext) (engine.Outputs, error) {
+	msg, _ := ctx.Input("message")
+	prefix := ctx.ConfigString("prefix")
+	if prefix == "" {
+		prefix = "[INFO]"
+	}
+	ctx.Info("%s %v", prefix, msg)
 	return nil, nil
 }

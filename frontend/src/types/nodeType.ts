@@ -135,3 +135,19 @@ export function resolvePortType(
   }
   return portDef.port_type;
 }
+
+// ── 新建节点时构造默认 config ─────────────────────────────
+// 从 NodeTypeDef.config_schema 收集所有 default 字段，叠加用户覆盖
+// 调用方：page 的 handleNodeTypeSelected、canvas 的 onDrop
+export function buildDefaultConfig(
+  typeDef: NodeTypeDef,
+  overrides: Record<string, unknown> = {},
+): Record<string, unknown> {
+  const config: Record<string, unknown> = {};
+  for (const field of typeDef.config_schema ?? []) {
+    if (field.default !== undefined && field.default !== null) {
+      config[field.id] = field.default;
+    }
+  }
+  return { ...config, ...overrides };
+}

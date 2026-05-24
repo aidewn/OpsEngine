@@ -9,7 +9,7 @@ import {
   type ReactNode,
 } from 'react';
 
-export type TabKind = 'workflow' | 'assemble';
+export type TabKind = 'workflow' | 'assemble' | 'execution';
 
 // 单个 tab 项
 export interface TabItem {
@@ -106,9 +106,14 @@ export function useTabs(): TabsContextValue {
 
 // 由 tab 推出路由路径
 export function routeFor(tab: TabItem | { kind: TabKind; id: string }): string {
-  return tab.kind === 'workflow'
-    ? `/workflows/${tab.id}`
-    : `/assembles/${tab.id}`;
+  switch (tab.kind) {
+    case 'workflow':
+      return `/workflows/${tab.id}`;
+    case 'assemble':
+      return `/assembles/${tab.id}`;
+    case 'execution':
+      return `/executions/${tab.id}`;
+  }
 }
 
 // 由当前 URL pathname 推出激活 tab 的 kind+id（找不到返回 null，例如在首页）
@@ -119,5 +124,7 @@ export function activeTabFromPath(
   if (wf && wf[1]) return { kind: 'workflow', id: wf[1] };
   const asm = pathname.match(/^\/assembles\/([^/]+)/);
   if (asm && asm[1]) return { kind: 'assemble', id: asm[1] };
+  const exec = pathname.match(/^\/executions\/([^/]+)/);
+  if (exec && exec[1]) return { kind: 'execution', id: exec[1] };
   return null;
 }

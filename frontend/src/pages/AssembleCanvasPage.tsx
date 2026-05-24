@@ -13,9 +13,10 @@ import {
 import { NodeDetailPanel } from '@/features/workflow/NodeDetailPanel';
 import { AddNodeDialog } from '@/features/workflow/AddNodeDialog';
 import { AssembleSidebar } from '@/features/assemble/AssembleSidebar';
+import { AssembleProvider } from '@/features/assemble/AssembleContext';
 import { Button } from '@/components/ui/Button';
 import type { AssembleDef } from '@/types/assemble';
-import type { NodeTypeDef } from '@/types/nodeType';
+import { buildDefaultConfig, type NodeTypeDef } from '@/types/nodeType';
 import { CenteredMessage } from '@/components/ui/CenteredMessage';
 import { TabBar } from '@/features/tabs/TabBar';
 import { useTabs } from '@/features/tabs/TabsContext';
@@ -72,6 +73,7 @@ export function AssembleCanvasPage() {
   ) {
     if (!assemble) return;
 
+    const config = buildDefaultConfig(typeDef);
     let result: { graph: AssembleDef; nodeId: string };
 
     if (pendingConnection && matchedPortId) {
@@ -81,13 +83,16 @@ export function AssembleCanvasPage() {
         pendingConnection.position,
         pendingConnection,
         matchedPortId,
+        config,
       );
     } else {
       const offset = assemble.nodes.length * 20;
-      result = addNodeToGraph(assemble, typeDef.type_id, {
-        x: 400 + offset,
-        y: 200 + offset,
-      });
+      result = addNodeToGraph(
+        assemble,
+        typeDef.type_id,
+        { x: 400 + offset, y: 200 + offset },
+        config,
+      );
     }
 
     handleAssembleChange(result.graph);
@@ -107,6 +112,7 @@ export function AssembleCanvasPage() {
 
   return (
     <ReactFlowProvider>
+      <AssembleProvider value={assemble}>
       <div className="flex h-screen flex-col">
         {/* 顶栏：返回 | tab 列表 | 右侧操作 */}
         <header className="flex h-12 items-center border-b border-slate-200 bg-white px-4">
@@ -156,6 +162,7 @@ export function AssembleCanvasPage() {
           onSelect={handleNodeTypeSelected}
         />
       </div>
+      </AssembleProvider>
     </ReactFlowProvider>
   );
 }

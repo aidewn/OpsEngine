@@ -3,14 +3,23 @@ name = "nginx部署"
 description = ""
 params = []
 returns = []
-variables = []
+
+[[variables]]
+  name = "1"
+  var_type = "String"
+  default = "1"
+
+[[variables]]
+  name = "2"
+  var_type = "String"
+  default = "3"
 
 [[nodes]]
   id = "29af7519-7f0d-49f7-83d5-c50c1aebd63e"
   type = "assemble_start"
   [nodes.config]
   [nodes.position]
-    x = -286.62622496988706
+    x = -290.58474870220573
     y = 98.72309503442807
 
 [[nodes]]
@@ -21,10 +30,94 @@ variables = []
     x = 674.4739433489746
     y = 89.53350819445178
 
+[[nodes]]
+  id = "9c2b9e57-b406-4c2c-9376-0419580a8c8c"
+  type = "parallel"
+  [nodes.config]
+  [nodes.position]
+    x = 240.8172231229487
+    y = -10.030580533271078
+
+[[nodes]]
+  id = "8ed9b269-8116-4fd5-aac9-806ae35d4836"
+  type = "print"
+  [nodes.config]
+  [nodes.position]
+    x = 468.81423193435194
+    y = -204.03229576699624
+
+[[nodes]]
+  id = "7c475e76-ee5a-45e5-b101-52a92c08c33a"
+  type = "print"
+  [nodes.config]
+  [nodes.position]
+    x = 463.6481085081672
+    y = -46.66150573381968
+
+[[nodes]]
+  id = "177f0315-0d0a-4714-a2b2-06a83a8e0772"
+  type = "var_get"
+  [nodes.config]
+    var_name = "1"
+    var_type = "String"
+  [nodes.position]
+    x = 464.65303618340585
+    y = -117.80034628287645
+
+[[nodes]]
+  id = "f0502477-a2ad-44d0-8c91-88a6eeb42943"
+  type = "var_get"
+  [nodes.config]
+    var_name = "2"
+    var_type = "String"
+  [nodes.position]
+    x = 459.1466000020105
+    y = 42.838567128415356
+
 [[edges]]
   [edges.from]
     node = "29af7519-7f0d-49f7-83d5-c50c1aebd63e"
     port = "exec_out"
   [edges.to]
+    node = "9c2b9e57-b406-4c2c-9376-0419580a8c8c"
+    port = "exec_in"
+
+[[edges]]
+  [edges.from]
+    node = "9c2b9e57-b406-4c2c-9376-0419580a8c8c"
+    port = "exec_out_1"
+  [edges.to]
+    node = "8ed9b269-8116-4fd5-aac9-806ae35d4836"
+    port = "exec_in"
+
+[[edges]]
+  [edges.from]
+    node = "9c2b9e57-b406-4c2c-9376-0419580a8c8c"
+    port = "exec_out_2"
+  [edges.to]
+    node = "7c475e76-ee5a-45e5-b101-52a92c08c33a"
+    port = "exec_in"
+
+[[edges]]
+  [edges.from]
+    node = "9c2b9e57-b406-4c2c-9376-0419580a8c8c"
+    port = "exec_out_done"
+  [edges.to]
     node = "2e39b83a-0027-4587-a43a-550d64917ac9"
     port = "exec_in"
+
+[[edges]]
+  [edges.from]
+    node = "177f0315-0d0a-4714-a2b2-06a83a8e0772"
+    port = "value"
+  [edges.to]
+    node = "8ed9b269-8116-4fd5-aac9-806ae35d4836"
+    port = "message"
+
+[[edges]]
+  [edges.from]
+    node = "f0502477-a2ad-44d0-8c91-88a6eeb42943"
+    port = "value"
+  [edges.to]
+    node = "7c475e76-ee5a-45e5-b101-52a92c08c33a"
+    port = "message"

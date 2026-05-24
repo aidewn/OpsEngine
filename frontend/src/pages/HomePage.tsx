@@ -4,8 +4,9 @@ import { useState } from 'react';
 import { cn } from '@/lib/cn';
 import { WorkflowList } from '@/features/workflow/WorkflowList';
 import { AssembleList } from '@/features/assemble/AssembleList';
+import { ExecutionList } from '@/features/execution/ExecutionList';
 
-type Tab = 'workflow' | 'assemble';
+type Tab = 'workflow' | 'assemble' | 'execution';
 
 export function HomePage() {
   const [tab, setTab] = useState<Tab>('workflow');
@@ -26,10 +27,18 @@ export function HomePage() {
         >
           集合
         </TabButton>
+        <TabButton
+          active={tab === 'execution'}
+          onClick={() => setTab('execution')}
+        >
+          执行
+        </TabButton>
       </div>
 
       {/* 列表内容 */}
-      {tab === 'workflow' ? <WorkflowList /> : <AssembleList />}
+      {tab === 'workflow' && <WorkflowList />}
+      {tab === 'assemble' && <AssembleList />}
+      {tab === 'execution' && <ExecutionList />}
     </div>
   );
 }

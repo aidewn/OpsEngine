@@ -1,8 +1,11 @@
 // 节点卡片骨架：图标 + 名称 + 端口列表
 // 紧凑型 UE Blueprint 风格，详情见右侧详情面板
+// 右上角可选显示执行状态角标（执行详情页用）
 
 import { type ReactNode } from 'react';
 import { cn } from '@/lib/cn';
+import { NodeStatusIcon } from '@/features/execution/ExecutionStatus';
+import type { NodeState } from '@/types/execution';
 
 export type NodeTone = 'ready' | 'update' | 'over' | 'neutral';
 
@@ -44,6 +47,8 @@ interface BaseNodeProps {
   title: string;
   // 节点 body 内容（端口行）
   children?: ReactNode;
+  // 执行状态：传入时右上角显示状态角标 + 失败/执行中边框高亮
+  execState?: NodeState;
 }
 
 export function BaseNode({
@@ -52,13 +57,23 @@ export function BaseNode({
   icon,
   title,
   children,
+  execState,
 }: BaseNodeProps) {
   const t = toneClass[tone];
+  // 执行中/失败状态覆盖默认边框
+  const stateBorder =
+    execState === 'Executing'
+      ? 'border-blue-500'
+      : execState === 'Failed'
+        ? 'border-red-500'
+        : execState === 'Success'
+          ? 'border-green-500'
+          : null;
   return (
     <div
       className={cn(
-        'min-w-[140px] overflow-hidden rounded-md border-2 bg-white shadow-sm transition-shadow',
-        selected ? t.selectedBorder : t.border,
+        'relative min-w-[140px] overflow-hidden rounded-md border-2 bg-white shadow-sm transition-shadow',
+        stateBorder ?? (selected ? t.selectedBorder : t.border),
         selected && 'shadow-md',
       )}
     >
@@ -71,7 +86,10 @@ export function BaseNode({
         )}
       >
         {icon && <span>{icon}</span>}
-        <span className="truncate">{title}</span>
+        <span className="flex-1 truncate">{title}</span>
+        {execState && (
+          <NodeStatusIcon state={execState} size={12} className="shrink-0" />
+        )}
       </div>
       {/* 端口区 */}
       {children && <div className="py-1">{children}</div>}

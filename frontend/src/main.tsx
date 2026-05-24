@@ -7,6 +7,7 @@ import { HashRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { App } from './App';
 import { TabsProvider } from '@/features/tabs/TabsContext';
+import { ExecutionStoreProvider } from '@/features/execution/ExecutionStore';
 import './index.css';
 
 const queryClient = new QueryClient({
@@ -26,7 +27,9 @@ createRoot(root).render(
     <QueryClientProvider client={queryClient}>
       <HashRouter>
         <TabsProvider>
-          <App />
+          <ExecutionStoreProvider>
+            <App />
+          </ExecutionStoreProvider>
         </TabsProvider>
       </HashRouter>
     </QueryClientProvider>

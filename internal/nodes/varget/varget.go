@@ -36,7 +36,17 @@ func (Node) TypeDef() core.NodeTypeDef {
 	}
 }
 
-// Execute Phase 0 暂时空实现，Phase 2 实装
+// Execute 从当前 frame 读变量并输出
+// 未定义的变量返回 nil 并写 warn 日志（容错策略，跟未连线 input 行为一致）
 func (Node) Execute(ctx engine.ExecContext) (engine.Outputs, error) {
-	return nil, nil
+	name := ctx.ConfigString("var_name")
+	if name == "" {
+		return engine.Outputs{"value": nil}, nil
+	}
+	v, ok := ctx.GetVariable(name)
+	if !ok {
+		ctx.Warn("变量 %q 未定义，使用零值", name)
+		return engine.Outputs{"value": nil}, nil
+	}
+	return engine.Outputs{"value": v}, nil
 }

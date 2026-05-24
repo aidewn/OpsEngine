@@ -6,6 +6,7 @@ import type { EdgeConfig, NodeInstance } from '@/types/workflow';
 import {
   isSystemNodeType,
   isAssembleNodeType,
+  isInternalNodeType,
 } from '@/types/nodeType';
 
 // 画布数据的通用接口（WorkflowDef 和 AssembleDef 都满足）
@@ -19,6 +20,7 @@ export type RfNodeData = NodeInstance;
 
 // 后端 NodeInstance → RF Node
 // 系统节点和集合内部节点走专用组件，其余走 generic
+// 内部节点（system_*、assemble_*）标记 deletable=false，React Flow 会拒绝删除
 export function toRfNode(node: NodeInstance): RfNode<RfNodeData> {
   let rfType = 'generic';
   if (isSystemNodeType(node.type_id) || isAssembleNodeType(node.type_id)) {
@@ -29,6 +31,7 @@ export function toRfNode(node: NodeInstance): RfNode<RfNodeData> {
     type: rfType,
     position: node.position,
     data: node,
+    deletable: !isInternalNodeType(node.type_id),
   };
 }
 

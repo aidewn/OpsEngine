@@ -7,6 +7,7 @@ import type { NodeInstance } from '@/types/workflow';
 import type { PortDef } from '@/types/nodeType';
 import { useNodeTypes } from '@/api/nodeTypes';
 import { getPortColor, resolvePortType } from '@/types/nodeType';
+import { useNodeExecState } from './useNodeExecState';
 
 type Props = NodeProps & { data: NodeInstance };
 
@@ -17,6 +18,7 @@ const HEADER_OFFSET = 30;
 export function GenericNode({ data, selected }: Props) {
   const { data: nodeTypes } = useNodeTypes();
   const def = nodeTypes?.find((t) => t.type_id === data.type_id);
+  const execState = useNodeExecState(data.instance_id);
 
   const inputPorts = def?.input_ports ?? [];
   const outputPorts = def?.output_ports ?? [];
@@ -28,6 +30,7 @@ export function GenericNode({ data, selected }: Props) {
       selected={selected}
       icon={def?.icon}
       title={def?.display_name ?? data.type_id}
+      execState={execState}
     >
       {/* 端口行：每行最多一个 input + 一个 output；显示「类型」而非「名字」 */}
       {Array.from({ length: rowCount }).map((_, idx) => {

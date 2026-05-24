@@ -3,17 +3,19 @@ import { Handle, Position, type NodeProps } from '@xyflow/react';
 import { BaseNode } from './BaseNode';
 import type { NodeInstance } from '@/types/workflow';
 import { getPortColor } from '@/types/nodeType';
+import { useNodeExecState } from './useNodeExecState';
 
 type Props = NodeProps & { data: NodeInstance };
 
 export function SystemReadyNode({ data, selected }: Props) {
-  void data;
+  const execState = useNodeExecState(data.instance_id);
   return (
     <BaseNode
       tone="ready"
       selected={selected}
       icon="🟢"
       title="System Ready"
+      execState={execState}
     >
       <div style={{ height: 20 }} />
       <Handle

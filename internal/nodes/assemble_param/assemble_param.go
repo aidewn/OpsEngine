@@ -36,7 +36,17 @@ func (Node) TypeDef() core.NodeTypeDef {
 	}
 }
 
-// Execute Phase 0 暂时空实现，Phase 4 实装
+// Execute 从当前 frame.Params 读参数值并作为 output 输出
+// 仅 assemble frame 有 params；主流 frame 调用此节点会输出 nil
 func (Node) Execute(ctx engine.ExecContext) (engine.Outputs, error) {
-	return nil, nil
+	name := ctx.ConfigString("param_name")
+	if name == "" {
+		return engine.Outputs{"value": nil}, nil
+	}
+	v, ok := ctx.GetParam(name)
+	if !ok {
+		ctx.Warn("参数 %q 未传入，使用零值", name)
+		return engine.Outputs{"value": nil}, nil
+	}
+	return engine.Outputs{"value": v}, nil
 }

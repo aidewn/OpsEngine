@@ -5,6 +5,8 @@
 package varset
 
 import (
+	"fmt"
+
 	"OpsEngine/internal/core"
 	"OpsEngine/internal/engine"
 )
@@ -39,7 +41,15 @@ func (Node) TypeDef() core.NodeTypeDef {
 	}
 }
 
-// Execute Phase 0 暂时空实现，Phase 2 实装
+// Execute 把 value input 写入当前 frame 的指定变量
+// var_name 必填，否则报错
 func (Node) Execute(ctx engine.ExecContext) (engine.Outputs, error) {
+	name := ctx.ConfigString("var_name")
+	if name == "" {
+		return nil, fmt.Errorf("var_set 节点的 var_name 未配置")
+	}
+	value, _ := ctx.Input("value")
+	ctx.SetVariable(name, value)
+	ctx.Info("设置变量 %s = %v", name, value)
 	return nil, nil
 }

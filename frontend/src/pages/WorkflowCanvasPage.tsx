@@ -15,10 +15,12 @@ import { AddNodeDialog } from '@/features/workflow/AddNodeDialog';
 import { WorkflowSidebar } from '@/features/workflow/WorkflowSidebar';
 import { Button } from '@/components/ui/Button';
 import type { WorkflowDef } from '@/types/workflow';
-import type { NodeTypeDef } from '@/types/nodeType';
+import { buildDefaultConfig, type NodeTypeDef } from '@/types/nodeType';
 import { CenteredMessage } from '@/components/ui/CenteredMessage';
 import { TabBar } from '@/features/tabs/TabBar';
 import { useTabs } from '@/features/tabs/TabsContext';
+import { useRunWorkflow } from '@/api/executions';
+import { RunningBadge } from '@/features/execution/RunningBadge';
 
 export function WorkflowCanvasPage() {
   const { id } = useParams<{ id: string }>();
@@ -26,6 +28,7 @@ export function WorkflowCanvasPage() {
   const { data: workflow, isLoading, error } = useWorkflow(id);
   const update = useUpdateWorkflow();
   const { openTab } = useTabs();
+  const runMutation = useRunWorkflow();
 
   // 进入页面 / 切到该路由时 upsert 当前 tab
   // 直接访问 URL 时先用 id 占位，doc 加载后用 name 覆盖
@@ -63,6 +66,22 @@ export function WorkflowCanvasPage() {
     setAddDialogOpen(true);
   }
 
+  // 启动工作流执行：调后端 Run → openTab(execution) → 跳转
+  async function handleRun() {
+    if (!workflow) return;
+    try {
+      const execID = await runMutation.mutateAsync(workflow.id);
+      openTab({
+        kind: 'execution',
+        id: execID,
+        name: `${workflow.name} #${execID.slice(0, 4)}`,
+      });
+      navigate(`/executions/${execID}`);
+    } catch (err) {
+      console.error('启动执行失败:', err);
+    }
+  }
+
   const handlePendingConnection = useCallback((pending: PendingConnection) => {
     setPendingConnection(pending);
     setAddDialogOpen(true);
@@ -74,6 +93,8 @@ export function WorkflowCanvasPage() {
   ) {
     if (!workflow) return;
 
+    // 从 ConfigSchema 收集默认值作为新节点的初始 config
+    const config = buildDefaultConfig(typeDef);
     let result: { graph: WorkflowDef; nodeId: string };
 
     if (pendingConnection && matchedPortId) {
@@ -83,13 +104,16 @@ export function WorkflowCanvasPage() {
         pendingConnection.position,
         pendingConnection,
         matchedPortId,
+        config,
       );
     } else {
       const offset = workflow.nodes.length * 20;
-      result = addNodeToGraph(workflow, typeDef.type_id, {
-        x: 400 + offset,
-        y: 200 + offset,
-      });
+      result = addNodeToGraph(
+        workflow,
+        typeDef.type_id,
+        { x: 400 + offset, y: 200 + offset },
+        config,
+      );
     }
 
     handleWorkflowChange(result.graph);
@@ -124,7 +148,15 @@ export function WorkflowCanvasPage() {
             <span className="text-xs text-slate-500">
               {update.isPending ? '保存中...' : '已保存'}
             </span>
-            <Button size="sm" onClick={handleAddButtonClick}>
+            <RunningBadge workflowID={workflow.id} />
+            <Button
+              size="sm"
+              onClick={handleRun}
+              disabled={runMutation.isPending}
+            >
+              ▶ 运行
+            </Button>
+            <Button size="sm" variant="secondary" onClick={handleAddButtonClick}>
               + 添加节点
             </Button>
           </div>

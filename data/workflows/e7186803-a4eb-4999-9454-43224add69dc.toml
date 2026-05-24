@@ -1,0 +1,100 @@
+id = "e7186803-a4eb-4999-9454-43224add69dc"
+name = "test"
+description = ""
+
+[[variables]]
+  name = "123"
+  var_type = "String"
+  default = "123"
+
+[[nodes]]
+  id = "fb4f32c2-fd0a-4818-8fb5-e4e45a18a9b9"
+  type = "system_ready"
+  [nodes.config]
+  [nodes.position]
+    x = -71.29965528685106
+    y = 14.203533597739607
+
+[[nodes]]
+  id = "29f67440-e558-4a47-bd4b-ea743002175d"
+  type = "system_update"
+  [nodes.config]
+    delta_seconds = 60.0
+    delta_type = "interval"
+  [nodes.position]
+    x = -58.11801059732805
+    y = 283.54965874039334
+
+[[nodes]]
+  id = "4ec01f65-bdc7-4e1c-a179-dc9d87671231"
+  type = "system_over"
+  [nodes.config]
+  [nodes.position]
+    x = 80.0
+    y = 480.0
+
+[[nodes]]
+  id = "9607ef28-6dff-4fbb-864f-17a7ec871a20"
+  type = "print"
+  [nodes.config]
+  [nodes.position]
+    x = 359.8976673955159
+    y = 22.187152382683777
+
+[[nodes]]
+  id = "f35e203e-42df-404f-889e-5c20827b15ca"
+  type = "var_get"
+  [nodes.config]
+    var_name = "123"
+    var_type = "String"
+  [nodes.position]
+    x = 345.06040930199885
+    y = 124.39257973305601
+
+[[nodes]]
+  id = "367a937a-8002-44cc-ac72-c1743766c73d"
+  type = "parallel"
+  [nodes.config]
+  [nodes.position]
+    x = 153.04599529969644
+    y = 8.729971362708163
+
+[[nodes]]
+  id = "6bcdd7f7-2b9a-4e50-aae8-67ac8bba4094"
+  type = "assemble:066e8608-f4ef-4347-b8e7-15d04efeec10"
+  [nodes.config]
+  [nodes.position]
+    x = 564.4516406496826
+    y = 15.223661602797229
+
+[[edges]]
+  [edges.from]
+    node = "f35e203e-42df-404f-889e-5c20827b15ca"
+    port = "value"
+  [edges.to]
+    node = "9607ef28-6dff-4fbb-864f-17a7ec871a20"
+    port = "message"
+
+[[edges]]
+  [edges.from]
+    node = "367a937a-8002-44cc-ac72-c1743766c73d"
+    port = "exec_out_1"
+  [edges.to]
+    node = "9607ef28-6dff-4fbb-864f-17a7ec871a20"
+    port = "exec_in"
+
+[[edges]]
+  [edges.from]
+    node = "fb4f32c2-fd0a-4818-8fb5-e4e45a18a9b9"
+    port = "exec_out"
+  [edges.to]
+    node = "367a937a-8002-44cc-ac72-c1743766c73d"
+    port = "exec_in"
+
+[[edges]]
+  [edges.from]
+    node = "9607ef28-6dff-4fbb-864f-17a7ec871a20"
+    port = "exec_out"
+  [edges.to]
+    node = "6bcdd7f7-2b9a-4e50-aae8-67ac8bba4094"
+    port = "exec_in"

@@ -9,6 +9,8 @@ import {
   useTabs,
   type TabItem,
 } from './TabsContext';
+import { useExecution } from '@/features/execution/ExecutionStore';
+import { WorkflowStatusIcon } from '@/features/execution/ExecutionStatus';
 
 export function TabBar() {
   const { tabs, closeTab } = useTabs();
@@ -53,9 +55,9 @@ export function TabBar() {
                 ? 'border-blue-500 bg-slate-50 font-medium text-slate-900'
                 : 'border-transparent text-slate-500 hover:bg-slate-50',
             )}
-            title={`${tab.kind === 'workflow' ? '工作流' : '集合'}: ${tab.name}`}
+            title={`${tabKindLabel(tab.kind)}: ${tab.name}`}
           >
-            <span>{tab.kind === 'workflow' ? '📄' : '📦'}</span>
+            <TabIcon tab={tab} />
             <span className="max-w-[160px] truncate">{tab.name}</span>
             <span
               role="button"
@@ -74,4 +76,30 @@ export function TabBar() {
       })}
     </div>
   );
+}
+
+// TabIcon 根据 tab 类型渲染图标
+// workflow → 📄；assemble → 📦；execution → 实时状态 SVG
+function TabIcon({ tab }: { tab: TabItem }) {
+  if (tab.kind === 'execution') {
+    return <ExecutionTabIcon executionID={tab.id} />;
+  }
+  return <span>{tab.kind === 'workflow' ? '📄' : '📦'}</span>;
+}
+
+// ExecutionTabIcon 从 ExecutionStore 读状态实时刷新
+function ExecutionTabIcon({ executionID }: { executionID: string }) {
+  const exec = useExecution(executionID);
+  return <WorkflowStatusIcon status={exec?.status} size={12} />;
+}
+
+function tabKindLabel(kind: TabItem['kind']): string {
+  switch (kind) {
+    case 'workflow':
+      return '工作流';
+    case 'assemble':
+      return '集合';
+    case 'execution':
+      return '执行';
+  }
 }

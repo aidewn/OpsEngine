@@ -27,7 +27,7 @@ import {
   graphToRf,
   toRfEdge,
 } from './canvasMapping';
-import { resolvePortType } from '@/types/nodeType';
+import { buildDefaultConfig, resolvePortType } from '@/types/nodeType';
 import { newUUID } from '@/lib/uuid';
 import { readDragPayload } from './dragNode';
 
@@ -48,11 +48,13 @@ interface CanvasProps<T extends GraphDef> {
   graph: T;
   selectedNodeId: string | null;
   onSelectNode: (nodeId: string | null) => void;
-  onGraphChange: (graph: T) => void;
+  onGraphChange?: (graph: T) => void;
   // 拖线到空白处时触发，通知父组件弹出节点创建框
-  onPendingConnection: (pending: PendingConnection) => void;
+  onPendingConnection?: (pending: PendingConnection) => void;
   // 节点双击：用于集合调用节点跳转到集合编辑页
   onNodeDoubleClick?: (typeId: string) => void;
+  // 只读模式：禁用拖动节点、连线、删除、拖入新节点（执行详情页使用）
+  readOnly?: boolean;
 }
 
 export function WorkflowCanvas<T extends GraphDef>({
@@ -62,6 +64,7 @@ export function WorkflowCanvas<T extends GraphDef>({
   onGraphChange,
   onPendingConnection,
   onNodeDoubleClick,
+  readOnly = false,
 }: CanvasProps<T>) {
   const { data: nodeTypes } = useNodeTypes();
   const rf = useReactFlow();
@@ -121,7 +124,22 @@ export function WorkflowCanvas<T extends GraphDef>({
       // 解析动态端口类型后比较
       const srcType = resolvePortType(sourcePort, sourceNode.config);
       const tgtType = resolvePortType(targetPort, targetNode.config);
-      return srcType === tgtType;
+      if (srcType !== tgtType) return false;
+
+      // exec 输出端口至多 1 条出边
+      if (srcType === 'Exec') {
+        const alreadyConnected = g.edges.some(
+          (e) =>
+            e.from.node === connection.source &&
+            e.from.port === connection.sourceHandle,
+        );
+        if (alreadyConnected) {
+          console.warn('exec 输出端口只能连一条线');
+          return false;
+        }
+      }
+
+      return true;
     },
     [nodeTypes],
   );
@@ -152,7 +170,7 @@ export function WorkflowCanvas<T extends GraphDef>({
       setEdges((prev) => [...prev, rfEdge]);
 
       // 持久化
-      onGraphChange({ ...g, edges: [...g.edges, newEdge] } as T);
+      onGraphChange?.({ ...g, edges: [...g.edges, newEdge] } as T);
     },
     [setEdges, onGraphChange],
   );
@@ -198,7 +216,7 @@ export function WorkflowCanvas<T extends GraphDef>({
         clientY = (event as MouseEvent).clientY;
       }
 
-      onPendingConnection({
+      onPendingConnection?.({
         sourcePortType: realType,
         sourceDirection: isOutput ? 'output' : 'input',
         nodeId: fromNodeId,
@@ -218,7 +236,7 @@ export function WorkflowCanvas<T extends GraphDef>({
       const deletedIds = new Set(deleted.map((n) => n.id));
       const g = graphRef.current;
 
-      onGraphChange({
+      onGraphChange?.({
         ...g,
         nodes: g.nodes.filter((n) => !deletedIds.has(n.instance_id)),
         edges: g.edges.filter(
@@ -247,16 +265,22 @@ export function WorkflowCanvas<T extends GraphDef>({
         y: event.clientY,
       });
 
+      // 用 ConfigSchema 默认值 + payload.config 兜底未指定字段
+      const typeDef = nodeTypes?.find((t) => t.type_id === payload.type_id);
+      const config = typeDef
+        ? buildDefaultConfig(typeDef, payload.config)
+        : payload.config;
+
       const g = graphRef.current;
       const node: NodeInstance = {
         instance_id: newUUID(),
         type_id: payload.type_id,
-        config: payload.config,
+        config,
         position,
       };
-      onGraphChange({ ...g, nodes: [...g.nodes, node] } as T);
+      onGraphChange?.({ ...g, nodes: [...g.nodes, node] } as T);
     },
-    [rf, onGraphChange],
+    [rf, nodeTypes, onGraphChange],
   );
 
   // ── 删除连线 ──────────────────────────────────────────
@@ -265,7 +289,7 @@ export function WorkflowCanvas<T extends GraphDef>({
       const deletedIds = new Set(deleted.map((e) => e.id));
       const g = graphRef.current;
 
-      onGraphChange({
+      onGraphChange?.({
         ...g,
         edges: g.edges.filter((e) => {
           const rfId = `${e.from.node}:${e.from.port}->${e.to.node}:${e.to.port}`;
@@ -280,15 +304,15 @@ export function WorkflowCanvas<T extends GraphDef>({
     <ReactFlow
       nodes={nodes}
       edges={edges}
-      onNodesChange={onNodesChange}
-      onEdgesChange={onEdgesChange}
-      onConnect={onConnect}
-      onConnectEnd={onConnectEnd}
-      onNodesDelete={onNodesDelete}
-      onEdgesDelete={onEdgesDelete}
-      isValidConnection={isValidConnection}
-      onDrop={onDrop}
-      onDragOver={onDragOver}
+      onNodesChange={readOnly ? undefined : onNodesChange}
+      onEdgesChange={readOnly ? undefined : onEdgesChange}
+      onConnect={readOnly ? undefined : onConnect}
+      onConnectEnd={readOnly ? undefined : onConnectEnd}
+      onNodesDelete={readOnly ? undefined : onNodesDelete}
+      onEdgesDelete={readOnly ? undefined : onEdgesDelete}
+      isValidConnection={readOnly ? () => false : isValidConnection}
+      onDrop={readOnly ? undefined : onDrop}
+      onDragOver={readOnly ? undefined : onDragOver}
       onNodeClick={(_, n) => onSelectNode(n.id)}
       onNodeDoubleClick={(_, n) => {
         const node = graphRef.current.nodes.find(
@@ -297,11 +321,16 @@ export function WorkflowCanvas<T extends GraphDef>({
         if (node && onNodeDoubleClick) onNodeDoubleClick(node.type_id);
       }}
       onPaneClick={() => onSelectNode(null)}
-      onNodeDragStop={() => {
-        onGraphChange(mergeNodePositions(graphRef.current, nodes));
-      }}
+      onNodeDragStop={
+        readOnly || !onGraphChange
+          ? undefined
+          : () => onGraphChange(mergeNodePositions(graphRef.current, nodes))
+      }
+      nodesDraggable={!readOnly}
+      nodesConnectable={!readOnly}
+      elementsSelectable
       nodeTypes={nodeTypeMap}
-      deleteKeyCode={['Backspace', 'Delete']}
+      deleteKeyCode={readOnly ? null : ['Backspace', 'Delete']}
       selectionOnDrag={false}
       fitView
       proOptions={{ hideAttribution: true }}

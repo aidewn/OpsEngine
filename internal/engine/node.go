@@ -54,6 +54,10 @@ type ExecContext interface {
 	// SetVariable 写当前 frame 作用域的变量
 	SetVariable(name string, value any)
 
+	// GetParam 读当前 frame 的参数值
+	// 仅 assemble frame 有 params；主流 frame 无 params，返回 (nil, false)
+	GetParam(name string) (any, bool)
+
 	// 日志（推送到前端 execution:log 事件）
 	Info(format string, args ...any)
 	Warn(format string, args ...any)

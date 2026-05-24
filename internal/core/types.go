@@ -72,6 +72,8 @@ type WorkflowStatus string
 const (
 	WorkflowStatusIdle       WorkflowStatus = "Idle"
 	WorkflowStatusRunning    WorkflowStatus = "Running"
+	WorkflowStatusSuccess    WorkflowStatus = "Success"
+	WorkflowStatusFailed     WorkflowStatus = "Failed"
 	WorkflowStatusTerminated WorkflowStatus = "Terminated"
 )
 
