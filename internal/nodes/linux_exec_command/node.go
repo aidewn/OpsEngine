@@ -51,6 +51,8 @@ func (Node) TypeDef() core.NodeTypeDef {
 				Placeholder: "uname -a"},
 			{Type: "number", ID: "timeout_seconds", Label: "超时（秒）",
 				Min: &minTimeout, Max: &maxTimeout, Default: int64(defaultTimeoutSeconds)},
+			// fail_on_error：命令非零退出/超时等执行失败时是否中断工作流；关闭则输出 success=false 并继续 exec 流
+			{Type: "toggle", ID: "fail_on_error", Label: "失败时中断工作流", Default: true},
 		},
 		ExecutionMode: core.ExecutionModeRemoteCmd,
 	}
@@ -101,14 +103,12 @@ func (Node) Execute(ctx engine.ExecContext) (engine.Outputs, error) {
 	}
 
 	if runErr != nil {
-		ctx.Error("命令执行失败，exit_code=%d", exitCode)
-		if stderrText != "" {
-			ctx.Error("stderr: %s", strings.TrimSpace(stderrText))
+		logCommandFailure(ctx, exitCode, stdoutText, stderrText)
+		if failOnError(ctx) {
+			return outputs, fmt.Errorf("命令执行失败，exit_code=%d: %w", exitCode, runErr)
 		}
-		if stdoutText != "" {
-			ctx.Info("stdout: %s", strings.TrimSpace(stdoutText))
-		}
-		return outputs, fmt.Errorf("命令执行失败，exit_code=%d: %w", exitCode, runErr)
+		ctx.Warn("命令未成功（exit_code=%d），已配置为不中断工作流，继续执行", exitCode)
+		return outputs, nil
 	}
 
 	ctx.Info("命令执行成功")
@@ -119,6 +119,25 @@ func (Node) Execute(ctx engine.ExecContext) (engine.Outputs, error) {
 		ctx.Warn("stderr: %s", strings.TrimSpace(stderrText))
 	}
 	return outputs, nil
+}
+
+// failOnError 是否在命令执行失败时中断工作流；默认 true（与旧行为一致）
+func failOnError(ctx engine.ExecContext) bool {
+	if ctx.Config("fail_on_error") == nil {
+		return true
+	}
+	return ctx.ConfigBool("fail_on_error")
+}
+
+// logCommandFailure 记录命令非零退出或超时等执行失败
+func logCommandFailure(ctx engine.ExecContext, exitCode int, stdoutText, stderrText string) {
+	ctx.Error("命令执行失败，exit_code=%d", exitCode)
+	if stderrText != "" {
+		ctx.Error("stderr: %s", strings.TrimSpace(stderrText))
+	}
+	if stdoutText != "" {
+		ctx.Info("stdout: %s", strings.TrimSpace(stdoutText))
+	}
 }
 
 // inputClient 从 client 输入端口读取 Linux SSH 连接句柄

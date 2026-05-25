@@ -216,7 +216,7 @@ export function WorkflowCanvas<T extends GraphDef>({
   // ── 连线完成 ──────────────────────────────────────────
   // 处理冲突边自动断开：
   //   1. 如果是 exec 输出端口（前缀 "exec_"），删除其旧的出边（exec_out 单出）
-  //   2. 不管什么类型 input 端口，删除其旧的入边（input 单入）
+  //   2. 数据 input 端口删除旧入边（单入）；exec_in 允许多入，不删
   // 然后追加新边
   const onConnect = useCallback(
     (connection: Connection) => {
@@ -229,9 +229,11 @@ export function WorkflowCanvas<T extends GraphDef>({
 
       const g = graphRef.current;
       const isExecSource = connection.sourceHandle.startsWith('exec_');
+      const isExecTarget = connection.targetHandle.startsWith('exec_');
 
       // 1. 删除 source 上的旧 exec 出边（仅 exec_out 单出）
-      // 2. 删除 target 上的旧入边（所有 input 单入）
+      // 2. 删除 target 上的旧入边——仅对**数据 input** 单入；
+      //    exec_in 允许多入（分支汇合场景），不删旧边
       const cleaned = g.edges.filter((e) => {
         if (
           isExecSource &&
@@ -241,6 +243,7 @@ export function WorkflowCanvas<T extends GraphDef>({
           return false;
         }
         if (
+          !isExecTarget &&
           e.to.node === connection.target &&
           e.to.port === connection.targetHandle
         ) {

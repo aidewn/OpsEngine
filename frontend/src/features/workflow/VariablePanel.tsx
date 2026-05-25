@@ -116,8 +116,12 @@ export function VariablePanel<T extends VarItem>({
                 if (payload) setDragPayload(e, payload);
               }}
               onClick={(e) => {
-                // 点击非删除按钮区域 → 进入编辑模式
-                if ((e.target as HTMLElement).closest('button')) return;
+                // 点击删除按钮区域 → 不进入编辑（含 visibility 隐藏时占位区域）
+                const el =
+                  e.target instanceof Element
+                    ? e.target
+                    : (e.target as Node).parentElement;
+                if (el?.closest('[data-var-delete]')) return;
                 setEditingIdx(idx);
                 setAdding(false);
               }}
@@ -138,11 +142,13 @@ export function VariablePanel<T extends VarItem>({
               <span className="text-[10px] text-slate-400">{item.var_type}</span>
               <button
                 type="button"
+                data-var-delete
+                onMouseDown={(e) => e.stopPropagation()}
                 onClick={(e) => {
                   e.stopPropagation();
                   handleDelete(idx);
                 }}
-                className="invisible text-xs text-red-500 group-hover:visible"
+                className="shrink-0 rounded p-0.5 text-xs leading-none text-red-500 opacity-40 hover:bg-red-50 hover:opacity-100 group-hover:opacity-100"
                 title="删除"
               >
                 ✕

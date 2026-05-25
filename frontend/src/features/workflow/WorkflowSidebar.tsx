@@ -5,16 +5,16 @@ import { VariablePanel } from './VariablePanel';
 
 interface Props {
   workflow: WorkflowDef;
-  onChange: (workflow: WorkflowDef) => void;
+  onVariablesChange: (items: VariableDef[]) => void;
 }
 
-export function WorkflowSidebar({ workflow, onChange }: Props) {
+export function WorkflowSidebar({ workflow, onVariablesChange }: Props) {
   return (
     <aside className="flex h-full w-60 flex-col overflow-y-auto border-r border-slate-200 bg-white">
       <VariablePanel<VariableDef>
         title="Variables"
-        items={workflow.variables}
-        onChange={(items) => onChange({ ...workflow, variables: items })}
+        items={workflow.variables ?? []}
+        onChange={onVariablesChange}
         showDefault
         // 变量拖入画布 → var_get 节点
         dragPayload={(item) => ({

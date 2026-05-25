@@ -11,14 +11,20 @@ import {
   addNodeWithEdge,
   type PendingConnection,
 } from '@/features/workflow/WorkflowCanvas';
-import { NodeDetailPanel } from '@/features/workflow/NodeDetailPanel';
+import { NodeDetailPanel, type GraphMetaPatch } from '@/features/workflow/NodeDetailPanel';
 import { AddNodeDialog } from '@/features/workflow/AddNodeDialog';
 import { AssembleSidebar } from '@/features/assemble/AssembleSidebar';
 import { AssembleProvider } from '@/features/assemble/AssembleContext';
 import { cleanupParallelEdges } from '@/features/workflow/cleanupParallel';
 import { useCopyPaste } from '@/features/clipboard/useCopyPaste';
 import { Button } from '@/components/ui/Button';
-import type { AssembleDef } from '@/types/assemble';
+import type { AssembleDef, ParamDef } from '@/types/assemble';
+import type { VariableDef } from '@/types/workflow';
+import {
+  applyParamsChange,
+  applyReturnsChange,
+  applyVariablesChange,
+} from '@/features/workflow/graphItemDelete';
 import { buildDefaultConfig, type NodeTypeDef } from '@/types/nodeType';
 import { CenteredMessage } from '@/components/ui/CenteredMessage';
 import { TabBar } from '@/features/tabs/TabBar';
@@ -41,7 +47,7 @@ function AssembleCanvasInner({ assembleId: id }: { assembleId: string | undefine
   const { data: assemble, isLoading, error } = useAssemble(id);
   const update = useUpdateAssemble();
   const queryClient = useQueryClient();
-  const { openTab } = useTabs();
+  const { openTab, renameTab } = useTabs();
 
   // 进入页面 / 切到该路由时 upsert tab
   useEffect(() => {
@@ -74,6 +80,36 @@ function AssembleCanvasInner({ assembleId: id }: { assembleId: string | undefine
     [update],
   );
 
+  const handleParamsChange = useCallback(
+    (items: ParamDef[]) => {
+      if (!id) return;
+      const prev = queryClient.getQueryData<AssembleDef>(['assembles', id]);
+      if (!prev) return;
+      handleAssembleChange(applyParamsChange(prev, items));
+    },
+    [id, queryClient, handleAssembleChange],
+  );
+
+  const handleReturnsChange = useCallback(
+    (items: ParamDef[]) => {
+      if (!id) return;
+      const prev = queryClient.getQueryData<AssembleDef>(['assembles', id]);
+      if (!prev) return;
+      handleAssembleChange(applyReturnsChange(prev, items));
+    },
+    [id, queryClient, handleAssembleChange],
+  );
+
+  const handleVariablesChange = useCallback(
+    (items: VariableDef[]) => {
+      if (!id) return;
+      const prev = queryClient.getQueryData<AssembleDef>(['assembles', id]);
+      if (!prev) return;
+      handleAssembleChange(applyVariablesChange(prev, items));
+    },
+    [id, queryClient, handleAssembleChange],
+  );
+
   const handleConfigChange = useCallback(
     (nodeId: string, config: Record<string, unknown>) => {
       if (!id) return;
@@ -89,6 +125,16 @@ function AssembleCanvasInner({ assembleId: id }: { assembleId: string | undefine
       handleAssembleChange(next);
     },
     [id, queryClient, handleAssembleChange],
+  );
+
+  const handleMetaChange = useCallback(
+    (patch: GraphMetaPatch) => {
+      if (!assemble) return;
+      const next: AssembleDef = { ...assemble, ...patch };
+      handleAssembleChange(next);
+      renameTab('assemble', assemble.id, patch.name);
+    },
+    [assemble, handleAssembleChange, renameTab],
   );
 
   function handleAddButtonClick() {
@@ -190,8 +236,12 @@ function AssembleCanvasInner({ assembleId: id }: { assembleId: string | undefine
 
         <div className="flex flex-1 overflow-hidden">
           <AssembleSidebar
-            assemble={assemble}
-            onChange={handleAssembleChange}
+            params={assemble.params ?? []}
+            returns={assemble.returns ?? []}
+            variables={assemble.variables ?? []}
+            onParamsChange={handleParamsChange}
+            onReturnsChange={handleReturnsChange}
+            onVariablesChange={handleVariablesChange}
           />
           <main className="flex-1">
             <WorkflowCanvas
@@ -208,12 +258,9 @@ function AssembleCanvasInner({ assembleId: id }: { assembleId: string | undefine
             graph={assemble}
             selectedNodeId={selectedNodeId}
             onConfigChange={handleConfigChange}
-            onParamsChange={(params) =>
-              handleAssembleChange({ ...assemble, params })
-            }
-            onReturnsChange={(returns) =>
-              handleAssembleChange({ ...assemble, returns })
-            }
+            onParamsChange={handleParamsChange}
+            onReturnsChange={handleReturnsChange}
+            onMetaChange={handleMetaChange}
           />
         </div>
 

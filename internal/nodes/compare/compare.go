@@ -60,6 +60,18 @@ func varTypeField(allowed []string) core.FieldSchema {
 	}
 }
 
+// operandDefaultField <portID>_default 字段
+// A / B 端口未连线时，引擎读这里的字符串再按 var_type 解析
+// 留空 → 退回零值（Int/Float 为 0，Bool 为 false，String 为空串）
+func operandDefaultField(portID, portLabel string) core.FieldSchema {
+	return core.FieldSchema{
+		Type:        "text",
+		ID:          portID + "_default",
+		Label:       portLabel + " 默认值",
+		Placeholder: "未连接时使用（按值类型解析）",
+	}
+}
+
 // resolveType 读 config.var_type，缺省 / 不在 allowed 列表时回退到 allowed[0]
 func resolveType(ctx engine.ExecContext, allowed []string) string {
 	t := ctx.ConfigString("var_type")
@@ -72,28 +84,43 @@ func resolveType(ctx engine.ExecContext, allowed []string) string {
 }
 
 // makeTypeDef 构造比较节点的通用 TypeDef
+// 字段顺序：var_type → A 默认值 → B 默认值
 func makeTypeDef(typeID, name, icon, description string, allowed []string) core.NodeTypeDef {
 	in, out := binaryPorts()
 	return core.NodeTypeDef{
-		TypeID:        typeID,
-		DisplayName:   name,
-		Category:      "compare",
-		NodeKind:      core.NodeKindPure,
-		Icon:          icon,
-		Description:   description,
-		InputPorts:    in,
-		OutputPorts:   out,
-		ConfigSchema:  []core.FieldSchema{varTypeField(allowed)},
+		TypeID:      typeID,
+		DisplayName: name,
+		Category:    "compare",
+		NodeKind:    core.NodeKindPure,
+		Icon:        icon,
+		Description: description,
+		InputPorts:  in,
+		OutputPorts: out,
+		ConfigSchema: []core.FieldSchema{
+			varTypeField(allowed),
+			operandDefaultField("a", "A"),
+			operandDefaultField("b", "B"),
+		},
 		ExecutionMode: core.ExecutionModeFlow,
 	}
 }
 
 // ── 求值 helper ──────────────────────────────────────────
 
+// readOperand 取单个操作数：优先连线值，否则回退到 config <portID>_default 字符串
+// 都没有 → 返回 nil（让上层按类型走零值兜底）
+func readOperand(ctx engine.ExecContext, portID string) any {
+	if v, ok := ctx.Input(portID); ok {
+		return v
+	}
+	if s := ctx.ConfigString(portID + "_default"); s != "" {
+		return s
+	}
+	return nil
+}
+
 func readPair(ctx engine.ExecContext) (any, any) {
-	a, _ := ctx.Input("a")
-	b, _ := ctx.Input("b")
-	return a, b
+	return readOperand(ctx, "a"), readOperand(ctx, "b")
 }
 
 // equalityResult 实现 eq/ne 共用逻辑，eqMode=true 返回 == 结果，false 返回 != 结果

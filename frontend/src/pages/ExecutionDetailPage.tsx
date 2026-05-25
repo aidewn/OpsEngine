@@ -1,5 +1,6 @@
 // 执行详情页（只读）
 // 顶栏: ← 返回 | TabBar | 状态指示器 + 重新运行/停止
+// 左侧: ExecutionCallStack 调用栈侧栏（进入子 frame 的唯一入口）
 // 中间: WorkflowCanvas readOnly，画布显示当前 frame 对应的 snapshot 节点 + 实时状态
 // 右侧: NodeDetailPanel 显示选中节点的日志
 // 画布上方面包屑: 主流 / 集合A / 集合B...
@@ -14,23 +15,29 @@ import {
 } from '@/api/executions';
 import {
   frameAt,
+  recordToState,
   useExecution as useExecutionLive,
   useExecutionHydrator,
 } from '@/features/execution/ExecutionStore';
 import { WorkflowStatusIcon } from '@/features/execution/ExecutionStatus';
+import { ExecutionCallStack } from '@/features/execution/ExecutionCallStack';
 import { WorkflowCanvas } from '@/features/workflow/WorkflowCanvas';
 import { NodeDetailPanel } from '@/features/workflow/NodeDetailPanel';
 import { Button } from '@/components/ui/Button';
 import { CenteredMessage } from '@/components/ui/CenteredMessage';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { TabBar } from '@/features/tabs/TabBar';
 import { useTabs } from '@/features/tabs/TabsContext';
 import { FramePathContext } from '@/features/workflow/nodes/useNodeExecState';
 import { cn } from '@/lib/cn';
 
+// 记录不存在/加载失败时，停留 NOT_FOUND_REDIRECT_MS 后自动跳首页
+const NOT_FOUND_REDIRECT_MS = 1500;
+
 export function ExecutionDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { openTab } = useTabs();
+  const { openTab, closeTab } = useTabs();
   const { hydrate } = useExecutionHydrator();
 
   const { data: record, isLoading, error } = useExecutionQuery(id);
@@ -38,7 +45,13 @@ export function ExecutionDetailPage() {
     if (record) hydrate(record);
   }, [record, hydrate]);
 
-  const exec = useExecutionLive(id);
+  const liveExec = useExecutionLive(id);
+
+  // hydrate 还没跑完时用 record 兜底，避免「记录已到但 store 仍空 → 误报不存在」白屏竞态
+  const exec = useMemo(
+    () => liveExec ?? (record ? recordToState(record) : null),
+    [liveExec, record],
+  );
 
   const runMutation = useRunWorkflow();
   const stopMutation = useStopExecution();
@@ -62,6 +75,18 @@ export function ExecutionDetailPage() {
     });
   }, [id, exec, openTab]);
 
+  // 加载失败 / 加载完成仍找不到记录 → 关掉对应 tab 并跳首页
+  // （比如别处删了记录但仍停留在旧 URL）
+  const notFound = !isLoading && (!!error || !exec);
+  useEffect(() => {
+    if (!notFound) return;
+    const timer = window.setTimeout(() => {
+      if (id) closeTab('execution', id);
+      navigate('/', { replace: true });
+    }, NOT_FOUND_REDIRECT_MS);
+    return () => window.clearTimeout(timer);
+  }, [notFound, id, navigate, closeTab]);
+
   const handleRerun = useCallback(async () => {
     if (!exec) return;
     try {
@@ -82,18 +107,6 @@ export function ExecutionDetailPage() {
     stopMutation.mutate(id);
   }, [id, stopMutation]);
 
-  // 双击集合调用节点 → 下钻到该 frame
-  const handleNodeDoubleClick = useCallback(
-    (typeId: string) => {
-      // 这里 typeId 不够，需要 instanceID。由于 WorkflowCanvas.onNodeDoubleClick 当前只传 typeId
-      // 我们用 selectedNodeId 作为线索（双击会触发 nodeClick → 设置 selectedNodeId）
-      if (typeId.startsWith('assemble:') && selectedNodeId) {
-        setFramePath((prev) => [...prev, selectedNodeId]);
-      }
-    },
-    [selectedNodeId],
-  );
-
   // 根据 framePath 解析当前 frame 对应的图
   const graph = useMemo(() => {
     if (!exec?.snapshot) return null;
@@ -107,13 +120,19 @@ export function ExecutionDetailPage() {
     return { id: exec.id, nodes: asm.nodes, edges: asm.edges };
   }, [exec, framePath]);
 
-  if (isLoading) return <CenteredMessage>加载中...</CenteredMessage>;
+  if (isLoading && !exec) return <CenteredMessage>加载中...</CenteredMessage>;
   if (error)
     return (
-      <CenteredMessage tone="error">加载失败：{error.message}</CenteredMessage>
+      <CenteredMessage tone="error">
+        加载失败：{error.message}（即将返回首页）
+      </CenteredMessage>
     );
   if (!exec)
-    return <CenteredMessage tone="error">执行记录不存在</CenteredMessage>;
+    return (
+      <CenteredMessage tone="error">
+        执行记录不存在（即将返回首页）
+      </CenteredMessage>
+    );
   if (!exec.snapshot || !graph)
     return <CenteredMessage tone="error">执行快照缺失</CenteredMessage>;
 
@@ -201,23 +220,31 @@ export function ExecutionDetailPage() {
             </div>
           )}
 
-          <div className="flex flex-1 overflow-hidden">
-            <main className="flex-1">
-              <WorkflowCanvas
+          <ErrorBoundary>
+            <div className="flex flex-1 overflow-hidden">
+              <ExecutionCallStack
+                exec={exec}
+                framePath={framePath}
+                selectedNodeId={selectedNodeId}
+                onSelectFrame={setFramePath}
+                onSelectNode={setSelectedNodeId}
+              />
+              <main className="flex-1">
+                <WorkflowCanvas
+                  graph={graph}
+                  selectedNodeId={selectedNodeId}
+                  onSelectNode={setSelectedNodeId}
+                  readOnly
+                />
+              </main>
+              <NodeDetailPanel
                 graph={graph}
                 selectedNodeId={selectedNodeId}
-                onSelectNode={setSelectedNodeId}
-                onNodeDoubleClick={handleNodeDoubleClick}
-                readOnly
+                executionID={exec.id}
+                framePath={framePath}
               />
-            </main>
-            <NodeDetailPanel
-              graph={graph}
-              selectedNodeId={selectedNodeId}
-              executionID={exec.id}
-              framePath={framePath}
-            />
-          </div>
+            </div>
+          </ErrorBoundary>
         </div>
       </FramePathContext.Provider>
     </ReactFlowProvider>

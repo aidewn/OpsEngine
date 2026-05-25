@@ -5,14 +5,15 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ReactFlowProvider } from '@xyflow/react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useUpdateWorkflow, useWorkflow } from '@/api/workflows';
-import type { WorkflowDef } from '@/types/workflow';
+import type { WorkflowDef, VariableDef } from '@/types/workflow';
+import { applyVariablesChange } from '@/features/workflow/graphItemDelete';
 import {
   WorkflowCanvas,
   addNodeToGraph,
   addNodeWithEdge,
   type PendingConnection,
 } from '@/features/workflow/WorkflowCanvas';
-import { NodeDetailPanel } from '@/features/workflow/NodeDetailPanel';
+import { NodeDetailPanel, type GraphMetaPatch } from '@/features/workflow/NodeDetailPanel';
 import { AddNodeDialog } from '@/features/workflow/AddNodeDialog';
 import { WorkflowSidebar } from '@/features/workflow/WorkflowSidebar';
 import { cleanupParallelEdges } from '@/features/workflow/cleanupParallel';
@@ -42,7 +43,7 @@ function WorkflowCanvasInner({ workflowId: id }: { workflowId: string | undefine
   const { data: workflow, isLoading, error } = useWorkflow(id);
   const update = useUpdateWorkflow();
   const queryClient = useQueryClient();
-  const { openTab } = useTabs();
+  const { openTab, renameTab } = useTabs();
   const runMutation = useRunWorkflow();
 
   // 进入页面 / 切到该路由时 upsert 当前 tab
@@ -79,6 +80,16 @@ function WorkflowCanvasInner({ workflowId: id }: { workflowId: string | undefine
     [update],
   );
 
+  const handleVariablesChange = useCallback(
+    (items: VariableDef[]) => {
+      if (!id) return;
+      const prev = queryClient.getQueryData<WorkflowDef>(['workflows', id]);
+      if (!prev) return;
+      handleWorkflowChange(applyVariablesChange(prev, items));
+    },
+    [id, queryClient, handleWorkflowChange],
+  );
+
   // 节点 config 修改回调（由 NodeDetailPanel.ConfigForm 触发）
   const handleConfigChange = useCallback(
     (nodeId: string, config: Record<string, unknown>) => {
@@ -95,6 +106,16 @@ function WorkflowCanvasInner({ workflowId: id }: { workflowId: string | undefine
       handleWorkflowChange(next);
     },
     [id, queryClient, handleWorkflowChange],
+  );
+
+  const handleMetaChange = useCallback(
+    (patch: GraphMetaPatch) => {
+      if (!workflow) return;
+      const next: WorkflowDef = { ...workflow, ...patch };
+      handleWorkflowChange(next);
+      renameTab('workflow', workflow.id, patch.name);
+    },
+    [workflow, handleWorkflowChange, renameTab],
   );
 
   function handleAddButtonClick() {
@@ -214,7 +235,7 @@ function WorkflowCanvasInner({ workflowId: id }: { workflowId: string | undefine
       <div className="flex flex-1 overflow-hidden">
         <WorkflowSidebar
           workflow={workflow}
-          onChange={handleWorkflowChange}
+          onVariablesChange={handleVariablesChange}
         />
         <main className="flex-1">
           <WorkflowCanvas
@@ -231,6 +252,7 @@ function WorkflowCanvasInner({ workflowId: id }: { workflowId: string | undefine
           graph={workflow}
           selectedNodeId={selectedNodeId}
           onConfigChange={handleConfigChange}
+          onMetaChange={handleMetaChange}
         />
       </div>
 

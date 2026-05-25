@@ -45,6 +45,8 @@ interface BaseNodeProps {
   selected?: boolean;
   icon?: string;
   title: string;
+  // 副标题（config 摘要，灰色小字）；空 → 不渲染，header 不变高
+  subtitle?: string;
   // 节点 body 内容（端口行）
   children?: ReactNode;
   // 执行状态：传入时右上角显示状态角标 + 失败/执行中边框高亮
@@ -56,6 +58,7 @@ export function BaseNode({
   selected,
   icon,
   title,
+  subtitle,
   children,
   execState,
 }: BaseNodeProps) {
@@ -86,8 +89,18 @@ export function BaseNode({
           t.headerText,
         )}
       >
-        {icon && <span>{icon}</span>}
-        <span className="flex-1 truncate">{title}</span>
+        {icon && <span className="shrink-0">{icon}</span>}
+        <div className="min-w-0 flex-1">
+          <div className="truncate">{title}</div>
+          {subtitle && (
+            <div
+              className="truncate text-[10px] font-normal text-slate-500"
+              title={subtitle}
+            >
+              {subtitle}
+            </div>
+          )}
+        </div>
         {execState && (
           <NodeStatusIcon state={execState} size={12} className="shrink-0" />
         )}

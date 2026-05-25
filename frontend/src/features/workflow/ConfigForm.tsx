@@ -123,6 +123,34 @@ function FieldRow({
   params?: ParamDef[];
   returns?: ParamDef[];
 }) {
+  // toggle：标签在上、勾选框在下，与其他字段对齐
+  if (field.type === 'toggle') {
+    const checked = !!value;
+    return (
+      <div className="space-y-1.5">
+        <Label htmlFor={field.id} className="text-xs">
+          {field.label}
+          {field.required && <span className="ml-0.5 text-red-500">*</span>}
+        </Label>
+        <label
+          htmlFor={field.id}
+          className="inline-flex cursor-pointer items-center gap-2.5"
+        >
+          <input
+            id={field.id}
+            type="checkbox"
+            checked={checked}
+            onChange={(e) => onChange(e.target.checked)}
+            className="size-4 shrink-0 rounded border-slate-300 accent-blue-600"
+          />
+          <span className="text-xs leading-none text-slate-500">
+            {checked ? '已启用' : '已禁用'}
+          </span>
+        </label>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-1">
       <Label htmlFor={field.id} className="text-xs">
@@ -220,20 +248,8 @@ function FieldControl({
         </select>
       );
     case 'toggle':
-      return (
-        <label className="inline-flex cursor-pointer items-center gap-2">
-          <input
-            id={field.id}
-            type="checkbox"
-            checked={!!value}
-            onChange={(e) => onChange(e.target.checked)}
-            className="size-4 rounded border-slate-300"
-          />
-          <span className="text-xs text-slate-600">
-            {value ? '已启用' : '已禁用'}
-          </span>
-        </label>
-      );
+      // 由 FieldRow 整行渲染；此处不应走到
+      return null;
     case 'variable_select':
       return (
         <VariableSelect

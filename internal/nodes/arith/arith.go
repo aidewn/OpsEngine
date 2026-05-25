@@ -20,6 +20,10 @@ import (
 // numberTypeOptions 算术节点支持的数值类型，与 var_set/var_get 共用 var_type 字段名
 var numberTypeOptions = []string{"Int", "Float"}
 
+// addTypeOptions math_add 除数值外额外支持 String（用 + 做字符串拼接）
+// 仅作用于 AddNode；sub/mul/div/mod 仍只接受 Int/Float
+var addTypeOptions = []string{"Int", "Float", "String"}
+
 // 注册全部算术节点
 func init() {
 	engine.Register(&AddNode{})
@@ -54,6 +58,18 @@ func varTypeField() core.FieldSchema {
 	}
 }
 
+// operandDefaultField <portID>_default 字段
+// 当 A / B 端口未连线时，引擎会读这里的字符串再按 var_type 解析
+// 留空 → 退回零值（Int/Float 为 0，String 为空串）
+func operandDefaultField(portID, portLabel string) core.FieldSchema {
+	return core.FieldSchema{
+		Type:        "text",
+		ID:          portID + "_default",
+		Label:       portLabel + " 默认值",
+		Placeholder: "未连接时使用（按数据类型解析）",
+	}
+}
+
 // resolveType 读 config.var_type，缺省 / 非法值回退到 Int
 func resolveType(ctx engine.ExecContext) string {
 	if ctx.ConfigString("var_type") == "Float" {
@@ -62,11 +78,23 @@ func resolveType(ctx engine.ExecContext) string {
 	return "Int"
 }
 
+// readOperand 取单个操作数：优先连线值，否则回退到 config <portID>_default 字符串
+// 都没有 → 返回 nil（让上层按类型走零值兜底）
+func readOperand(ctx engine.ExecContext, portID string) any {
+	if v, ok := ctx.Input(portID); ok {
+		return v
+	}
+	if s := ctx.ConfigString(portID + "_default"); s != "" {
+		return s
+	}
+	return nil
+}
+
 // readOperands 求两个操作数并按类型转换
 // 转换失败时打 warn 日志（不阻断，使用零值继续）
 func readOperands(ctx engine.ExecContext, numType string) (intA, intB int64, fA, fB float64) {
-	a, _ := ctx.Input("a")
-	b, _ := ctx.Input("b")
+	a := readOperand(ctx, "a")
+	b := readOperand(ctx, "b")
 
 	if numType == "Float" {
 		var ok bool
@@ -90,18 +118,23 @@ func readOperands(ctx engine.ExecContext, numType string) (intA, intB int64, fA,
 }
 
 // makeTypeDef 构造算术节点的通用 TypeDef
+// 字段顺序：var_type → A 默认值 → B 默认值
 func makeTypeDef(typeID, name, icon, description string) core.NodeTypeDef {
 	in, out := binaryPorts()
 	return core.NodeTypeDef{
-		TypeID:        typeID,
-		DisplayName:   name,
-		Category:      "math",
-		NodeKind:      core.NodeKindPure,
-		Icon:          icon,
-		Description:   description,
-		InputPorts:    in,
-		OutputPorts:   out,
-		ConfigSchema:  []core.FieldSchema{varTypeField()},
+		TypeID:      typeID,
+		DisplayName: name,
+		Category:    "math",
+		NodeKind:    core.NodeKindPure,
+		Icon:        icon,
+		Description: description,
+		InputPorts:  in,
+		OutputPorts: out,
+		ConfigSchema: []core.FieldSchema{
+			varTypeField(),
+			operandDefaultField("a", "A"),
+			operandDefaultField("b", "B"),
+		},
 		ExecutionMode: core.ExecutionModeFlow,
 	}
 }
@@ -111,10 +144,32 @@ func makeTypeDef(typeID, name, icon, description string) core.NodeTypeDef {
 type AddNode struct{}
 
 func (AddNode) TypeDef() core.NodeTypeDef {
-	return makeTypeDef("math_add", "加 (+)", "➕", "返回 A + B")
+	td := makeTypeDef("math_add", "加 (+)", "➕", "返回 A + B；var_type=String 时做字符串拼接")
+	// 把 var_type 字段的选项替换为带 String 的版本；其他字段（a_default / b_default）保留
+	for i := range td.ConfigSchema {
+		if td.ConfigSchema[i].ID == "var_type" {
+			td.ConfigSchema[i].Options = addTypeOptions
+			td.ConfigSchema[i].Label = "数据类型"
+			break
+		}
+	}
+	return td
 }
 
 func (AddNode) Execute(ctx engine.ExecContext) (engine.Outputs, error) {
+	if ctx.ConfigString("var_type") == "String" {
+		a := readOperand(ctx, "a")
+		b := readOperand(ctx, "b")
+		sa, oka := exprhelper.ToString(a)
+		if !oka && a != nil {
+			ctx.Warn("操作数 a (%v) 无法转为 String，使用空串", a)
+		}
+		sb, okb := exprhelper.ToString(b)
+		if !okb && b != nil {
+			ctx.Warn("操作数 b (%v) 无法转为 String，使用空串", b)
+		}
+		return engine.Outputs{"result": sa + sb}, nil
+	}
 	t := resolveType(ctx)
 	ai, bi, af, bf := readOperands(ctx, t)
 	if t == "Float" {

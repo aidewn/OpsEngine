@@ -94,6 +94,21 @@ func TestCommandTextPrefersInput(t *testing.T) {
 	}
 }
 
+func TestFailOnErrorDefaultTrue(t *testing.T) {
+	if !failOnError(fakeContext{config: map[string]any{}}) {
+		t.Fatal("未配置 fail_on_error 时应默认为 true")
+	}
+}
+
+func TestFailOnErrorToggle(t *testing.T) {
+	if failOnError(fakeContext{config: map[string]any{"fail_on_error": false}}) {
+		t.Fatal("fail_on_error=false 时应不中断")
+	}
+	if !failOnError(fakeContext{config: map[string]any{"fail_on_error": true}}) {
+		t.Fatal("fail_on_error=true 时应中断")
+	}
+}
+
 type fakeContext struct {
 	inputs  map[string]any
 	config  map[string]any

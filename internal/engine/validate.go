@@ -2,7 +2,7 @@
 // 校验项：
 //   - 单例节点（system_ready/update/over 等）至多 1 个
 //   - 每个 exec 输出端口至多连 1 条边
-//   - 每个输入端口至多 1 条入边
+//   - 每个**数据**输入端口至多 1 条入边（exec_in 多入允许，用于分支汇合）
 //   - var_set / var_get 引用的变量必须在 Variables 列表中定义
 
 package engine
@@ -107,15 +107,20 @@ func validateExecOutSingle(edges []core.EdgeConfig) error {
 	return nil
 }
 
-// validateInputSingle 每个输入端口至多 1 条入边
-// 适用所有 input（exec_in / 数据 input），参考 UE Blueprint 单入语义
+// validateInputSingle 每个**数据**输入端口至多 1 条入边
+// exec_in 允许多入（任一上游 exec_out 推进到此处都会触发节点执行），
+// 这样 branch 的 true/false 分支可以汇合回主流。与 UE Blueprint 行为一致。
+// 端口类型判断沿用命名约定：以 "exec_" 开头视为 exec 端口。
 func validateInputSingle(edges []core.EdgeConfig) error {
 	counts := map[string]int{}
 	for _, e := range edges {
+		if strings.HasPrefix(e.To.Port, "exec_") {
+			continue
+		}
 		key := e.To.Node + ":" + e.To.Port
 		counts[key]++
 		if counts[key] > 1 {
-			return fmt.Errorf("输入端口 %s 只能接收 1 条边", e.To.Port)
+			return fmt.Errorf("数据输入端口 %s 只能接收 1 条边", e.To.Port)
 		}
 	}
 	return nil

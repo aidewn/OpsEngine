@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { cn } from '@/lib/cn';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { WorkflowList } from '@/features/workflow/WorkflowList';
 import { AssembleList } from '@/features/assemble/AssembleList';
 import { ExecutionList } from '@/features/execution/ExecutionList';
@@ -35,10 +36,12 @@ export function HomePage() {
         </TabButton>
       </div>
 
-      {/* 列表内容 */}
-      {tab === 'workflow' && <WorkflowList />}
-      {tab === 'assemble' && <AssembleList />}
-      {tab === 'execution' && <ExecutionList />}
+      {/* 列表内容；包 ErrorBoundary 避免单个 tab 渲染异常打挂整页 */}
+      <ErrorBoundary>
+        {tab === 'workflow' && <WorkflowList />}
+        {tab === 'assemble' && <AssembleList />}
+        {tab === 'execution' && <ExecutionList />}
+      </ErrorBoundary>
     </div>
   );
 }

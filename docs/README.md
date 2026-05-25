@@ -11,6 +11,7 @@
 | [node-development.md](./node-development.md) | **节点开发手册**：Go 节点实现、注册、端口、ConfigSchema、前端对接 | 节点/插件开发者 |
 | [source-reading.md](./source-reading.md) | **源码阅读说明**：推荐阅读顺序、关键文件、调试与测试入口 | 贡献者 |
 | [phase8-13-plan.md](./phase8-13-plan.md) | **迭代计划**（Phase 8–13） | 维护者 |
+| [execution-ux-plan.md](./execution-ux-plan.md) | **执行体验改进**：白屏修复（已完成）、调用栈侧栏、详情页稳健性 | 前端 / 全栈 |
 
 ## 建议阅读路径
 
@@ -22,7 +23,7 @@
   └─ architecture.md（执行流）→ node-development.md → source-reading.md
 
 要改前端画布 / 执行 UI
-  └─ architecture.md（事件与 Frame）→ source-reading.md（前端章节）
+  └─ architecture.md（事件与 Frame）→ execution-ux-plan.md → source-reading.md（前端章节）
 ```
 
 ## 文档约定

@@ -3,7 +3,7 @@
 // - 选中节点：Config / Logs / Info 三 tab
 // - 传入 executionID 时，Logs tab 从 ExecutionStore 读实时日志
 
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import type { NodeInstance, VariableDef } from '@/types/workflow';
 import type { ParamDef } from '@/types/assemble';
 import type { GraphDef } from './canvasMapping';
@@ -18,7 +18,16 @@ import { frameAt, useExecution } from '@/features/execution/ExecutionStore';
 import { NodeStatusIcon } from '@/features/execution/ExecutionStatus';
 import { ConfigForm } from './ConfigForm';
 import { VariablePanel } from './VariablePanel';
+import { Input } from '@/components/ui/Input';
+import { Label } from '@/components/ui/Label';
+import { Textarea } from '@/components/ui/Textarea';
 import { cn } from '@/lib/cn';
+
+/** 图元信息（名称、描述）变更；仅工作流/集合编辑页传入 */
+export interface GraphMetaPatch {
+  name: string;
+  description: string;
+}
 
 interface NodeDetailPanelProps {
   graph: GraphDef & {
@@ -39,6 +48,8 @@ interface NodeDetailPanelProps {
   // 集合编辑：选中 Start/End 时在 Config 中维护 params / returns
   onParamsChange?: (items: ParamDef[]) => void;
   onReturnsChange?: (items: ParamDef[]) => void;
+  // 未选中节点时编辑名称/描述（执行详情页不传 = 只读）
+  onMetaChange?: (patch: GraphMetaPatch) => void;
 }
 
 export function NodeDetailPanel({
@@ -49,6 +60,7 @@ export function NodeDetailPanel({
   onConfigChange,
   onParamsChange,
   onReturnsChange,
+  onMetaChange,
 }: NodeDetailPanelProps) {
   const node = selectedNodeId
     ? (graph.nodes.find((n) => n.instance_id === selectedNodeId) ?? null)
@@ -76,7 +88,11 @@ export function NodeDetailPanel({
           />
         ) : (
           <div className="px-4 py-3">
-            <GraphDetail graph={graph} />
+            <GraphDetail
+              graph={graph}
+              editable={!!onMetaChange}
+              onMetaChange={onMetaChange}
+            />
           </div>
         )}
       </div>
@@ -369,24 +385,92 @@ function InfoTab({ node }: { node: NodeInstance }) {
 
 function GraphDetail({
   graph,
+  editable,
+  onMetaChange,
 }: {
   graph: GraphDef & { id?: string; name?: string; description?: string };
+  editable?: boolean;
+  onMetaChange?: (patch: GraphMetaPatch) => void;
 }) {
+  const [name, setName] = useState(graph.name ?? '');
+  const [description, setDescription] = useState(graph.description ?? '');
+  const [nameError, setNameError] = useState<string | null>(null);
+
+  // 外部保存/重拉后同步本地草稿
+  useEffect(() => {
+    setName(graph.name ?? '');
+    setDescription(graph.description ?? '');
+    setNameError(null);
+  }, [graph.id, graph.name, graph.description]);
+
+  function commitMeta() {
+    if (!onMetaChange) return;
+    const trimmed = name.trim();
+    if (!trimmed) {
+      setNameError('名称不能为空');
+      return;
+    }
+    const desc = description.trim();
+    if (trimmed === (graph.name ?? '') && desc === (graph.description ?? '')) {
+      setNameError(null);
+      return;
+    }
+    setNameError(null);
+    onMetaChange({ name: trimmed, description: desc });
+  }
+
   return (
-    <dl className="space-y-3 text-sm">
-      {graph.id && <Field label="ID" value={graph.id} mono />}
-      {graph.name && <Field label="名称" value={graph.name} />}
-      <Field
-        label="描述"
-        value={
-          graph.description || (
-            <span className="text-slate-400">（未填写）</span>
-          )
-        }
-      />
-      <Field label="节点数量" value={String(graph.nodes.length)} />
-      <Field label="连线数量" value={String(graph.edges.length)} />
-    </dl>
+    <div className="space-y-4 text-sm">
+      {editable && onMetaChange ? (
+        <>
+          <div className="space-y-1">
+            <Label htmlFor="graph-meta-name">名称</Label>
+            <Input
+              id="graph-meta-name"
+              value={name}
+              onChange={(e) => {
+                setName(e.target.value);
+                if (nameError) setNameError(null);
+              }}
+              onBlur={commitMeta}
+              placeholder="工作流或集合名称"
+            />
+            {nameError && (
+              <p className="text-xs text-red-600">{nameError}</p>
+            )}
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor="graph-meta-desc">描述</Label>
+            <Textarea
+              id="graph-meta-desc"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              onBlur={commitMeta}
+              rows={3}
+              placeholder="说明用途（可选）"
+            />
+          </div>
+        </>
+      ) : (
+        <dl className="space-y-3">
+          {graph.name && <Field label="名称" value={graph.name} />}
+          <Field
+            label="描述"
+            value={
+              graph.description || (
+                <span className="text-slate-400">（未填写）</span>
+              )
+            }
+          />
+        </dl>
+      )}
+
+      <dl className="space-y-3 border-t border-slate-100 pt-3">
+        {graph.id && <Field label="ID" value={graph.id} mono />}
+        <Field label="节点数量" value={String(graph.nodes.length)} />
+        <Field label="连线数量" value={String(graph.edges.length)} />
+      </dl>
+    </div>
   );
 }
 

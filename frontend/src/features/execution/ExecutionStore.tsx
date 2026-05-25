@@ -210,20 +210,9 @@ function reducer(state: StoreState, action: Action): StoreState {
       };
     }
     case 'hydrate': {
-      const r = action.record;
-      const next: ExecutionState = {
-        id: r.id,
-        workflowID: r.workflow_id,
-        workflowName: r.snapshot.workflow.name,
-        snapshot: r.snapshot,
-        status: r.status,
-        startedAt: r.started_at,
-        finishedAt: r.finished_at,
-        rootFrame: r.root_frame ?? emptyFrame(),
-        error: r.error,
-      };
+      const next = recordToState(action.record);
       return {
-        executions: { ...state.executions, [r.id]: next },
+        executions: { ...state.executions, [next.id]: next },
       };
     }
     case 'remove': {
@@ -234,6 +223,23 @@ function reducer(state: StoreState, action: Action): StoreState {
     default:
       return state;
   }
+}
+
+// recordToState 把 API 返回的 ExecutionRecord 直接投影成 store 内的 ExecutionState
+// 与 reducer 'hydrate' 分支保持一致；详情页在 store 尚未 hydrate 时用它兜底渲染，
+// 避免出现「record 已到但 exec 仍为 null → 误报记录不存在」的白屏竞态。
+export function recordToState(record: ExecutionRecord): ExecutionState {
+  return {
+    id: record.id,
+    workflowID: record.workflow_id,
+    workflowName: record.snapshot.workflow.name,
+    snapshot: record.snapshot,
+    status: record.status,
+    startedAt: record.started_at,
+    finishedAt: record.finished_at,
+    rootFrame: record.root_frame ?? emptyFrame(),
+    error: record.error,
+  };
 }
 
 // 沿 path 取 frame，找不到返回 undefined

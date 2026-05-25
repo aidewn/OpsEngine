@@ -81,13 +81,13 @@ func TestValidateWorkflow_InputSingle(t *testing.T) {
 		t.Fatalf("错误信息应提到端口名，实际: %v", err)
 	}
 
-	// exec_in 也必须单入
+	// exec_in 允许多入（分支汇合场景）
 	wf.Edges = []core.EdgeConfig{
 		{From: core.PortRef{Node: "n1", Port: "exec_out"}, To: core.PortRef{Node: "n3", Port: "exec_in"}},
 		{From: core.PortRef{Node: "n2", Port: "exec_out"}, To: core.PortRef{Node: "n3", Port: "exec_in"}},
 	}
-	if err := ValidateWorkflow(wf); err == nil {
-		t.Fatal("期望失败：exec_in 接收多条边")
+	if err := ValidateWorkflow(wf); err != nil {
+		t.Fatalf("exec_in 多入应允许（分支汇合），实际失败: %v", err)
 	}
 
 	// output 一对多仍然允许
