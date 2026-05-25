@@ -1,38 +1,32 @@
 id = "6d9df07e-5853-4bb9-af14-f92b903601c6"
 name = "配置yum仓库"
-description = ""
+description = "配置yum仓库并安装epel"
 returns = []
-variables = []
 
 [[params]]
   name = "ssh"
   var_type = "LinuxSshConnection"
+
+[[variables]]
+  name = "cmd"
+  var_type = "String"
+  default = "| grep \"mirrors.aliyun.com\" | wc -l"
 
 [[nodes]]
   id = "3712b9ef-b31d-4cca-81fa-2f1c919d5230"
   type = "assemble_start"
   [nodes.config]
   [nodes.position]
-    x = 80.0
-    y = 200.0
+    x = -1856.556037464406
+    y = 319.52291013934246
 
 [[nodes]]
   id = "7365d9df-2a8f-4cff-962c-b65412fb238e"
   type = "assemble_end"
   [nodes.config]
   [nodes.position]
-    x = 1118.6130318085318
-    y = 200.23552354167438
-
-[[nodes]]
-  id = "443ea36d-e36d-4fe8-ad22-ac42fbe247c9"
-  type = "linux_exec_command"
-  [nodes.config]
-    command = "yum clean all\nyum makecache"
-    timeout_seconds = 60.0
-  [nodes.position]
-    x = 715.6796724238583
-    y = 201.25451493754264
+    x = 478.2350454612994
+    y = 122.54917747225383
 
 [[nodes]]
   id = "4177dad1-5a77-49e2-8880-1d2a95c716c1"
@@ -45,49 +39,177 @@ variables = []
     timeout_seconds = 60.0
     url = "https://mirrors.aliyun.com/repo/Centos-7.repo"
   [nodes.position]
-    x = 289.475394641524
-    y = 195.41991923365538
+    x = -1198.6769254387254
+    y = 455.0279709897836
 
 [[nodes]]
   id = "fbaf76e5-6a9a-4814-99bd-ff63f20de91c"
   type = "branch"
   [nodes.config]
   [nodes.position]
-    x = 488.5650208236361
-    y = 196.36143095096566
+    x = -891.0361245909228
+    y = 460.4550684370811
 
 [[nodes]]
-  id = "a7d594ee-8fcb-432f-bdd6-d57221d15c6b"
+  id = "dd317c4e-26b1-4104-ac59-e9df27038156"
+  type = "linux_exec_command"
+  [nodes.config]
+    command = "yum install -y epel-release\nyum clean all && yum makecache"
+    timeout_seconds = 600.0
+  [nodes.position]
+    x = 166.4376852692966
+    y = 273.7643827793087
+
+[[nodes]]
+  id = "6c6521aa-6581-47d7-a1ab-b49572eddc4c"
   type = "assemble_param"
   [nodes.config]
     param_name = "ssh"
     var_type = "LinuxSshConnection"
   [nodes.position]
-    x = 721.7513353745235
-    y = 376.4538893563038
+    x = 140.13808529921022
+    y = 462.4353499355235
 
 [[nodes]]
-  id = "9a952d6a-c78a-4188-b433-160c7558fbc1"
+  id = "22be256e-562a-428e-843c-583e4f028c87"
+  type = "linux_exec_command"
+  [nodes.config]
+    command = "yum list"
+    fail_on_error = false
+    timeout_seconds = 60.0
+  [nodes.position]
+    x = -1587.611995961733
+    y = 320.4092806646838
+
+[[nodes]]
+  id = "78d5d33d-65f0-493a-afc7-e0c426af7bdf"
   type = "branch"
   [nodes.config]
   [nodes.position]
-    x = 923.2866612234535
-    y = 202.46216819462438
+    x = -1356.7870477136207
+    y = 317.71445871258095
 
 [[nodes]]
-  id = "27479c79-b75f-40f8-aa30-85c1fa0c3305"
-  type = "print"
+  id = "503e22a7-e1a3-4ff2-87a6-8d96b0220141"
+  type = "linux_exec_command"
+  [nodes.config]
+    command = "rpm -qa | grep epel-release | wc -l"
+    fail_on_error = false
+    timeout_seconds = 60.0
+  [nodes.position]
+    x = -915.9242901770698
+    y = 168.073180560022
+
+[[nodes]]
+  id = "42ad4dc9-8f27-4bc9-8252-4404d01b3afd"
+  type = "compare_ne"
+  [nodes.config]
+    b_default = "0"
+    var_type = "Int"
+  [nodes.position]
+    x = -683.8703951123741
+    y = 308.6932679657201
+
+[[nodes]]
+  id = "dd34a5e7-6544-408f-b138-bb2f1cf3fe24"
+  type = "branch"
   [nodes.config]
   [nodes.position]
-    x = 1152.1588100502029
-    y = 271.3818987018058
+    x = -516.8065077981415
+    y = 164.17845355760463
+
+[[nodes]]
+  id = "6f8dac09-e0a4-496e-8b15-ef534c7f721a"
+  type = "linux_download_file"
+  [nodes.config]
+    dest_path = "/etc/yum.repos.d/epel.repo"
+    ensure_parent_dir = true
+    follow_redirects = true
+    insecure = false
+    timeout_seconds = 60.0
+    url = "https://mirrors.aliyun.com/repo/epel-7.repo"
+  [nodes.position]
+    x = -306.51600797640265
+    y = 279.1956620695537
+
+[[nodes]]
+  id = "f65dd27a-9c7e-42a6-a26e-acacc1eb9ad9"
+  type = "branch"
+  [nodes.config]
+  [nodes.position]
+    x = -45.84409771288274
+    y = 286.4169938088461
+
+[[nodes]]
+  id = "11f1dab8-80d3-41cf-951c-0109cd38e345"
+  type = "linux_exec_command"
+  [nodes.config]
+    command = "yum clean all && yum makecache"
+    timeout_seconds = 600.0
+  [nodes.position]
+    x = 2.8657778952844097
+    y = -60.319057615934746
+
+[[nodes]]
+  id = "a26fccee-b408-4c89-bac7-27ef16d3a5da"
+  type = "assemble_param"
+  [nodes.config]
+    param_name = "ssh"
+    var_type = "LinuxSshConnection"
+  [nodes.position]
+    x = -20.104872651978084
+    y = 116.6628200596121
+
+[[nodes]]
+  id = "66108f12-8e02-4bed-b234-420e5e395540"
+  type = "assemble_param"
+  [nodes.config]
+    param_name = "ssh"
+    var_type = "LinuxSshConnection"
+  [nodes.position]
+    x = -1098.713793143279
+    y = 338.16563479377345
+
+[[nodes]]
+  id = "9a003d71-f6ca-4a5d-9ea0-3ec2e27e648d"
+  type = "assemble_param"
+  [nodes.config]
+    param_name = "ssh"
+    var_type = "LinuxSshConnection"
+  [nodes.position]
+    x = -430.9479109554676
+    y = 424.9688586812247
+
+[[edges]]
+  [edges.from]
+    node = "4177dad1-5a77-49e2-8880-1d2a95c716c1"
+    port = "success"
+  [edges.to]
+    node = "fbaf76e5-6a9a-4814-99bd-ff63f20de91c"
+    port = "condition"
+
+[[edges]]
+  [edges.from]
+    node = "4177dad1-5a77-49e2-8880-1d2a95c716c1"
+    port = "exec_out"
+  [edges.to]
+    node = "fbaf76e5-6a9a-4814-99bd-ff63f20de91c"
+    port = "exec_in"
+
+[[edges]]
+  [edges.from]
+    node = "6c6521aa-6581-47d7-a1ab-b49572eddc4c"
+    port = "value"
+  [edges.to]
+    node = "dd317c4e-26b1-4104-ac59-e9df27038156"
+    port = "client"
 
 [[edges]]
   [edges.from]
     node = "3712b9ef-b31d-4cca-81fa-2f1c919d5230"
     port = "param_ssh"
   [edges.to]
-    node = "4177dad1-5a77-49e2-8880-1d2a95c716c1"
+    node = "22be256e-562a-428e-843c-583e4f028c87"
     port = "client"
 
 [[edges]]
@@ -95,23 +217,63 @@ variables = []
     node = "3712b9ef-b31d-4cca-81fa-2f1c919d5230"
     port = "exec_out"
   [edges.to]
+    node = "22be256e-562a-428e-843c-583e4f028c87"
+    port = "exec_in"
+
+[[edges]]
+  [edges.from]
+    node = "22be256e-562a-428e-843c-583e4f028c87"
+    port = "exec_out"
+  [edges.to]
+    node = "78d5d33d-65f0-493a-afc7-e0c426af7bdf"
+    port = "exec_in"
+
+[[edges]]
+  [edges.from]
+    node = "22be256e-562a-428e-843c-583e4f028c87"
+    port = "success"
+  [edges.to]
+    node = "78d5d33d-65f0-493a-afc7-e0c426af7bdf"
+    port = "condition"
+
+[[edges]]
+  [edges.from]
+    node = "78d5d33d-65f0-493a-afc7-e0c426af7bdf"
+    port = "exec_out_true"
+  [edges.to]
+    node = "503e22a7-e1a3-4ff2-87a6-8d96b0220141"
+    port = "exec_in"
+
+[[edges]]
+  [edges.from]
+    node = "78d5d33d-65f0-493a-afc7-e0c426af7bdf"
+    port = "exec_out_false"
+  [edges.to]
     node = "4177dad1-5a77-49e2-8880-1d2a95c716c1"
     port = "exec_in"
 
 [[edges]]
   [edges.from]
-    node = "4177dad1-5a77-49e2-8880-1d2a95c716c1"
-    port = "success"
+    node = "503e22a7-e1a3-4ff2-87a6-8d96b0220141"
+    port = "combined_output"
   [edges.to]
-    node = "fbaf76e5-6a9a-4814-99bd-ff63f20de91c"
+    node = "42ad4dc9-8f27-4bc9-8252-4404d01b3afd"
+    port = "a"
+
+[[edges]]
+  [edges.from]
+    node = "42ad4dc9-8f27-4bc9-8252-4404d01b3afd"
+    port = "result"
+  [edges.to]
+    node = "dd34a5e7-6544-408f-b138-bb2f1cf3fe24"
     port = "condition"
 
 [[edges]]
   [edges.from]
-    node = "4177dad1-5a77-49e2-8880-1d2a95c716c1"
+    node = "503e22a7-e1a3-4ff2-87a6-8d96b0220141"
     port = "exec_out"
   [edges.to]
-    node = "fbaf76e5-6a9a-4814-99bd-ff63f20de91c"
+    node = "dd34a5e7-6544-408f-b138-bb2f1cf3fe24"
     port = "exec_in"
 
 [[edges]]
@@ -119,53 +281,85 @@ variables = []
     node = "fbaf76e5-6a9a-4814-99bd-ff63f20de91c"
     port = "exec_out_true"
   [edges.to]
-    node = "443ea36d-e36d-4fe8-ad22-ac42fbe247c9"
+    node = "503e22a7-e1a3-4ff2-87a6-8d96b0220141"
     port = "exec_in"
 
 [[edges]]
   [edges.from]
-    node = "a7d594ee-8fcb-432f-bdd6-d57221d15c6b"
+    node = "6f8dac09-e0a4-496e-8b15-ef534c7f721a"
+    port = "success"
+  [edges.to]
+    node = "f65dd27a-9c7e-42a6-a26e-acacc1eb9ad9"
+    port = "condition"
+
+[[edges]]
+  [edges.from]
+    node = "6f8dac09-e0a4-496e-8b15-ef534c7f721a"
+    port = "exec_out"
+  [edges.to]
+    node = "f65dd27a-9c7e-42a6-a26e-acacc1eb9ad9"
+    port = "exec_in"
+
+[[edges]]
+  [edges.from]
+    node = "dd34a5e7-6544-408f-b138-bb2f1cf3fe24"
+    port = "exec_out_false"
+  [edges.to]
+    node = "6f8dac09-e0a4-496e-8b15-ef534c7f721a"
+    port = "exec_in"
+
+[[edges]]
+  [edges.from]
+    node = "f65dd27a-9c7e-42a6-a26e-acacc1eb9ad9"
+    port = "exec_out_true"
+  [edges.to]
+    node = "dd317c4e-26b1-4104-ac59-e9df27038156"
+    port = "exec_in"
+
+[[edges]]
+  [edges.from]
+    node = "a26fccee-b408-4c89-bac7-27ef16d3a5da"
     port = "value"
   [edges.to]
-    node = "443ea36d-e36d-4fe8-ad22-ac42fbe247c9"
+    node = "11f1dab8-80d3-41cf-951c-0109cd38e345"
     port = "client"
 
 [[edges]]
   [edges.from]
-    node = "443ea36d-e36d-4fe8-ad22-ac42fbe247c9"
-    port = "success"
+    node = "dd34a5e7-6544-408f-b138-bb2f1cf3fe24"
+    port = "exec_out_true"
   [edges.to]
-    node = "9a952d6a-c78a-4188-b433-160c7558fbc1"
-    port = "condition"
+    node = "11f1dab8-80d3-41cf-951c-0109cd38e345"
+    port = "exec_in"
 
 [[edges]]
   [edges.from]
-    node = "9a952d6a-c78a-4188-b433-160c7558fbc1"
-    port = "exec_out_true"
+    node = "11f1dab8-80d3-41cf-951c-0109cd38e345"
+    port = "exec_out"
   [edges.to]
     node = "7365d9df-2a8f-4cff-962c-b65412fb238e"
     port = "exec_in"
 
 [[edges]]
   [edges.from]
-    node = "443ea36d-e36d-4fe8-ad22-ac42fbe247c9"
+    node = "dd317c4e-26b1-4104-ac59-e9df27038156"
     port = "exec_out"
   [edges.to]
-    node = "9a952d6a-c78a-4188-b433-160c7558fbc1"
+    node = "7365d9df-2a8f-4cff-962c-b65412fb238e"
     port = "exec_in"
 
 [[edges]]
   [edges.from]
-    node = "9a952d6a-c78a-4188-b433-160c7558fbc1"
-    port = "exec_out_false"
+    node = "66108f12-8e02-4bed-b234-420e5e395540"
+    port = "value"
   [edges.to]
-    node = "27479c79-b75f-40f8-aa30-85c1fa0c3305"
-    port = "exec_in"
+    node = "503e22a7-e1a3-4ff2-87a6-8d96b0220141"
+    port = "client"
 
 [[edges]]
   [edges.from]
-    node = "443ea36d-e36d-4fe8-ad22-ac42fbe247c9"
-    port = "combined_output"
+    node = "9a003d71-f6ca-4a5d-9ea0-3ec2e27e648d"
+    port = "value"
   [edges.to]
-    node = "27479c79-b75f-40f8-aa30-85c1fa0c3305"
-    port = "message"
+    node = "6f8dac09-e0a4-496e-8b15-ef534c7f721a"
+    port = "client"

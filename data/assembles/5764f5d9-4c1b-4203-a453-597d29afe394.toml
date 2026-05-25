@@ -1,0 +1,26 @@
+id = "5764f5d9-4c1b-4203-a453-597d29afe394"
+name = "docker部署"
+description = ""
+returns = []
+variables = []
+edges = []
+
+[[params]]
+  name = "ssh"
+  var_type = "LinuxSshConnection"
+
+[[nodes]]
+  id = "65fecfad-c4e5-450b-89f9-6fc3eba6b0e0"
+  type = "assemble_start"
+  [nodes.config]
+  [nodes.position]
+    x = -176.91395802351246
+    y = 198.4842834334896
+
+[[nodes]]
+  id = "ebb73fe0-45fd-4023-9c3e-2daebe77eeec"
+  type = "assemble_end"
+  [nodes.config]
+  [nodes.position]
+    x = 600.0
+    y = 200.0

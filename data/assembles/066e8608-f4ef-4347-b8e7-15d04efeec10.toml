@@ -1,123 +1,166 @@
 id = "066e8608-f4ef-4347-b8e7-15d04efeec10"
 name = "nginx部署"
 description = ""
-params = []
 returns = []
+variables = []
 
-[[variables]]
-  name = "1"
-  var_type = "String"
-  default = "1"
-
-[[variables]]
-  name = "2"
-  var_type = "String"
-  default = "3"
+[[params]]
+  name = "ssh"
+  var_type = "LinuxSshConnection"
 
 [[nodes]]
   id = "29af7519-7f0d-49f7-83d5-c50c1aebd63e"
   type = "assemble_start"
   [nodes.config]
   [nodes.position]
-    x = -290.58474870220573
-    y = 98.72309503442807
+    x = -307.81522402716126
+    y = 80.91827053197403
 
 [[nodes]]
   id = "2e39b83a-0027-4587-a43a-550d64917ac9"
   type = "assemble_end"
   [nodes.config]
   [nodes.position]
-    x = 674.4739433489746
-    y = 89.53350819445178
+    x = 627.14110904617
+    y = 69.43198136338506
 
 [[nodes]]
-  id = "9c2b9e57-b406-4c2c-9376-0419580a8c8c"
-  type = "parallel"
+  id = "5d791326-6dcc-4738-89bf-f0cf1f01c90d"
+  type = "linux_exec_command"
   [nodes.config]
+    command = "rpm -q nginx"
+    fail_on_error = false
+    timeout_seconds = 60.0
   [nodes.position]
-    x = 240.8172231229487
-    y = -10.030580533271078
+    x = -83.56489573825922
+    y = 81.68119025292528
 
 [[nodes]]
-  id = "8ed9b269-8116-4fd5-aac9-806ae35d4836"
-  type = "print"
+  id = "7d6638d7-fa4c-4ac9-9770-c4555b70d254"
+  type = "branch"
   [nodes.config]
   [nodes.position]
-    x = 468.81423193435194
-    y = -204.03229576699624
+    x = 167.66294250950432
+    y = 74.54973039244965
 
 [[nodes]]
-  id = "7c475e76-ee5a-45e5-b101-52a92c08c33a"
-  type = "print"
+  id = "6f31ecee-d764-4842-bad4-b014066d332d"
+  type = "linux_exec_command"
   [nodes.config]
+    command = "yum install -y nginx"
+    fail_on_error = true
+    timeout_seconds = 300.0
   [nodes.position]
-    x = 463.6481085081672
-    y = -46.66150573381968
+    x = 191.66294250950432
+    y = 190.04973039244965
 
 [[nodes]]
-  id = "177f0315-0d0a-4714-a2b2-06a83a8e0772"
-  type = "var_get"
+  id = "d1fe9eee-3149-4496-b822-9bef3bdb5e47"
+  type = "linux_exec_command"
   [nodes.config]
-    var_name = "1"
-    var_type = "String"
+    command = "systemctl start nginx"
+    fail_on_error = true
+    timeout_seconds = 60.0
   [nodes.position]
-    x = 464.65303618340585
-    y = -117.80034628287645
+    x = 415.1629425095043
+    y = 65.54973039244965
 
 [[nodes]]
-  id = "f0502477-a2ad-44d0-8c91-88a6eeb42943"
-  type = "var_get"
+  id = "6f44a470-2aa5-4ae3-8dfa-1f58e83b1e69"
+  type = "assemble_param"
   [nodes.config]
-    var_name = "2"
-    var_type = "String"
+    param_name = "ssh"
+    var_type = "LinuxSshConnection"
   [nodes.position]
-    x = 459.1466000020105
-    y = 42.838567128415356
+    x = 185.16294250950432
+    y = 385.04973039244965
+
+[[nodes]]
+  id = "68578946-45ee-4a2d-9c0c-1458d209b8ee"
+  type = "assemble_param"
+  [nodes.config]
+    param_name = "ssh"
+    var_type = "LinuxSshConnection"
+  [nodes.position]
+    x = 408.1629425095043
+    y = 262.04973039244965
 
 [[edges]]
   [edges.from]
     node = "29af7519-7f0d-49f7-83d5-c50c1aebd63e"
     port = "exec_out"
   [edges.to]
-    node = "9c2b9e57-b406-4c2c-9376-0419580a8c8c"
+    node = "5d791326-6dcc-4738-89bf-f0cf1f01c90d"
     port = "exec_in"
 
 [[edges]]
   [edges.from]
-    node = "9c2b9e57-b406-4c2c-9376-0419580a8c8c"
-    port = "exec_out_1"
+    node = "29af7519-7f0d-49f7-83d5-c50c1aebd63e"
+    port = "param_ssh"
   [edges.to]
-    node = "8ed9b269-8116-4fd5-aac9-806ae35d4836"
-    port = "exec_in"
+    node = "5d791326-6dcc-4738-89bf-f0cf1f01c90d"
+    port = "client"
 
 [[edges]]
   [edges.from]
-    node = "9c2b9e57-b406-4c2c-9376-0419580a8c8c"
-    port = "exec_out_2"
+    node = "5d791326-6dcc-4738-89bf-f0cf1f01c90d"
+    port = "success"
   [edges.to]
-    node = "7c475e76-ee5a-45e5-b101-52a92c08c33a"
+    node = "7d6638d7-fa4c-4ac9-9770-c4555b70d254"
+    port = "condition"
+
+[[edges]]
+  [edges.from]
+    node = "5d791326-6dcc-4738-89bf-f0cf1f01c90d"
+    port = "exec_out"
+  [edges.to]
+    node = "7d6638d7-fa4c-4ac9-9770-c4555b70d254"
     port = "exec_in"
 
 [[edges]]
   [edges.from]
-    node = "9c2b9e57-b406-4c2c-9376-0419580a8c8c"
-    port = "exec_out_done"
+    node = "7d6638d7-fa4c-4ac9-9770-c4555b70d254"
+    port = "exec_out_false"
+  [edges.to]
+    node = "6f31ecee-d764-4842-bad4-b014066d332d"
+    port = "exec_in"
+
+[[edges]]
+  [edges.from]
+    node = "7d6638d7-fa4c-4ac9-9770-c4555b70d254"
+    port = "exec_out_true"
+  [edges.to]
+    node = "d1fe9eee-3149-4496-b822-9bef3bdb5e47"
+    port = "exec_in"
+
+[[edges]]
+  [edges.from]
+    node = "d1fe9eee-3149-4496-b822-9bef3bdb5e47"
+    port = "exec_out"
   [edges.to]
     node = "2e39b83a-0027-4587-a43a-550d64917ac9"
     port = "exec_in"
 
 [[edges]]
   [edges.from]
-    node = "177f0315-0d0a-4714-a2b2-06a83a8e0772"
-    port = "value"
+    node = "6f31ecee-d764-4842-bad4-b014066d332d"
+    port = "exec_out"
   [edges.to]
-    node = "8ed9b269-8116-4fd5-aac9-806ae35d4836"
-    port = "message"
+    node = "d1fe9eee-3149-4496-b822-9bef3bdb5e47"
+    port = "exec_in"
 
 [[edges]]
   [edges.from]
-    node = "f0502477-a2ad-44d0-8c91-88a6eeb42943"
+    node = "6f44a470-2aa5-4ae3-8dfa-1f58e83b1e69"
     port = "value"
   [edges.to]
-    node = "7c475e76-ee5a-45e5-b101-52a92c08c33a"
-    port = "message"
+    node = "6f31ecee-d764-4842-bad4-b014066d332d"
+    port = "client"
+
+[[edges]]
+  [edges.from]
+    node = "68578946-45ee-4a2d-9c0c-1458d209b8ee"
+    port = "value"
+  [edges.to]
+    node = "d1fe9eee-3149-4496-b822-9bef3bdb5e47"
+    port = "client"
