@@ -37,6 +37,17 @@ export interface ExecutionSnapshot {
   assembles: Record<string, AssembleDef>;
 }
 
+// 单个调用栈帧的状态（递归树状结构）
+export interface FrameState {
+  assemble_id: string;
+  node_states: Record<string, NodeState>;
+  node_logs: Record<string, LogEntry[]>;
+  variables: Record<string, unknown>;
+  params?: Record<string, unknown>;
+  returns?: Record<string, unknown>;
+  children?: Record<string, FrameState>;
+}
+
 // 完整执行记录
 export interface ExecutionRecord {
   id: string;
@@ -45,9 +56,7 @@ export interface ExecutionRecord {
   status: WorkflowStatus;
   started_at: string;
   finished_at?: string;
-  node_states: Record<string, NodeState>;
-  node_logs: Record<string, LogEntry[]>;
-  variables: Record<string, unknown>;
+  root_frame: FrameState;
   error?: string;
 }
 

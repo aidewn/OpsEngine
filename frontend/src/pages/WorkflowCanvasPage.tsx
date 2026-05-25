@@ -1,6 +1,6 @@
 // 工作流画布页：顶栏 + 中间画布 + 右侧详情 + 添加节点弹窗
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ReactFlowProvider } from '@xyflow/react';
 import { useUpdateWorkflow, useWorkflow } from '@/api/workflows';
@@ -13,6 +13,7 @@ import {
 import { NodeDetailPanel } from '@/features/workflow/NodeDetailPanel';
 import { AddNodeDialog } from '@/features/workflow/AddNodeDialog';
 import { WorkflowSidebar } from '@/features/workflow/WorkflowSidebar';
+import { cleanupParallelEdges } from '@/features/workflow/cleanupParallel';
 import { Button } from '@/components/ui/Button';
 import type { WorkflowDef } from '@/types/workflow';
 import { buildDefaultConfig, type NodeTypeDef } from '@/types/nodeType';
@@ -21,9 +22,21 @@ import { TabBar } from '@/features/tabs/TabBar';
 import { useTabs } from '@/features/tabs/TabsContext';
 import { useRunWorkflow } from '@/api/executions';
 import { RunningBadge } from '@/features/execution/RunningBadge';
+import { useCopyPaste } from '@/features/clipboard/useCopyPaste';
 
+// 外壳组件：仅负责挂载 ReactFlowProvider
+// 内部 hook（如 useCopyPaste → useReactFlow）必须位于 Provider 子树才能正常工作
 export function WorkflowCanvasPage() {
   const { id } = useParams<{ id: string }>();
+  return (
+    <ReactFlowProvider>
+      <WorkflowCanvasInner workflowId={id} />
+    </ReactFlowProvider>
+  );
+}
+
+// 内核组件：承载页面的全部逻辑与渲染
+function WorkflowCanvasInner({ workflowId: id }: { workflowId: string | undefined }) {
   const navigate = useNavigate();
   const { data: workflow, isLoading, error } = useWorkflow(id);
   const update = useUpdateWorkflow();
@@ -50,15 +63,33 @@ export function WorkflowCanvasPage() {
   );
 
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  const [selectedNodeIds, setSelectedNodeIds] = useState<Set<string>>(new Set());
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [pendingConnection, setPendingConnection] =
     useState<PendingConnection | null>(null);
 
   const handleWorkflowChange = useCallback(
     (next: WorkflowDef) => {
-      update.mutate(next);
+      // 副作用：parallel 节点 branch_count 改小后清理超范围 exec_out 边
+      const cleaned = cleanupParallelEdges(next);
+      update.mutate(cleaned);
     },
     [update],
+  );
+
+  // 节点 config 修改回调（由 NodeDetailPanel.ConfigForm 触发）
+  const handleConfigChange = useCallback(
+    (nodeId: string, config: Record<string, unknown>) => {
+      if (!workflow) return;
+      const next = {
+        ...workflow,
+        nodes: workflow.nodes.map((n) =>
+          n.instance_id === nodeId ? { ...n, config } : n,
+        ),
+      };
+      handleWorkflowChange(next);
+    },
+    [workflow, handleWorkflowChange],
   );
 
   function handleAddButtonClick() {
@@ -121,6 +152,20 @@ export function WorkflowCanvasPage() {
     setPendingConnection(null);
   }
 
+  // 复制粘贴：Ctrl/Cmd + C/X/V
+  // Hook 必须在所有早返回之前调用（保持调用顺序）
+  // workflow 未加载时用稳定的兜底对象 + ":none" editorKey 让 hook 内部短路
+  const fallbackWorkflow = useMemo(
+    () => ({ id: '', nodes: [], edges: [] }) as unknown as WorkflowDef,
+    [],
+  );
+  useCopyPaste<WorkflowDef>({
+    editorKey: workflow ? `workflow:${workflow.id}` : 'workflow:none',
+    graph: workflow ?? fallbackWorkflow,
+    selectedNodeIds,
+    onGraphChange: handleWorkflowChange,
+  });
+
   if (isLoading) return <CenteredMessage>加载中...</CenteredMessage>;
   if (error)
     return (
@@ -132,64 +177,64 @@ export function WorkflowCanvasPage() {
     return <CenteredMessage tone="error">工作流不存在</CenteredMessage>;
 
   return (
-    <ReactFlowProvider>
-      <div className="flex h-screen flex-col">
-        {/* 顶栏：返回 | tab 列表 | 右侧操作 */}
-        <header className="flex h-12 items-center border-b border-slate-200 bg-white px-4">
-          <Link
-            to="/"
-            className="mr-3 text-sm text-slate-500 hover:text-slate-900"
+    <div className="flex h-screen flex-col">
+      {/* 顶栏：返回 | tab 列表 | 右侧操作 */}
+      <header className="flex h-12 items-center border-b border-slate-200 bg-white px-4">
+        <Link
+          to="/"
+          className="mr-3 text-sm text-slate-500 hover:text-slate-900"
+        >
+          ← 返回
+        </Link>
+        <span className="mr-2 text-slate-300">|</span>
+        <TabBar />
+        <div className="ml-3 flex items-center gap-3">
+          <span className="text-xs text-slate-500">
+            {update.isPending ? '保存中...' : '已保存'}
+          </span>
+          <RunningBadge workflowID={workflow.id} />
+          <Button
+            size="sm"
+            onClick={handleRun}
+            disabled={runMutation.isPending}
           >
-            ← 返回
-          </Link>
-          <span className="mr-2 text-slate-300">|</span>
-          <TabBar />
-          <div className="ml-3 flex items-center gap-3">
-            <span className="text-xs text-slate-500">
-              {update.isPending ? '保存中...' : '已保存'}
-            </span>
-            <RunningBadge workflowID={workflow.id} />
-            <Button
-              size="sm"
-              onClick={handleRun}
-              disabled={runMutation.isPending}
-            >
-              ▶ 运行
-            </Button>
-            <Button size="sm" variant="secondary" onClick={handleAddButtonClick}>
-              + 添加节点
-            </Button>
-          </div>
-        </header>
+            ▶ 运行
+          </Button>
+          <Button size="sm" variant="secondary" onClick={handleAddButtonClick}>
+            + 添加节点
+          </Button>
+        </div>
+      </header>
 
-        <div className="flex flex-1 overflow-hidden">
-          <WorkflowSidebar
-            workflow={workflow}
-            onChange={handleWorkflowChange}
-          />
-          <main className="flex-1">
-            <WorkflowCanvas
-              graph={workflow}
-              selectedNodeId={selectedNodeId}
-              onSelectNode={setSelectedNodeId}
-              onGraphChange={handleWorkflowChange}
-              onPendingConnection={handlePendingConnection}
-              onNodeDoubleClick={handleNodeDoubleClick}
-            />
-          </main>
-          <NodeDetailPanel
+      <div className="flex flex-1 overflow-hidden">
+        <WorkflowSidebar
+          workflow={workflow}
+          onChange={handleWorkflowChange}
+        />
+        <main className="flex-1">
+          <WorkflowCanvas
             graph={workflow}
             selectedNodeId={selectedNodeId}
+            onSelectNode={setSelectedNodeId}
+            onSelectedNodesChange={setSelectedNodeIds}
+            onGraphChange={handleWorkflowChange}
+            onPendingConnection={handlePendingConnection}
+            onNodeDoubleClick={handleNodeDoubleClick}
           />
-        </div>
-
-        <AddNodeDialog
-          open={addDialogOpen}
-          onOpenChange={setAddDialogOpen}
-          pendingConnection={pendingConnection}
-          onSelect={handleNodeTypeSelected}
+        </main>
+        <NodeDetailPanel
+          graph={workflow}
+          selectedNodeId={selectedNodeId}
+          onConfigChange={handleConfigChange}
         />
       </div>
-    </ReactFlowProvider>
+
+      <AddNodeDialog
+        open={addDialogOpen}
+        onOpenChange={setAddDialogOpen}
+        pendingConnection={pendingConnection}
+        onSelect={handleNodeTypeSelected}
+      />
+    </div>
   );
 }

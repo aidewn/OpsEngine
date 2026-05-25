@@ -75,7 +75,7 @@ func TestSystemUpdate_Interval(t *testing.T) {
 		t.Fatalf("期望 Terminated，实际 %s", got)
 	}
 
-	logs := rt.Record().NodeLogs["p"]
+	logs := rt.Record().RootFrame.NodeLogs["p"]
 	if len(logs) < 2 {
 		t.Errorf("期望至少 2 条 print 日志，实际 %d 条: %+v", len(logs), logs)
 	}
@@ -150,8 +150,8 @@ func TestSystemOver_Triggered(t *testing.T) {
 	}
 
 	rec := rt.Record()
-	mainLogs := rec.NodeLogs["pmain"]
-	overLogs := rec.NodeLogs["pover"]
+	mainLogs := rec.RootFrame.NodeLogs["pmain"]
+	overLogs := rec.RootFrame.NodeLogs["pover"]
 	if len(mainLogs) == 0 || mainLogs[0].Message != "[INFO] main" {
 		t.Errorf("主流 print 异常: %+v", mainLogs)
 	}
@@ -217,7 +217,7 @@ func TestSystemOver_NaturalEnd(t *testing.T) {
 	}
 
 	rec := rt.Record()
-	overLogs := rec.NodeLogs["pover"]
+	overLogs := rec.RootFrame.NodeLogs["pover"]
 	if len(overLogs) == 0 || overLogs[0].Message != "[INFO] cleanup" {
 		t.Errorf("over 流应执行 print cleanup，实际: %+v", overLogs)
 	}

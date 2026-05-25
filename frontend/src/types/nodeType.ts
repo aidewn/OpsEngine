@@ -20,7 +20,7 @@ export type NodeKind = 'event' | 'action' | 'pure' | 'flow_control';
 export type ExecutionMode = 'remote_cmd' | 'agent' | 'flow';
 
 // 字段类型，对应后端 FieldSchema.Type
-export type FieldType = 'text' | 'password' | 'number' | 'select' | 'toggle';
+export type FieldType = 'text' | 'password' | 'number' | 'select' | 'toggle' | 'textarea';
 
 export interface PortDef {
   id: string;

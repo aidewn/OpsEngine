@@ -1,8 +1,6 @@
 // 执行状态全局 store：内存 + Wails 事件订阅
-// 设计要点：
-//   - 后端持续推 execution:* 事件，store 内 reducer 更新对应 ExecutionState
-//   - 列表/详情页通过 hooks 读 store，保证实时性
-//   - store 不与 TanStack Query 重复：API hooks 用于初次拉取，事件用于增量更新
+// 数据按 FrameState 树状组织（与后端对齐）
+// 事件 payload 带 framePath，reducer 递归定位到对应 frame 更新
 
 import {
   createContext,
@@ -18,7 +16,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import type {
   ExecutionRecord,
   ExecutionSnapshot,
-  LogEntry,
+  FrameState,
   NodeState,
   WorkflowStatus,
 } from '@/types/execution';
@@ -32,13 +30,10 @@ export interface ExecutionState {
   status: WorkflowStatus;
   startedAt: string;
   finishedAt?: string;
-  nodeStates: Record<string, NodeState>;
-  nodeLogs: Record<string, LogEntry[]>;
-  variables: Record<string, unknown>;
+  rootFrame: FrameState;
   error?: string;
 }
 
-// reducer state：以 executionID 索引
 interface StoreState {
   executions: Record<string, ExecutionState>;
 }
@@ -57,12 +52,14 @@ interface StatusPayload {
 }
 interface NodePayload {
   executionID: string;
+  framePath: string[];
   nodeID: string;
   state: NodeState;
   errorMsg?: string;
 }
 interface LogPayload {
   executionID: string;
+  framePath: string[];
   nodeID: string;
   time: string;
   level: 'info' | 'warn' | 'error';
@@ -70,6 +67,7 @@ interface LogPayload {
 }
 interface VariablePayload {
   executionID: string;
+  framePath: string[];
   name: string;
   value: unknown;
 }
@@ -79,7 +77,7 @@ interface FinishedPayload {
   error?: string;
 }
 
-// ── reducer actions ──────────────────────────────────────
+// ── reducer ─────────────────────────────────────────────
 
 type Action =
   | { type: 'started'; p: StartedPayload }
@@ -88,8 +86,35 @@ type Action =
   | { type: 'log'; p: LogPayload }
   | { type: 'variable'; p: VariablePayload }
   | { type: 'finished'; p: FinishedPayload }
-  | { type: 'hydrate'; record: ExecutionRecord } // 从后端 GetExecution 注入
+  | { type: 'hydrate'; record: ExecutionRecord }
   | { type: 'remove'; executionID: string };
+
+// 创建空 frame
+function emptyFrame(assembleID = ''): FrameState {
+  return {
+    assemble_id: assembleID,
+    node_states: {},
+    node_logs: {},
+    variables: {},
+  };
+}
+
+// 沿 path 递归找到 frame；不存在时按需创建
+// 返回的是新对象树（保留 React state immutability）
+function withFrameAt(
+  root: FrameState,
+  path: string[],
+  update: (f: FrameState) => FrameState,
+): FrameState {
+  if (path.length === 0) {
+    return update(root);
+  }
+  const [head, ...rest] = path;
+  const children = { ...(root.children ?? {}) };
+  const child = children[head!] ?? emptyFrame();
+  children[head!] = withFrameAt(child, rest, update);
+  return { ...root, children };
+}
 
 function reducer(state: StoreState, action: Action): StoreState {
   switch (action.type) {
@@ -101,9 +126,7 @@ function reducer(state: StoreState, action: Action): StoreState {
         snapshot: action.p.snapshot,
         status: 'Running',
         startedAt: action.p.startedAt,
-        nodeStates: {},
-        nodeLogs: {},
-        variables: {},
+        rootFrame: emptyFrame(),
       };
       return {
         executions: { ...state.executions, [action.p.executionID]: next },
@@ -122,56 +145,52 @@ function reducer(state: StoreState, action: Action): StoreState {
     case 'node': {
       const cur = state.executions[action.p.executionID];
       if (!cur) return state;
+      const rootFrame = withFrameAt(cur.rootFrame, action.p.framePath, (f) => ({
+        ...f,
+        node_states: { ...f.node_states, [action.p.nodeID]: action.p.state },
+      }));
       return {
         executions: {
           ...state.executions,
-          [action.p.executionID]: {
-            ...cur,
-            nodeStates: {
-              ...cur.nodeStates,
-              [action.p.nodeID]: action.p.state,
-            },
-          },
+          [action.p.executionID]: { ...cur, rootFrame },
         },
       };
     }
     case 'log': {
       const cur = state.executions[action.p.executionID];
       if (!cur) return state;
-      const prev = cur.nodeLogs[action.p.nodeID] ?? [];
+      const rootFrame = withFrameAt(cur.rootFrame, action.p.framePath, (f) => ({
+        ...f,
+        node_logs: {
+          ...f.node_logs,
+          [action.p.nodeID]: [
+            ...(f.node_logs[action.p.nodeID] ?? []),
+            {
+              time: action.p.time,
+              level: action.p.level,
+              message: action.p.message,
+            },
+          ],
+        },
+      }));
       return {
         executions: {
           ...state.executions,
-          [action.p.executionID]: {
-            ...cur,
-            nodeLogs: {
-              ...cur.nodeLogs,
-              [action.p.nodeID]: [
-                ...prev,
-                {
-                  time: action.p.time,
-                  level: action.p.level,
-                  message: action.p.message,
-                },
-              ],
-            },
-          },
+          [action.p.executionID]: { ...cur, rootFrame },
         },
       };
     }
     case 'variable': {
       const cur = state.executions[action.p.executionID];
       if (!cur) return state;
+      const rootFrame = withFrameAt(cur.rootFrame, action.p.framePath, (f) => ({
+        ...f,
+        variables: { ...f.variables, [action.p.name]: action.p.value },
+      }));
       return {
         executions: {
           ...state.executions,
-          [action.p.executionID]: {
-            ...cur,
-            variables: {
-              ...cur.variables,
-              [action.p.name]: action.p.value,
-            },
-          },
+          [action.p.executionID]: { ...cur, rootFrame },
         },
       };
     }
@@ -200,9 +219,7 @@ function reducer(state: StoreState, action: Action): StoreState {
         status: r.status,
         startedAt: r.started_at,
         finishedAt: r.finished_at,
-        nodeStates: r.node_states ?? {},
-        nodeLogs: r.node_logs ?? {},
-        variables: r.variables ?? {},
+        rootFrame: r.root_frame ?? emptyFrame(),
         error: r.error,
       };
       return {
@@ -219,6 +236,20 @@ function reducer(state: StoreState, action: Action): StoreState {
   }
 }
 
+// 沿 path 取 frame，找不到返回 undefined
+export function frameAt(
+  root: FrameState | undefined,
+  path: string[],
+): FrameState | undefined {
+  if (!root) return undefined;
+  let cur: FrameState | undefined = root;
+  for (const id of path) {
+    cur = cur?.children?.[id];
+    if (!cur) return undefined;
+  }
+  return cur;
+}
+
 // ── Context + Hooks ──────────────────────────────────────
 
 interface ContextValue {
@@ -233,9 +264,6 @@ export function ExecutionStoreProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(reducer, { executions: {} });
   const qc = useQueryClient();
 
-  // 订阅 6 个 Wails 事件
-  // started / finished 同步 invalidate TanStack Query 的列表缓存
-  // 让 useExecutions / useExecutionsByWorkflow 能从后端拉到最新混合数据
   useEffect(() => {
     const invalidateList = () => {
       qc.invalidateQueries({ queryKey: ['executions'] });
@@ -291,21 +319,18 @@ export function ExecutionStoreProvider({ children }: { children: ReactNode }) {
   );
 }
 
-// useExecutionStore 拿到整个 store
 function useStore(): ContextValue {
   const ctx = useContext(ExecutionStoreContext);
   if (!ctx) throw new Error('useExecutionStore 必须在 ExecutionStoreProvider 内使用');
   return ctx;
 }
 
-// useExecution 取单个 execution 的实时状态
 export function useExecution(executionID: string | undefined): ExecutionState | null {
   const { executions } = useStore();
   if (!executionID) return null;
   return executions[executionID] ?? null;
 }
 
-// useExecutionsByWorkflow 取某工作流的所有 execution（按开始时间倒序）
 export function useExecutionsByWorkflow(
   workflowID: string | undefined,
 ): ExecutionState[] {
@@ -316,7 +341,6 @@ export function useExecutionsByWorkflow(
     .sort((a, b) => (a.startedAt < b.startedAt ? 1 : -1));
 }
 
-// useAllExecutions 取全部 execution（首页第三 tab 用）
 export function useAllExecutions(): ExecutionState[] {
   const { executions } = useStore();
   return Object.values(executions).sort((a, b) =>
@@ -324,7 +348,6 @@ export function useAllExecutions(): ExecutionState[] {
   );
 }
 
-// useExecutionHydrator hydrate / remove 的快捷出口
 export function useExecutionHydrator(): {
   hydrate: (record: ExecutionRecord) => void;
   remove: (executionID: string) => void;

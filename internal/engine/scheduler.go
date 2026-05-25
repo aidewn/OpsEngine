@@ -83,16 +83,14 @@ func (s *Scheduler) Start(ctx context.Context, nodes []core.NodeInstance, edges 
 		return true
 
 	case "cron":
-		// Cron 留到后续迭代
-		s.runtime.appendLog(updateNode.InstanceID, "warn", "cron 触发方式暂未支持，工作流将不会周期触发")
-		return true // 仍认为有 update：runtime 不会立即退出，可由用户控制停止
+		s.runtime.appendLog(s.runtime.rootFrame, updateNode.InstanceID, "warn", "cron 触发方式暂未支持，工作流将不会周期触发")
+		return true
 
 	case "manual":
-		// 不主动触发；runtime 仍存活等待用户操作
 		return true
 
 	default:
-		s.runtime.appendLog(updateNode.InstanceID, "warn", "未知的 delta_type: "+deltaType)
+		s.runtime.appendLog(s.runtime.rootFrame, updateNode.InstanceID, "warn", "未知的 delta_type: "+deltaType)
 		return false
 	}
 }
@@ -111,7 +109,7 @@ func (s *Scheduler) startInterval(
 	s.runtime.wg.Add(1)
 	go func() {
 		defer s.runtime.wg.Done()
-		s.runtime.appendLog(updateNode.InstanceID, "info", "启动周期触发 ("+interval.String()+")")
+		s.runtime.appendLog(s.runtime.rootFrame, updateNode.InstanceID, "info", "启动周期触发 ("+interval.String()+")")
 		for {
 			select {
 			case <-ctx.Done():
@@ -134,7 +132,7 @@ func (s *Scheduler) triggerUpdate(
 	s.updateMu.Lock()
 	if s.updateRunning {
 		s.updateMu.Unlock()
-		s.runtime.appendLog(updateNode.InstanceID, "warn", "上次 update 流尚未结束，本次跳过")
+		s.runtime.appendLog(s.runtime.rootFrame, updateNode.InstanceID, "warn", "上次 update 流尚未结束，本次跳过")
 		return
 	}
 	s.updateRunning = true
@@ -149,10 +147,9 @@ func (s *Scheduler) triggerUpdate(
 	if next == "" {
 		return
 	}
-	// update 流在主栈上跑（共享主帧变量）
-	stack := s.runtime.newMainStack()
-	if err := s.runtime.executeFlow(ctx, stack, nodes, edges, next); err != nil {
-		s.runtime.appendLog(updateNode.InstanceID, "error", "update 流失败: "+err.Error())
+	// update 流在主帧上跑（共享主流变量）
+	if err := s.runtime.executeFlow(ctx, s.runtime.rootFrame, nodes, edges, next); err != nil {
+		s.runtime.appendLog(s.runtime.rootFrame, updateNode.InstanceID, "error", "update 流失败: "+err.Error())
 	}
 }
 

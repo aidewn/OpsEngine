@@ -82,7 +82,7 @@ func TestParallel_AllBranchesRun(t *testing.T) {
 		{"pd", "[INFO] Done"},
 	}
 	for _, c := range checks {
-		logs := rec.NodeLogs[c.id]
+		logs := rec.RootFrame.NodeLogs[c.id]
 		if len(logs) == 0 {
 			t.Errorf("节点 %s 未输出日志", c.id)
 			continue
@@ -91,7 +91,7 @@ func TestParallel_AllBranchesRun(t *testing.T) {
 			t.Errorf("节点 %s 日志期望 %q，实际 %q", c.id, c.want, logs[0].Message)
 		}
 	}
-	t.Logf("节点状态: %+v", rec.NodeStates)
+	t.Logf("节点状态: %+v", rec.RootFrame.NodeStates)
 }
 
 // TestParallel_ConcurrentWrites 并发分支写同一变量不应 panic
@@ -149,7 +149,7 @@ func TestParallel_ConcurrentWrites(t *testing.T) {
 		t.Fatalf("期望 Success，实际 %s", got)
 	}
 	// shared 终态是 v1/v2/v3 之一（取决于谁最后写）
-	v := rt.Record().Variables["shared"]
+	v := rt.Record().RootFrame.Variables["shared"]
 	valid := map[string]bool{"v1": true, "v2": true, "v3": true}
 	if !valid[v.(string)] {
 		t.Errorf("shared 终态应为 v1/v2/v3 之一，实际 %v", v)
@@ -207,8 +207,8 @@ func TestThread_MainNotBlocked(t *testing.T) {
 		t.Fatalf("期望 Success，实际 %s", got)
 	}
 	rec := rt.Record()
-	mainLog := rec.NodeLogs["pmain"]
-	bgLog := rec.NodeLogs["pbg"]
+	mainLog := rec.RootFrame.NodeLogs["pmain"]
+	bgLog := rec.RootFrame.NodeLogs["pbg"]
 	if len(mainLog) == 0 || mainLog[0].Message != "[INFO] main" {
 		t.Errorf("main 日志异常: %+v", mainLog)
 	}

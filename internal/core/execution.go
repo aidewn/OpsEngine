@@ -1,6 +1,7 @@
 // 执行记录数据结构
-// ExecutionRecord 是一次运行的完整快照（含初始 snapshot + 终态）
-// ExecutionSummary 是列表用的精简结构
+// ExecutionRecord 是一次运行的完整快照
+// 节点状态/日志/变量按调用栈树状组织（RootFrame + Children）
+// 同一个集合多次被调用时，按 caller node instance ID 索引区分
 
 package core
 
@@ -9,20 +10,30 @@ import "time"
 // ExecutionRecord 单次执行的完整数据
 // 通过 Wails 绑定返回给前端时整体序列化为 JSON
 type ExecutionRecord struct {
-	ID         string                 `json:"id"`
-	WorkflowID string                 `json:"workflow_id"`
-	Snapshot   ExecutionSnapshot      `json:"snapshot"`     // 启动时的不可变快照
-	Status     WorkflowStatus         `json:"status"`       // running / success / failed / terminated
-	StartedAt  time.Time              `json:"started_at"`
-	FinishedAt *time.Time             `json:"finished_at,omitempty"`
-	NodeStates map[string]NodeState   `json:"node_states"`  // key = instance_id
-	NodeLogs   map[string][]LogEntry  `json:"node_logs"`
-	Variables  map[string]any         `json:"variables"`    // 主 frame 的变量当前/终态值
-	Error      string                 `json:"error,omitempty"`
+	ID         string            `json:"id"`
+	WorkflowID string            `json:"workflow_id"`
+	Snapshot   ExecutionSnapshot `json:"snapshot"`     // 启动时的不可变快照
+	Status     WorkflowStatus    `json:"status"`       // running / success / failed / terminated
+	StartedAt  time.Time         `json:"started_at"`
+	FinishedAt *time.Time        `json:"finished_at,omitempty"`
+	RootFrame  FrameState        `json:"root_frame"`   // 主流 frame + 嵌套调用的 children
+	Error      string            `json:"error,omitempty"`
+}
+
+// FrameState 单个调用栈帧的状态（树状递归）
+// AssembleID 为空表示主流帧，否则为对应集合 ID
+// Children 按 caller node instance ID 索引：同一集合被不同调用节点调用时是不同 frame
+type FrameState struct {
+	AssembleID string                  `json:"assemble_id"`
+	NodeStates map[string]NodeState    `json:"node_states"`
+	NodeLogs   map[string][]LogEntry   `json:"node_logs"`
+	Variables  map[string]any          `json:"variables"`
+	Params     map[string]any          `json:"params,omitempty"`
+	Returns    map[string]any          `json:"returns,omitempty"`
+	Children   map[string]*FrameState  `json:"children,omitempty"`
 }
 
 // ExecutionSnapshot 启动时打的快照
-// 包含工作流定义以及递归引用到的所有集合定义
 type ExecutionSnapshot struct {
 	Workflow  WorkflowDef            `json:"workflow"`
 	Assembles map[string]AssembleDef `json:"assembles"` // key = assemble ID
@@ -35,11 +46,11 @@ type LogEntry struct {
 	Message string    `json:"message"`
 }
 
-// ExecutionSummary 列表展示用的精简结构（剥离 snapshot / logs）
+// ExecutionSummary 列表展示用的精简结构（剥离 snapshot / logs / frames）
 type ExecutionSummary struct {
 	ID           string         `json:"id"`
 	WorkflowID   string         `json:"workflow_id"`
-	WorkflowName string         `json:"workflow_name"` // 便利字段，来自 snapshot
+	WorkflowName string         `json:"workflow_name"`
 	Status       WorkflowStatus `json:"status"`
 	StartedAt    time.Time      `json:"started_at"`
 	FinishedAt   *time.Time     `json:"finished_at,omitempty"`
@@ -47,7 +58,6 @@ type ExecutionSummary struct {
 }
 
 // Summary 从 ExecutionRecord 派生 ExecutionSummary
-// 用于持久化记录在列表展示时的精简
 func (r ExecutionRecord) Summary() ExecutionSummary {
 	return ExecutionSummary{
 		ID:           r.ID,

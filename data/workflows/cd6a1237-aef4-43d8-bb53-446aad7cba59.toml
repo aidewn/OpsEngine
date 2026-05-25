@@ -1,0 +1,31 @@
+id = "cd6a1237-aef4-43d8-bb53-446aad7cba59"
+name = "test"
+description = ""
+variables = []
+edges = []
+
+[[nodes]]
+  id = "de27339a-bc16-46d3-951f-67a09039bf0d"
+  type = "system_ready"
+  [nodes.config]
+  [nodes.position]
+    x = 80.0
+    y = 80.0
+
+[[nodes]]
+  id = "193b2778-e946-473f-a388-2d19eb4afb62"
+  type = "system_update"
+  [nodes.config]
+    delta_seconds = 60.0
+    delta_type = "interval"
+  [nodes.position]
+    x = 80.0
+    y = 280.0
+
+[[nodes]]
+  id = "d67700ba-5b40-41fa-867a-276d853a1291"
+  type = "system_over"
+  [nodes.config]
+  [nodes.position]
+    x = 80.0
+    y = 480.0

@@ -94,7 +94,7 @@ func TestPersistence_SaveAndLoad(t *testing.T) {
 	if !ok {
 		t.Fatal("GetRecord 找不到持久化记录")
 	}
-	logs := rec.NodeLogs["p"]
+	logs := rec.RootFrame.NodeLogs["p"]
 	if len(logs) == 0 || logs[0].Message != "[INFO] Hello" {
 		t.Errorf("持久化的日志不正确: %+v", logs)
 	}

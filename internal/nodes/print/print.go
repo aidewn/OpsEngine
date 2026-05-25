@@ -31,6 +31,8 @@ func (Node) TypeDef() core.NodeTypeDef {
 		},
 		ConfigSchema: []core.FieldSchema{
 			{Type: "text", ID: "prefix", Label: "前缀", Placeholder: "[DEBUG]"},
+			{Type: "textarea", ID: "default_text", Label: "默认文本",
+				Placeholder: "message 未连接时使用此文本"},
 		},
 		ExecutionMode: core.ExecutionModeFlow,
 	}
@@ -38,8 +40,12 @@ func (Node) TypeDef() core.NodeTypeDef {
 
 // Execute 把 message 输入打印到日志
 // prefix 配置作为日志前缀，未配置时用 "[INFO]"
+// 当 message input 未连接时，使用 default_text 作为消息内容
 func (Node) Execute(ctx engine.ExecContext) (engine.Outputs, error) {
-	msg, _ := ctx.Input("message")
+	msg, ok := ctx.Input("message")
+	if !ok {
+		msg = ctx.ConfigString("default_text")
+	}
 	prefix := ctx.ConfigString("prefix")
 	if prefix == "" {
 		prefix = "[INFO]"

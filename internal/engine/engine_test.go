@@ -134,7 +134,7 @@ func TestEngine_HelloWorld(t *testing.T) {
 
 	// 校验日志中包含 Hello World
 	record := rt.Record()
-	logs := record.NodeLogs["print"]
+	logs := record.RootFrame.NodeLogs["print"]
 	if len(logs) == 0 {
 		t.Fatal("print 节点没有日志")
 	}
@@ -143,11 +143,11 @@ func TestEngine_HelloWorld(t *testing.T) {
 	}
 
 	// 校验节点状态
-	if record.NodeStates["ready"] != core.NodeStateSuccess {
-		t.Errorf("ready 节点状态应为 Success，实际 %s", record.NodeStates["ready"])
+	if record.RootFrame.NodeStates["ready"] != core.NodeStateSuccess {
+		t.Errorf("ready 节点状态应为 Success，实际 %s", record.RootFrame.NodeStates["ready"])
 	}
-	if record.NodeStates["print"] != core.NodeStateSuccess {
-		t.Errorf("print 节点状态应为 Success，实际 %s", record.NodeStates["print"])
+	if record.RootFrame.NodeStates["print"] != core.NodeStateSuccess {
+		t.Errorf("print 节点状态应为 Success，实际 %s", record.RootFrame.NodeStates["print"])
 	}
 	// var_get 是 pure 节点，按需求值，没有 Executing → Success 状态变更
 	// 这是正确行为
@@ -228,12 +228,12 @@ func TestEngine_VarSetGet(t *testing.T) {
 
 	record := rt.Record()
 	// counter 应该被改成 "99"
-	if v := record.Variables["counter"]; v != "99" {
+	if v := record.RootFrame.Variables["counter"]; v != "99" {
 		t.Errorf("counter 应为 \"99\"，实际 %v (%T)", v, v)
 	}
 
 	// print 日志最后应是 "[INFO] 99"
-	logs := record.NodeLogs["print"]
+	logs := record.RootFrame.NodeLogs["print"]
 	if len(logs) == 0 {
 		t.Fatal("print 节点没有日志")
 	}

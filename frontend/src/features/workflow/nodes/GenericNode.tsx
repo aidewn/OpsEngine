@@ -4,10 +4,11 @@
 import { Handle, Position, type NodeProps } from '@xyflow/react';
 import { BaseNode } from './BaseNode';
 import type { NodeInstance } from '@/types/workflow';
-import type { PortDef } from '@/types/nodeType';
+import type { NodeTypeDef, PortDef } from '@/types/nodeType';
 import { useNodeTypes } from '@/api/nodeTypes';
 import { getPortColor, resolvePortType } from '@/types/nodeType';
 import { useNodeExecState } from './useNodeExecState';
+import { effectiveBranchCount } from '../cleanupParallel';
 
 type Props = NodeProps & { data: NodeInstance };
 
@@ -21,7 +22,8 @@ export function GenericNode({ data, selected }: Props) {
   const execState = useNodeExecState(data.instance_id);
 
   const inputPorts = def?.input_ports ?? [];
-  const outputPorts = def?.output_ports ?? [];
+  // parallel 节点根据 config.branch_count 动态计算可见输出端口数
+  const outputPorts = effectiveOutputPorts(data, def);
   const rowCount = Math.max(inputPorts.length, outputPorts.length);
 
   return (
@@ -79,6 +81,24 @@ export function GenericNode({ data, selected }: Props) {
       ))}
     </BaseNode>
   );
+}
+
+// effectiveOutputPorts 计算节点实际可见的输出端口列表
+// parallel 节点：根据 config.branch_count 只显示前 N 个 exec_out_<i> + exec_out_done
+// 其他节点：使用 TypeDef 中定义的全部 output_ports
+function effectiveOutputPorts(
+  data: NodeInstance,
+  def: NodeTypeDef | undefined,
+): PortDef[] {
+  const all = def?.output_ports ?? [];
+  if (data.type_id !== 'parallel') return all;
+  const n = effectiveBranchCount(data.config);
+  return all.filter((p) => {
+    const m = /^exec_out_(\d+)$/.exec(p.id);
+    if (!m) return true; // exec_out_done 保留
+    const idx = parseInt(m[1] ?? '0', 10);
+    return idx <= n;
+  });
 }
 
 // 单个 handle，绝对定位到行的左/右边缘

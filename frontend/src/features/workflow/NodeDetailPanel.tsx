@@ -7,9 +7,10 @@ import { useState, type ReactNode } from 'react';
 import type { NodeInstance } from '@/types/workflow';
 import type { GraphDef } from './canvasMapping';
 import { useNodeTypes } from '@/api/nodeTypes';
-import { isInternalNodeType } from '@/types/nodeType';
-import { useExecution } from '@/features/execution/ExecutionStore';
+import { isInternalNodeType, type NodeTypeDef } from '@/types/nodeType';
+import { frameAt, useExecution } from '@/features/execution/ExecutionStore';
 import { NodeStatusIcon } from '@/features/execution/ExecutionStatus';
+import { ConfigForm } from './ConfigForm';
 import { cn } from '@/lib/cn';
 
 interface NodeDetailPanelProps {
@@ -17,12 +18,18 @@ interface NodeDetailPanelProps {
   selectedNodeId: string | null;
   // 若传入，节点的 Logs tab 显示此 execution 的实时日志
   executionID?: string;
+  // 当前 frame 路径（用于从 ExecutionStore 的树状结构定位）
+  framePath?: string[];
+  // 节点 config 修改回调（仅编辑页传入，执行详情页不传 = 只读）
+  onConfigChange?: (nodeId: string, config: Record<string, unknown>) => void;
 }
 
 export function NodeDetailPanel({
   graph,
   selectedNodeId,
   executionID,
+  framePath = [],
+  onConfigChange,
 }: NodeDetailPanelProps) {
   const node = selectedNodeId
     ? (graph.nodes.find((n) => n.instance_id === selectedNodeId) ?? null)
@@ -37,7 +44,12 @@ export function NodeDetailPanel({
       </header>
       <div className="flex-1 overflow-y-auto">
         {node ? (
-          <NodeTabs node={node} executionID={executionID} />
+          <NodeTabs
+            node={node}
+            executionID={executionID}
+            framePath={framePath}
+            onConfigChange={onConfigChange}
+          />
         ) : (
           <div className="px-4 py-3">
             <GraphDetail graph={graph} />
@@ -55,13 +67,20 @@ type Tab = 'config' | 'logs' | 'info';
 function NodeTabs({
   node,
   executionID,
+  framePath,
+  onConfigChange,
 }: {
   node: NodeInstance;
   executionID?: string;
+  framePath: string[];
+  onConfigChange?: (nodeId: string, config: Record<string, unknown>) => void;
 }) {
-  const [tab, setTab] = useState<Tab>(executionID ? 'logs' : 'info');
+  const [tab, setTab] = useState<Tab>(executionID ? 'logs' : 'config');
   const exec = useExecution(executionID);
-  const nodeState = exec?.nodeStates[node.instance_id];
+  const frame = frameAt(exec?.rootFrame, framePath);
+  const nodeState = frame?.node_states[node.instance_id];
+  const { data: nodeTypes } = useNodeTypes();
+  const nodeType = nodeTypes?.find((t) => t.type_id === node.type_id);
 
   return (
     <div className="flex h-full flex-col">
@@ -90,9 +109,20 @@ function NodeTabs({
 
       {/* tab 内容 */}
       <div className="flex-1 overflow-y-auto px-4 py-3">
-        {tab === 'config' && <ConfigTab node={node} />}
+        {tab === 'config' && (
+          <ConfigTab
+            key={node.instance_id}
+            node={node}
+            nodeType={nodeType}
+            onConfigChange={onConfigChange}
+          />
+        )}
         {tab === 'logs' && (
-          <LogsTab nodeID={node.instance_id} executionID={executionID} />
+          <LogsTab
+            nodeID={node.instance_id}
+            executionID={executionID}
+            framePath={framePath}
+          />
         )}
         {tab === 'info' && <InfoTab node={node} />}
       </div>
@@ -125,16 +155,35 @@ function TabButton({
   );
 }
 
-// ── Config tab：当前节点的 config（MVP 阶段只读 JSON） ────
+// ── Config tab：根据 ConfigSchema 渲染表单 ────────────────
 
-function ConfigTab({ node }: { node: NodeInstance }) {
-  if (Object.keys(node.config).length === 0) {
-    return <div className="text-xs text-slate-400">（空）</div>;
+function ConfigTab({
+  node,
+  nodeType,
+  onConfigChange,
+}: {
+  node: NodeInstance;
+  nodeType: NodeTypeDef | undefined;
+  onConfigChange?: (nodeId: string, config: Record<string, unknown>) => void;
+}) {
+  const schema = nodeType?.config_schema ?? [];
+  if (schema.length === 0) {
+    return <div className="text-xs text-slate-400">（无配置项）</div>;
+  }
+  // 没有 onConfigChange = 只读模式（执行详情页）
+  if (!onConfigChange) {
+    return (
+      <pre className="max-h-full overflow-auto rounded bg-slate-50 p-2 text-xs">
+        {JSON.stringify(node.config, null, 2)}
+      </pre>
+    );
   }
   return (
-    <pre className="max-h-full overflow-auto rounded bg-slate-50 p-2 text-xs">
-      {JSON.stringify(node.config, null, 2)}
-    </pre>
+    <ConfigForm
+      schema={schema}
+      value={node.config}
+      onChange={(next) => onConfigChange(node.instance_id, next)}
+    />
   );
 }
 
@@ -143,9 +192,11 @@ function ConfigTab({ node }: { node: NodeInstance }) {
 function LogsTab({
   nodeID,
   executionID,
+  framePath,
 }: {
   nodeID: string;
   executionID?: string;
+  framePath: string[];
 }) {
   const exec = useExecution(executionID);
   if (!executionID) {
@@ -155,7 +206,8 @@ function LogsTab({
       </div>
     );
   }
-  const logs = exec?.nodeLogs[nodeID] ?? [];
+  const frame = frameAt(exec?.rootFrame, framePath);
+  const logs = frame?.node_logs[nodeID] ?? [];
   if (logs.length === 0) {
     return <div className="text-xs text-slate-400">（无日志）</div>;
   }

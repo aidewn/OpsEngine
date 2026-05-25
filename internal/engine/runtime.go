@@ -1,11 +1,12 @@
 // 单次执行的运行时状态容器
-// 维护：节点状态 / 节点日志 / 节点输出缓存 / 变量帧栈 / 取消信号
+// 所有节点状态/日志/变量都内化到 Frame 上，Runtime 持有根帧
+// 每次集合调用创建子 Frame 并挂在父 Frame.Children[callerInstanceID]
+// 并发分支 / 多 update tick 共享同一 Frame（通过 mu 串行化）
 
 package engine
 
 import (
 	"context"
-	"fmt"
 	"strconv"
 	"sync"
 	"time"
@@ -15,44 +16,43 @@ import (
 	"github.com/google/uuid"
 )
 
-// Frame 调用栈帧
-// 主工作流是 frame 0，进入集合调用 push 新 frame，集合返回 pop
-// MVP 阶段集合调用未实装，frame 栈始终只有主帧
+// Frame 调用栈帧（树节点）
+// 主流 frame 是 Runtime.rootFrame，AssembleID = ""
 type Frame struct {
-	AssembleID string         // 帧对应的集合 ID；主帧为空
-	Variables  map[string]any // 本帧的变量作用域
-	Params     map[string]any // 调用方传入的参数（仅 assemble 帧）
-	Returns    map[string]any // 待返回给调用者的值
+	AssembleID string
+	Variables  map[string]any
+	Params     map[string]any
+	Returns    map[string]any
 	Parent     *Frame
+
+	// 该 frame 内的执行数据
+	NodeStates map[string]core.NodeState
+	NodeLogs   map[string][]core.LogEntry
+	Outputs    map[string]Outputs
+
+	// 子 frame：key = caller node instance ID
+	Children map[string]*Frame
+
+	// 路径（从根到该 frame 的 caller instance ID 序列）
+	// 用于事件 payload 的 framePath
+	Path []string
 }
 
 // Runtime 单次执行的状态容器
-// 字段都是私有，外部通过 Record() / Summary() / 事件流读取
-//
-// 并发模型：
-//   - frames 不再是 Runtime 的全局字段，由每个执行流（goroutine）通过 FrameStack 维护
-//   - mainFrame 是栈底根帧，所有栈共享同一个对象
-//   - Frame 内部的 map 读写通过 Runtime.mu 串行化
 type Runtime struct {
 	ID         string
 	WorkflowID string
 	Snapshot   core.ExecutionSnapshot
 	StartedAt  time.Time
 
-	// 主帧（栈底根帧），保存工作流变量
-	// 多个执行流共享该对象，所有变量修改通过 mu 保护
-	mainFrame *Frame
+	rootFrame *Frame // 主流 frame（栈底，所有派生帧的根）
 
 	// 以下字段需要 mu 保护
 	status     core.WorkflowStatus
 	finishedAt *time.Time
 	errMsg     string
-	nodeStates map[string]core.NodeState
-	nodeLogs   map[string][]core.LogEntry
-	outputs    map[string]Outputs // 已执行 action 节点的输出缓存
 
 	// 追踪所有活跃 goroutine（含 thread spawn 的后台流）
-	// runMain 等待 wg 归零再标记终态
 	wg sync.WaitGroup
 
 	ctx     context.Context
@@ -63,7 +63,6 @@ type Runtime struct {
 }
 
 // newRuntime 创建运行时实例
-// 主帧根据 workflow.Variables 的 default 初始化
 func newRuntime(wf core.WorkflowDef, snapshot core.ExecutionSnapshot, emitter Emitter) *Runtime {
 	ctx, cancel := context.WithCancel(context.Background())
 	rt := &Runtime{
@@ -72,73 +71,100 @@ func newRuntime(wf core.WorkflowDef, snapshot core.ExecutionSnapshot, emitter Em
 		Snapshot:   snapshot,
 		StartedAt:  time.Now(),
 		status:     core.WorkflowStatusRunning,
-		nodeStates: map[string]core.NodeState{},
-		nodeLogs:   map[string][]core.LogEntry{},
-		outputs:    map[string]Outputs{},
 		ctx:        ctx,
 		cancel:     cancel,
 		emitter:    emitter,
 	}
-	rt.mainFrame = &Frame{Variables: initVariables(wf.Variables)}
+	rt.rootFrame = newFrame("", initVariables(wf.Variables), nil, nil)
 	return rt
 }
 
-// newMainStack 创建一个以主帧为底的新栈
-// 每次启动主流 / 主线程时调用
-func (r *Runtime) newMainStack() *FrameStack {
-	return newStack(r.mainFrame)
+// newFrame 创建一个新的 Frame
+func newFrame(assembleID string, vars map[string]any, parent *Frame, callerID *string) *Frame {
+	path := []string{}
+	if parent != nil {
+		path = append(path, parent.Path...)
+	}
+	if callerID != nil {
+		path = append(path, *callerID)
+	}
+	if vars == nil {
+		vars = map[string]any{}
+	}
+	return &Frame{
+		AssembleID: assembleID,
+		Variables:  vars,
+		Parent:     parent,
+		NodeStates: map[string]core.NodeState{},
+		NodeLogs:   map[string][]core.LogEntry{},
+		Outputs:    map[string]Outputs{},
+		Children:   map[string]*Frame{},
+		Path:       path,
+	}
 }
 
-// ── 变量读写（在指定栈的当前帧作用域） ────────────────────
+// pushChildFrame 在 parent 上挂载子 frame（key 为 caller 节点 instance ID）
+// 同一 caller 重复调用（如 update 多次 tick）会覆盖之前的 frame
+func (r *Runtime) pushChildFrame(parent *Frame, callerInstanceID, assembleID string, vars, params map[string]any) *Frame {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	id := callerInstanceID
+	f := newFrame(assembleID, vars, parent, &id)
+	f.Params = params
+	f.Returns = map[string]any{}
+	parent.Children[callerInstanceID] = f
+	return f
+}
 
-func (r *Runtime) getVariable(stack *FrameStack, name string) (any, bool) {
-	f := stack.current()
-	if f == nil {
+// ── 变量读写（在指定 frame 作用域） ────────────────────────
+
+func (r *Runtime) getVariable(frame *Frame, name string) (any, bool) {
+	if frame == nil {
 		return nil, false
 	}
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	v, ok := f.Variables[name]
+	v, ok := frame.Variables[name]
 	return v, ok
 }
 
-func (r *Runtime) setVariable(stack *FrameStack, name string, value any) {
-	f := stack.current()
-	if f == nil {
+func (r *Runtime) setVariable(frame *Frame, name string, value any) {
+	if frame == nil {
 		return
 	}
 	r.mu.Lock()
-	f.Variables[name] = value
+	frame.Variables[name] = value
 	r.mu.Unlock()
 
 	r.emitter.Emit(EventVariable, map[string]any{
 		"executionID": r.ID,
+		"framePath":   frame.Path,
 		"name":        name,
 		"value":       value,
 	})
 }
 
-// getParam 读栈顶帧的参数
-func (r *Runtime) getParam(stack *FrameStack, name string) (any, bool) {
-	f := stack.current()
-	if f == nil || f.Params == nil {
+// getParam 读 frame 的参数
+func (r *Runtime) getParam(frame *Frame, name string) (any, bool) {
+	if frame == nil || frame.Params == nil {
 		return nil, false
 	}
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	v, ok := f.Params[name]
+	v, ok := frame.Params[name]
 	return v, ok
 }
 
-// ── 节点状态推送 ──────────────────────────────────────────
+// ── 节点状态推送（按 frame） ──────────────────────────────
 
-func (r *Runtime) setNodeState(nodeID string, state core.NodeState, errMsg string) {
+func (r *Runtime) setNodeState(frame *Frame, nodeID string, state core.NodeState, errMsg string) {
 	r.mu.Lock()
-	r.nodeStates[nodeID] = state
+	frame.NodeStates[nodeID] = state
 	r.mu.Unlock()
 
 	payload := map[string]any{
 		"executionID": r.ID,
+		"framePath":   frame.Path,
 		"nodeID":      nodeID,
 		"state":       state,
 	}
@@ -150,14 +176,15 @@ func (r *Runtime) setNodeState(nodeID string, state core.NodeState, errMsg strin
 
 // ── 日志推送 ──────────────────────────────────────────────
 
-func (r *Runtime) appendLog(nodeID, level, msg string) {
+func (r *Runtime) appendLog(frame *Frame, nodeID, level, msg string) {
 	entry := core.LogEntry{Time: time.Now(), Level: level, Message: msg}
 	r.mu.Lock()
-	r.nodeLogs[nodeID] = append(r.nodeLogs[nodeID], entry)
+	frame.NodeLogs[nodeID] = append(frame.NodeLogs[nodeID], entry)
 	r.mu.Unlock()
 
 	r.emitter.Emit(EventLog, map[string]any{
 		"executionID": r.ID,
+		"framePath":   frame.Path,
 		"nodeID":      nodeID,
 		"time":        entry.Time,
 		"level":       level,
@@ -167,42 +194,44 @@ func (r *Runtime) appendLog(nodeID, level, msg string) {
 
 // ── 终态收尾 ──────────────────────────────────────────────
 
-// markRemainingTerminated 把仍处于 Executing 的节点标记为 Terminated
-// 用于 break / Stop 中断时把"被打断"的节点状态从 Executing → Terminated
-// 推送对应事件让前端 UI 同步
+// markRemainingTerminated 递归把所有 frame 中仍在 Executing 的节点标记 Terminated
 func (r *Runtime) markRemainingTerminated() {
+	r.markFrameTerminated(r.rootFrame)
+}
+
+func (r *Runtime) markFrameTerminated(frame *Frame) {
 	r.mu.Lock()
 	var changed []string
-	for nodeID, state := range r.nodeStates {
+	for nodeID, state := range frame.NodeStates {
 		if state == core.NodeStateExecuting {
-			r.nodeStates[nodeID] = core.NodeStateTerminated
+			frame.NodeStates[nodeID] = core.NodeStateTerminated
 			changed = append(changed, nodeID)
 		}
+	}
+	children := make([]*Frame, 0, len(frame.Children))
+	for _, c := range frame.Children {
+		children = append(children, c)
 	}
 	r.mu.Unlock()
 
 	for _, nodeID := range changed {
 		r.emitter.Emit(EventNode, map[string]any{
 			"executionID": r.ID,
+			"framePath":   frame.Path,
 			"nodeID":      nodeID,
 			"state":       core.NodeStateTerminated,
 		})
+	}
+	for _, c := range children {
+		r.markFrameTerminated(c)
 	}
 }
 
 // ── 终态标记 ──────────────────────────────────────────────
 
-func (r *Runtime) markSuccess() {
-	r.markFinished(core.WorkflowStatusSuccess, "")
-}
-
-func (r *Runtime) markFailed(errMsg string) {
-	r.markFinished(core.WorkflowStatusFailed, errMsg)
-}
-
-func (r *Runtime) markTerminated() {
-	r.markFinished(core.WorkflowStatusTerminated, "")
-}
+func (r *Runtime) markSuccess()    { r.markFinished(core.WorkflowStatusSuccess, "") }
+func (r *Runtime) markFailed(e string) { r.markFinished(core.WorkflowStatusFailed, e) }
+func (r *Runtime) markTerminated() { r.markFinished(core.WorkflowStatusTerminated, "") }
 
 func (r *Runtime) markFinished(status core.WorkflowStatus, errMsg string) {
 	t := time.Now()
@@ -235,26 +264,6 @@ func (r *Runtime) Status() core.WorkflowStatus {
 func (r *Runtime) Record() core.ExecutionRecord {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-
-	// 复制 map 防止外部并发改动
-	nodeStates := make(map[string]core.NodeState, len(r.nodeStates))
-	for k, v := range r.nodeStates {
-		nodeStates[k] = v
-	}
-	nodeLogs := make(map[string][]core.LogEntry, len(r.nodeLogs))
-	for k, v := range r.nodeLogs {
-		logs := make([]core.LogEntry, len(v))
-		copy(logs, v)
-		nodeLogs[k] = logs
-	}
-	var vars map[string]any
-	if r.mainFrame != nil {
-		vars = make(map[string]any, len(r.mainFrame.Variables))
-		for k, v := range r.mainFrame.Variables {
-			vars[k] = v
-		}
-	}
-
 	return core.ExecutionRecord{
 		ID:         r.ID,
 		WorkflowID: r.WorkflowID,
@@ -262,11 +271,62 @@ func (r *Runtime) Record() core.ExecutionRecord {
 		Status:     r.status,
 		StartedAt:  r.StartedAt,
 		FinishedAt: r.finishedAt,
-		NodeStates: nodeStates,
-		NodeLogs:   nodeLogs,
-		Variables:  vars,
+		RootFrame:  serializeFrame(r.rootFrame),
 		Error:      r.errMsg,
 	}
+}
+
+// serializeFrame 递归把 Frame 转成 core.FrameState（深拷贝）
+func serializeFrame(f *Frame) core.FrameState {
+	state := core.FrameState{
+		AssembleID: f.AssembleID,
+		NodeStates: copyStateMap(f.NodeStates),
+		NodeLogs:   copyLogsMap(f.NodeLogs),
+		Variables:  copyAnyMap(f.Variables),
+		Params:     copyAnyMap(f.Params),
+		Returns:    copyAnyMap(f.Returns),
+	}
+	if len(f.Children) > 0 {
+		state.Children = make(map[string]*core.FrameState, len(f.Children))
+		for k, child := range f.Children {
+			sub := serializeFrame(child)
+			state.Children[k] = &sub
+		}
+	}
+	return state
+}
+
+func copyStateMap(m map[string]core.NodeState) map[string]core.NodeState {
+	if m == nil {
+		return nil
+	}
+	out := make(map[string]core.NodeState, len(m))
+	for k, v := range m {
+		out[k] = v
+	}
+	return out
+}
+func copyLogsMap(m map[string][]core.LogEntry) map[string][]core.LogEntry {
+	if m == nil {
+		return nil
+	}
+	out := make(map[string][]core.LogEntry, len(m))
+	for k, v := range m {
+		cp := make([]core.LogEntry, len(v))
+		copy(cp, v)
+		out[k] = cp
+	}
+	return out
+}
+func copyAnyMap(m map[string]any) map[string]any {
+	if m == nil {
+		return nil
+	}
+	out := make(map[string]any, len(m))
+	for k, v := range m {
+		out[k] = v
+	}
+	return out
 }
 
 // Summary 列表用精简结构
@@ -286,8 +346,6 @@ func (r *Runtime) Summary() core.ExecutionSummary {
 
 // ── 变量默认值转换 ────────────────────────────────────────
 
-// initVariables 根据 VariableDef 列表初始化变量 map
-// default 字段按 var_type 转成对应 Go 类型
 func initVariables(defs []core.VariableDef) map[string]any {
 	vars := map[string]any{}
 	for _, d := range defs {
@@ -296,14 +354,13 @@ func initVariables(defs []core.VariableDef) map[string]any {
 	return vars
 }
 
-// coerceDefault 把 default 原始值（通常是 string）按变量类型转换
 func coerceDefault(raw any, varType core.PortType) any {
 	if raw == nil {
 		return zeroValue(varType)
 	}
 	s, ok := raw.(string)
 	if !ok {
-		return raw // 已是具体类型
+		return raw
 	}
 	if s == "" {
 		return zeroValue(varType)
@@ -326,11 +383,10 @@ func coerceDefault(raw any, varType core.PortType) any {
 	case core.PortTypeBool:
 		return s == "true" || s == "1"
 	default:
-		return nil // 句柄类型无法从字面字符串构造
+		return nil
 	}
 }
 
-// zeroValue 返回某类型的零值
 func zeroValue(varType core.PortType) any {
 	switch varType {
 	case core.PortTypeString:
@@ -346,8 +402,7 @@ func zeroValue(varType core.PortType) any {
 	}
 }
 
-// ── 辅助：在节点列表里查找 ──────────────────────────────
-
+// findNode 在节点列表中查找
 func findNode(nodes []core.NodeInstance, id string) *core.NodeInstance {
 	for i := range nodes {
 		if nodes[i].InstanceID == id {
@@ -357,7 +412,11 @@ func findNode(nodes []core.NodeInstance, id string) *core.NodeInstance {
 	return nil
 }
 
-// errMissingNode 节点 ID 不存在时的错误（提供给调用方便利使用）
+// errMissingNode 节点 ID 不存在时的错误
 func errMissingNode(id string) error {
-	return fmt.Errorf("节点 %s 不存在于快照中", id)
+	return errMissingNodeErr{id: id}
 }
+
+type errMissingNodeErr struct{ id string }
+
+func (e errMissingNodeErr) Error() string { return "节点 " + e.id + " 不存在于快照中" }

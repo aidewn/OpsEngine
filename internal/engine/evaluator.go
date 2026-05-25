@@ -1,19 +1,20 @@
 // 数据流求值 + 执行流推进
-// ctx 由调用方传入：主流用 runtime.ctx；system_over 用独立 ctx 保证可跑完
+// 所有接口都接收 *Frame（替代之前的 *FrameStack）
 
 package engine
 
 import (
 	"context"
+	"fmt"
 
 	"OpsEngine/internal/core"
 )
 
 // evalInput 求某节点的某 input 端口值
-func (r *Runtime) evalInput(ctx context.Context, stack *FrameStack, nodes []core.NodeInstance, edges []core.EdgeConfig, nodeID, portID string) (any, bool) {
+func (r *Runtime) evalInput(ctx context.Context, frame *Frame, nodes []core.NodeInstance, edges []core.EdgeConfig, nodeID, portID string) (any, bool) {
 	for _, e := range edges {
 		if e.To.Node == nodeID && e.To.Port == portID {
-			return r.evalOutput(ctx, stack, nodes, edges, e.From.Node, e.From.Port)
+			return r.evalOutput(ctx, frame, nodes, edges, e.From.Node, e.From.Port)
 		}
 	}
 	return nil, false
@@ -22,9 +23,9 @@ func (r *Runtime) evalInput(ctx context.Context, stack *FrameStack, nodes []core
 // evalOutput 求某节点的某 output 端口值
 // action 节点：读 outputs 缓存
 // pure 节点：按需 Execute（不缓存）
-func (r *Runtime) evalOutput(ctx context.Context, stack *FrameStack, nodes []core.NodeInstance, edges []core.EdgeConfig, nodeID, portID string) (any, bool) {
+func (r *Runtime) evalOutput(ctx context.Context, frame *Frame, nodes []core.NodeInstance, edges []core.EdgeConfig, nodeID, portID string) (any, bool) {
 	r.mu.Lock()
-	cached, hasCache := r.outputs[nodeID]
+	cached, hasCache := frame.Outputs[nodeID]
 	r.mu.Unlock()
 	if hasCache {
 		v, ok := cached[portID]
@@ -44,7 +45,7 @@ func (r *Runtime) evalOutput(ctx context.Context, stack *FrameStack, nodes []cor
 		return nil, false
 	}
 
-	c := newExecContext(ctx, r, stack, *node, nodes, edges)
+	c := newExecContext(ctx, r, frame, *node, nodes, edges)
 	outputs, err := n.Execute(c)
 	if err != nil {
 		return nil, false
@@ -56,7 +57,7 @@ func (r *Runtime) evalOutput(ctx context.Context, stack *FrameStack, nodes []cor
 }
 
 // executeFlow 沿 exec 流单线推进
-func (r *Runtime) executeFlow(ctx context.Context, stack *FrameStack, nodes []core.NodeInstance, edges []core.EdgeConfig, startNodeID string) error {
+func (r *Runtime) executeFlow(ctx context.Context, frame *Frame, nodes []core.NodeInstance, edges []core.EdgeConfig, startNodeID string) error {
 	cur := startNodeID
 	for cur != "" {
 		select {
@@ -72,14 +73,14 @@ func (r *Runtime) executeFlow(ctx context.Context, stack *FrameStack, nodes []co
 
 		// ── 引擎特判：集合调用 ───────────────────────────
 		if isAssembleCallType(node.TypeID) {
-			outputs, err := r.execAssembleCall(ctx, stack, *node, nodes, edges)
+			outputs, err := r.execAssembleCall(ctx, frame, *node, nodes, edges)
 			if err != nil {
-				r.setNodeState(cur, core.NodeStateFailed, err.Error())
+				r.setNodeState(frame, cur, core.NodeStateFailed, err.Error())
 				return err
 			}
-			r.setNodeState(cur, core.NodeStateSuccess, "")
+			r.setNodeState(frame, cur, core.NodeStateSuccess, "")
 			r.mu.Lock()
-			r.outputs[cur] = outputs
+			frame.Outputs[cur] = outputs
 			r.mu.Unlock()
 			cur = r.findNextExec(edges, cur, "exec_out")
 			continue
@@ -87,8 +88,8 @@ func (r *Runtime) executeFlow(ctx context.Context, stack *FrameStack, nodes []co
 
 		// ── 引擎特判：assemble_end ───────────────────────
 		if node.TypeID == "assemble_end" {
-			if err := r.runAssembleEnd(ctx, stack, *node, nodes, edges); err != nil {
-				r.setNodeState(cur, core.NodeStateFailed, err.Error())
+			if err := r.runAssembleEnd(ctx, frame, *node, nodes, edges); err != nil {
+				r.setNodeState(frame, cur, core.NodeStateFailed, err.Error())
 				return err
 			}
 			return nil
@@ -96,28 +97,27 @@ func (r *Runtime) executeFlow(ctx context.Context, stack *FrameStack, nodes []co
 
 		// ── 引擎特判：parallel ───────────────────────────
 		if node.TypeID == "parallel" {
-			if err := r.runParallel(ctx, stack, *node, nodes, edges); err != nil {
-				r.setNodeState(cur, core.NodeStateFailed, err.Error())
+			if err := r.runParallel(ctx, frame, *node, nodes, edges); err != nil {
+				r.setNodeState(frame, cur, core.NodeStateFailed, err.Error())
 				return err
 			}
-			r.setNodeState(cur, core.NodeStateSuccess, "")
+			r.setNodeState(frame, cur, core.NodeStateSuccess, "")
 			cur = r.findNextExec(edges, cur, "exec_out_done")
 			continue
 		}
 
 		// ── 引擎特判：thread ─────────────────────────────
 		if node.TypeID == "thread" {
-			r.runThread(ctx, stack, *node, nodes, edges)
-			r.setNodeState(cur, core.NodeStateSuccess, "")
+			r.runThread(ctx, frame, *node, nodes, edges)
+			r.setNodeState(frame, cur, core.NodeStateSuccess, "")
 			cur = r.findNextExec(edges, cur, "exec_out_continue")
 			continue
 		}
 
-		// ── 引擎特判：break（终止整个工作流） ─────────────
-		// 等同于用户点 Stop：cancel ctx → 跑 system_over → markTerminated
+		// ── 引擎特判：break ──────────────────────────────
 		if node.TypeID == "break" {
-			r.setNodeState(cur, core.NodeStateSuccess, "")
-			r.appendLog(cur, "info", "Break 触发，工作流即将终止")
+			r.setNodeState(frame, cur, core.NodeStateSuccess, "")
+			r.appendLog(frame, cur, "info", "Break 触发，工作流即将终止")
 			r.cancel()
 			return nil
 		}
@@ -125,22 +125,22 @@ func (r *Runtime) executeFlow(ctx context.Context, stack *FrameStack, nodes []co
 		// ── 通用：从注册表拿 Node 调用 Execute ────────────
 		n, ok := Lookup(node.TypeID)
 		if !ok {
-			r.setNodeState(cur, core.NodeStateFailed, "未注册的节点类型")
+			r.setNodeState(frame, cur, core.NodeStateFailed, "未注册的节点类型")
 			return errUnknownType(node.TypeID)
 		}
 
-		r.setNodeState(cur, core.NodeStateExecuting, "")
+		r.setNodeState(frame, cur, core.NodeStateExecuting, "")
 
-		c := newExecContext(ctx, r, stack, *node, nodes, edges)
+		c := newExecContext(ctx, r, frame, *node, nodes, edges)
 		outputs, err := n.Execute(c)
 		if err != nil {
-			r.setNodeState(cur, core.NodeStateFailed, err.Error())
+			r.setNodeState(frame, cur, core.NodeStateFailed, err.Error())
 			return err
 		}
-		r.setNodeState(cur, core.NodeStateSuccess, "")
+		r.setNodeState(frame, cur, core.NodeStateSuccess, "")
 
 		r.mu.Lock()
-		r.outputs[cur] = outputs
+		frame.Outputs[cur] = outputs
 		r.mu.Unlock()
 
 		cur = r.findNextExec(edges, cur, "exec_out")
@@ -148,7 +148,6 @@ func (r *Runtime) executeFlow(ctx context.Context, stack *FrameStack, nodes []co
 	return nil
 }
 
-// findNextExec 沿 (fromNode, fromPort) 找下游 exec 节点的 instance_id
 func (r *Runtime) findNextExec(edges []core.EdgeConfig, fromNode, fromPort string) string {
 	for _, e := range edges {
 		if e.From.Node == fromNode && e.From.Port == fromPort {
@@ -156,4 +155,9 @@ func (r *Runtime) findNextExec(edges []core.EdgeConfig, fromNode, fromPort strin
 		}
 	}
 	return ""
+}
+
+// errUnknownType 未注册的节点类型错误
+func errUnknownType(typeID string) error {
+	return fmt.Errorf("未注册的节点类型: %s", typeID)
 }

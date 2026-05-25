@@ -8,6 +8,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { App } from './App';
 import { TabsProvider } from '@/features/tabs/TabsContext';
 import { ExecutionStoreProvider } from '@/features/execution/ExecutionStore';
+import { ClipboardProvider } from '@/features/clipboard/ClipboardContext';
 import './index.css';
 
 const queryClient = new QueryClient({
@@ -28,7 +29,9 @@ createRoot(root).render(
       <HashRouter>
         <TabsProvider>
           <ExecutionStoreProvider>
-            <App />
+            <ClipboardProvider>
+              <App />
+            </ClipboardProvider>
           </ExecutionStoreProvider>
         </TabsProvider>
       </HashRouter>

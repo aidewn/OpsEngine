@@ -112,7 +112,7 @@ func TestSystemUpdate_Off(t *testing.T) {
 		t.Fatalf("off 应当立即 Success，实际 %s", got)
 	}
 	// 不应该跑 print（ticker 没启动）
-	logs := rt.Record().NodeLogs["p"]
+	logs := rt.Record().RootFrame.NodeLogs["p"]
 	if len(logs) > 0 {
 		t.Errorf("off 状态下 update 不应触发，实际触发了 %d 次", len(logs))
 	}
@@ -178,15 +178,15 @@ func TestBreak_TerminatesWorkflow(t *testing.T) {
 	}
 	rec := rt.Record()
 	// pnever 不应被执行
-	if logs := rec.NodeLogs["pnever"]; len(logs) > 0 {
+	if logs := rec.RootFrame.NodeLogs["pnever"]; len(logs) > 0 {
 		t.Errorf("break 后的节点不应执行，实际日志: %+v", logs)
 	}
 	// pover 应被执行
-	if logs := rec.NodeLogs["pover"]; len(logs) == 0 || logs[0].Message != "[INFO] over" {
+	if logs := rec.RootFrame.NodeLogs["pover"]; len(logs) == 0 || logs[0].Message != "[INFO] over" {
 		t.Errorf("over 流应该执行，实际: %+v", logs)
 	}
 	// brk 自身状态应为 Success
-	if s := rec.NodeStates["brk"]; s != core.NodeStateSuccess {
+	if s := rec.RootFrame.NodeStates["brk"]; s != core.NodeStateSuccess {
 		t.Errorf("break 节点自身应为 Success，实际 %s", s)
 	}
 }

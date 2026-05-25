@@ -36,6 +36,7 @@ func (Node) TypeDef() core.NodeTypeDef {
 		PortType: core.PortTypeExec,
 	})
 
+	minB, maxB := int64(2), int64(8)
 	return core.NodeTypeDef{
 		TypeID:      "parallel",
 		DisplayName: "并发",
@@ -46,7 +47,11 @@ func (Node) TypeDef() core.NodeTypeDef {
 		InputPorts: []core.PortDef{
 			{ID: "exec_in", Label: "▶", PortType: core.PortTypeExec, Required: true},
 		},
-		OutputPorts:   outputs,
+		OutputPorts: outputs,
+		ConfigSchema: []core.FieldSchema{
+			{Type: "number", ID: "branch_count", Label: "分支数",
+				Min: &minB, Max: &maxB, Default: int64(4)},
+		},
 		ExecutionMode: core.ExecutionModeFlow,
 	}
 }

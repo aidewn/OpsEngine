@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"sort"
-	"strings"
 	"sync"
 	"time"
 
@@ -111,8 +110,7 @@ func (e *Engine) runMain(rt *Runtime) {
 
 	var mainErr error
 	if readyID != "" {
-		stack := rt.newMainStack()
-		mainErr = rt.executeFlow(rt.ctx, stack, nodes, edges, readyID)
+		mainErr = rt.executeFlow(rt.ctx, rt.rootFrame, nodes, edges, readyID)
 	}
 
 	if mainErr != nil && !errors.Is(mainErr, context.Canceled) {
@@ -147,7 +145,8 @@ func (e *Engine) runMain(rt *Runtime) {
 	// 持久化终态记录到磁盘
 	if e.executionStore != nil {
 		if err := e.executionStore.Save(rt.Record()); err != nil {
-			rt.appendLog("", "error", "持久化执行记录失败: "+err.Error())
+			// 无具体节点，写到 rootFrame 的特殊位置
+			rt.appendLog(rt.rootFrame, "", "error", "持久化执行记录失败: "+err.Error())
 		}
 	}
 }
@@ -173,10 +172,9 @@ func runOver(rt *Runtime, nodes []core.NodeInstance, edges []core.EdgeConfig) {
 	overCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	rt.appendLog(overID, "info", "触发 system_over 流")
-	stack := rt.newMainStack()
-	if err := rt.executeFlow(overCtx, stack, nodes, edges, next); err != nil {
-		rt.appendLog(overID, "error", "system_over 流失败: "+err.Error())
+	rt.appendLog(rt.rootFrame, overID, "info", "触发 system_over 流")
+	if err := rt.executeFlow(overCtx, rt.rootFrame, nodes, edges, next); err != nil {
+		rt.appendLog(rt.rootFrame, overID, "error", "system_over 流失败: "+err.Error())
 	}
 }
 
@@ -279,14 +277,3 @@ func (e *Engine) Remove(executionID string) error {
 	return nil
 }
 
-// ── 辅助 ─────────────────────────────────────────────────
-
-// isAssembleCallType 判断节点类型是否为集合调用
-func isAssembleCallType(typeID string) bool {
-	return strings.HasPrefix(typeID, "assemble:")
-}
-
-// errUnknownType 未注册的节点类型错误
-func errUnknownType(typeID string) error {
-	return fmt.Errorf("未注册的节点类型: %s", typeID)
-}

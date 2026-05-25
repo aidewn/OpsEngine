@@ -72,15 +72,16 @@ export function BaseNode({
   return (
     <div
       className={cn(
-        'relative min-w-[140px] overflow-hidden rounded-md border-2 bg-white shadow-sm transition-shadow',
+        'relative min-w-[140px] rounded-md border-2 bg-white shadow-sm transition-shadow',
         stateBorder ?? (selected ? t.selectedBorder : t.border),
         selected && 'shadow-md',
       )}
     >
       {/* 标题区：icon + 名字 */}
+      {/* 注意：外层不能用 overflow-hidden（会裁掉 Handle 半圆），所以这里需要手动加圆角让 headerBg 贴合外层圆角 */}
       <div
         className={cn(
-          'flex items-center gap-1.5 px-2 py-1 text-xs font-semibold',
+          'flex items-center gap-1.5 rounded-t-[4px] px-2 py-1 text-xs font-semibold',
           t.headerBg,
           t.headerText,
         )}

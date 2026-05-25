@@ -124,8 +124,12 @@ func TestAssembleCall_ParamReturn(t *testing.T) {
 
 	record := rt.Record()
 
-	// 集合内的 print 应该输出 "[ASM] Hello Assemble"
-	asmPrintLogs := record.NodeLogs["print"]
+	// 集合内的 print 在子 frame（caller = "call"）中
+	callFrame := record.RootFrame.Children["call"]
+	if callFrame == nil {
+		t.Fatal("找不到集合 frame")
+	}
+	asmPrintLogs := callFrame.NodeLogs["print"]
 	if len(asmPrintLogs) == 0 {
 		t.Fatal("集合内 print 节点无日志")
 	}
@@ -134,7 +138,7 @@ func TestAssembleCall_ParamReturn(t *testing.T) {
 	}
 
 	// 主流的 print2 应该输出 "[MAIN] Hello Assemble"
-	mainPrintLogs := record.NodeLogs["print2"]
+	mainPrintLogs := record.RootFrame.NodeLogs["print2"]
 	if len(mainPrintLogs) == 0 {
 		t.Fatal("主流 print2 节点无日志")
 	}
@@ -142,7 +146,8 @@ func TestAssembleCall_ParamReturn(t *testing.T) {
 		t.Errorf("主流 print2 期望 '[MAIN] Hello Assemble'，实际: %q", mainPrintLogs[0].Message)
 	}
 
-	t.Logf("节点状态: %+v", record.NodeStates)
+	t.Logf("主流节点状态: %+v", record.RootFrame.NodeStates)
+	t.Logf("集合节点状态: %+v", callFrame.NodeStates)
 }
 
 // TestAssembleCall_VariableIsolation 验证集合变量与主流变量互不影响
@@ -243,12 +248,12 @@ func TestAssembleCall_VariableIsolation(t *testing.T) {
 
 	record := rt.Record()
 	// 主流的 x 应该仍是 main-val，没被集合内部的 set 影响
-	if v := record.Variables["x"]; v != "main-val" {
+	if v := record.RootFrame.Variables["x"]; v != "main-val" {
 		t.Errorf("主流变量 x 应为 \"main-val\"，实际 %v", v)
 	}
 
 	// print 日志应该是 "[INFO] main-val"
-	logs := record.NodeLogs["print"]
+	logs := record.RootFrame.NodeLogs["print"]
 	if len(logs) == 0 {
 		t.Fatal("主流 print 无日志")
 	}

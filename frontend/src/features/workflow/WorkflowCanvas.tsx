@@ -15,7 +15,7 @@ import {
   type OnConnectEnd,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { EdgeConfig, NodeInstance } from '@/types/workflow';
 import type { PortType } from '@/types/nodeType';
 import { useNodeTypes } from '@/api/nodeTypes';
@@ -30,6 +30,7 @@ import {
 import { buildDefaultConfig, resolvePortType } from '@/types/nodeType';
 import { newUUID } from '@/lib/uuid';
 import { readDragPayload } from './dragNode';
+import { effectiveBranchCount } from './cleanupParallel';
 
 // 拖线到空白时记录的上下文信息
 export interface PendingConnection {
@@ -53,6 +54,8 @@ interface CanvasProps<T extends GraphDef> {
   onPendingConnection?: (pending: PendingConnection) => void;
   // 节点双击：用于集合调用节点跳转到集合编辑页
   onNodeDoubleClick?: (typeId: string) => void;
+  // 选中节点集合变化（用于框选复制粘贴）
+  onSelectedNodesChange?: (selected: Set<string>) => void;
   // 只读模式：禁用拖动节点、连线、删除、拖入新节点（执行详情页使用）
   readOnly?: boolean;
 }
@@ -64,21 +67,62 @@ export function WorkflowCanvas<T extends GraphDef>({
   onGraphChange,
   onPendingConnection,
   onNodeDoubleClick,
+  onSelectedNodesChange,
   readOnly = false,
 }: CanvasProps<T>) {
   const { data: nodeTypes } = useNodeTypes();
   const rf = useReactFlow();
+
+  // 监听 Shift 键：按下时切换为框选模式（左键拖空白 = 框选）
+  const [isShiftHeld, setIsShiftHeld] = useState(false);
+  useEffect(() => {
+    if (readOnly) return;
+    const down = (e: KeyboardEvent) => {
+      if (e.key === 'Shift') setIsShiftHeld(true);
+    };
+    const up = (e: KeyboardEvent) => {
+      if (e.key === 'Shift') setIsShiftHeld(false);
+    };
+    window.addEventListener('keydown', down);
+    window.addEventListener('keyup', up);
+    return () => {
+      window.removeEventListener('keydown', down);
+      window.removeEventListener('keyup', up);
+    };
+  }, [readOnly]);
+
   const initial = graphToRf(graph);
   const [nodes, setNodes, onNodesChange] = useNodesState<RfNode<RfNodeData>>(
     initial.nodes,
   );
   const [edges, setEdges, onEdgesChange] = useEdgesState(initial.edges);
 
+  // 推送 RF 选中节点集合给父组件（用于复制粘贴）
+  // 关键：避免每次 nodes 变化（即使内容相同）都创建新 Set 推送
+  // 用排序后的 id 字符串作为 key 比较内容，只在真正变化时通知
+  const selectedIdsKey = useMemo(
+    () =>
+      nodes
+        .filter((n) => n.selected)
+        .map((n) => n.id)
+        .sort()
+        .join(','),
+    [nodes],
+  );
+  const lastSelectedKey = useRef<string | null>(null);
+  useEffect(() => {
+    if (!onSelectedNodesChange) return;
+    if (selectedIdsKey === lastSelectedKey.current) return;
+    lastSelectedKey.current = selectedIdsKey;
+    const ids = selectedIdsKey ? selectedIdsKey.split(',') : [];
+    onSelectedNodesChange(new Set(ids));
+  }, [selectedIdsKey, onSelectedNodesChange]);
+
   // 最新 graph 引用，供回调中使用
   const graphRef = useRef(graph);
   graphRef.current = graph;
 
-  // 外部 graph 变化时重置画布
+  // 外部 graph 变化时重置画布（结构性变化：节点新增/删除、连线变化）
   const lastGraphKey = useRef<string>(buildKey(graph));
   useEffect(() => {
     const key = buildKey(graph);
@@ -89,6 +133,23 @@ export function WorkflowCanvas<T extends GraphDef>({
       lastGraphKey.current = key;
     }
   }, [graph, setNodes, setEdges]);
+
+  // 节点 data（即 NodeInstance，含 config）同步：保留 RF 内部状态（selected / dragging / position）
+  // 只在某节点的 NodeInstance 引用变化时更新对应 RF node 的 data
+  // 用途：右侧 ConfigForm 改 parallel.branch_count 后，画布端口数量能立刻刷新；
+  // 因为只改 config 时 buildKey 不变，单靠上面 key-based reset 是检测不到的
+  useEffect(() => {
+    setNodes((prev) => {
+      let changed = false;
+      const next = prev.map((n) => {
+        const fresh = graph.nodes.find((gn) => gn.instance_id === n.id);
+        if (!fresh || n.data === fresh) return n;
+        changed = true;
+        return { ...n, data: fresh };
+      });
+      return changed ? next : prev;
+    });
+  }, [graph.nodes, setNodes]);
 
   // ── 连线校验 ──────────────────────────────────────────
   const isValidConnection = useCallback(
@@ -125,6 +186,15 @@ export function WorkflowCanvas<T extends GraphDef>({
       const srcType = resolvePortType(sourcePort, sourceNode.config);
       const tgtType = resolvePortType(targetPort, targetNode.config);
       if (srcType !== tgtType) return false;
+
+      // parallel 节点的 exec_out_<i> 限制：超出 branch_count 的端口拒绝连接
+      if (sourceNode.type_id === 'parallel') {
+        const m = /^exec_out_(\d+)$/.exec(connection.sourceHandle ?? '');
+        if (m) {
+          const idx = parseInt(m[1] ?? '0', 10);
+          if (idx > effectiveBranchCount(sourceNode.config)) return false;
+        }
+      }
 
       // exec_out 单出 / input 单入的「冲突自动断开旧线」逻辑放在 onConnect 中处理
       // 这里允许通过（用户拖动时不显示拒绝色），保持静默体验
@@ -214,11 +284,7 @@ export function WorkflowCanvas<T extends GraphDef>({
 
       const realType = resolvePortType(portDef, fromNode.config);
 
-      const reactFlowBounds = (
-        event.target as HTMLElement
-      ).closest('.react-flow')?.getBoundingClientRect();
-      if (!reactFlowBounds) return;
-
+      // 取松手时的鼠标/触控屏幕坐标
       let clientX: number;
       let clientY: number;
       if ('changedTouches' in event) {
@@ -231,35 +297,18 @@ export function WorkflowCanvas<T extends GraphDef>({
         clientY = (event as MouseEvent).clientY;
       }
 
+      // 屏幕坐标 → 画布 flow 坐标（受 pan / zoom 影响），与 node.position 语义一致
+      const flowPos = rf.screenToFlowPosition({ x: clientX, y: clientY });
+
       onPendingConnection?.({
         sourcePortType: realType,
         sourceDirection: isOutput ? 'output' : 'input',
         nodeId: fromNodeId,
         portId: fromHandleId,
-        position: {
-          x: clientX - reactFlowBounds.left,
-          y: clientY - reactFlowBounds.top,
-        },
+        position: flowPos,
       });
     },
-    [nodeTypes, onPendingConnection],
-  );
-
-  // ── 删除节点 ──────────────────────────────────────────
-  const onNodesDelete = useCallback(
-    (deleted: RfNode<RfNodeData>[]) => {
-      const deletedIds = new Set(deleted.map((n) => n.id));
-      const g = graphRef.current;
-
-      onGraphChange?.({
-        ...g,
-        nodes: g.nodes.filter((n) => !deletedIds.has(n.instance_id)),
-        edges: g.edges.filter(
-          (e) => !deletedIds.has(e.from.node) && !deletedIds.has(e.to.node),
-        ),
-      } as T);
-    },
-    [onGraphChange],
+    [nodeTypes, onPendingConnection, rf],
   );
 
   // ── 拖到画布：从左侧栏列表项拖入 ────────────────────────
@@ -298,17 +347,23 @@ export function WorkflowCanvas<T extends GraphDef>({
     [rf, nodeTypes, onGraphChange],
   );
 
-  // ── 删除连线 ──────────────────────────────────────────
-  const onEdgesDelete = useCallback(
-    (deleted: RfEdge[]) => {
-      const deletedIds = new Set(deleted.map((e) => e.id));
+  // ── 删除节点 / 连线（统一回调，避免 onNodesDelete + onEdgesDelete 竞争同一 graphRef） ──
+  // RF v12 删除一个节点时会同时触发节点 + 被波及连线，旧实现分两个 callback 各自读 graphRef.current
+  // 第二个回调读到的还是旧 graph → 覆盖第一个的更新 → 用户感受为需要再按一次 Delete
+  const onDelete = useCallback(
+    ({ nodes: delNodes, edges: delEdges }: { nodes: RfNode[]; edges: RfEdge[] }) => {
+      const delNodeIds = new Set(delNodes.map((n) => n.id));
+      const delEdgeIds = new Set(delEdges.map((e) => e.id));
       const g = graphRef.current;
-
       onGraphChange?.({
         ...g,
+        nodes: g.nodes.filter((n) => !delNodeIds.has(n.instance_id)),
         edges: g.edges.filter((e) => {
+          // 节点被删 → 连带连线全部移除
+          if (delNodeIds.has(e.from.node) || delNodeIds.has(e.to.node)) return false;
+          // 用户直接选中的连线
           const rfId = `${e.from.node}:${e.from.port}->${e.to.node}:${e.to.port}`;
-          return !deletedIds.has(rfId);
+          return !delEdgeIds.has(rfId);
         }),
       } as T);
     },
@@ -323,8 +378,7 @@ export function WorkflowCanvas<T extends GraphDef>({
       onEdgesChange={readOnly ? undefined : onEdgesChange}
       onConnect={readOnly ? undefined : onConnect}
       onConnectEnd={readOnly ? undefined : onConnectEnd}
-      onNodesDelete={readOnly ? undefined : onNodesDelete}
-      onEdgesDelete={readOnly ? undefined : onEdgesDelete}
+      onDelete={readOnly ? undefined : onDelete}
       isValidConnection={readOnly ? () => false : isValidConnection}
       onDrop={readOnly ? undefined : onDrop}
       onDragOver={readOnly ? undefined : onDragOver}
@@ -346,7 +400,10 @@ export function WorkflowCanvas<T extends GraphDef>({
       elementsSelectable
       nodeTypes={nodeTypeMap}
       deleteKeyCode={readOnly ? null : ['Backspace', 'Delete']}
-      selectionOnDrag={false}
+      // Shift 按下时启用框选（左键拖空白 = 框选），其余时间平移
+      selectionOnDrag={!readOnly && isShiftHeld}
+      panOnDrag={readOnly || !isShiftHeld}
+      selectionMode={'partial' as never}
       fitView
       proOptions={{ hideAttribution: true }}
     >

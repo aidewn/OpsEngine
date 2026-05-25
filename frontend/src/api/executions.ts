@@ -50,7 +50,7 @@ export function useExecution(
 ): UseQueryResult<ExecutionRecord> {
   return useQuery({
     queryKey: executionID ? KEY.detail(executionID) : ['executions', 'undef'],
-    queryFn: () => GetExecution(executionID!) as Promise<ExecutionRecord>,
+    queryFn: () => GetExecution(executionID!) as unknown as Promise<ExecutionRecord>,
     enabled: !!executionID,
   });
 }
