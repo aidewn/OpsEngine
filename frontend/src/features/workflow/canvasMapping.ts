@@ -2,7 +2,7 @@
 // 单向同步：拖动节点改变 position 后调用 mergeNodePositions 写回
 
 import { type Node as RfNode, type Edge as RfEdge } from '@xyflow/react';
-import type { EdgeConfig, NodeInstance } from '@/types/workflow';
+import type { EdgeConfig, NodeInstance, VariableDef } from '@/types/workflow';
 import {
   isSystemNodeType,
   isAssembleNodeType,
@@ -10,9 +10,11 @@ import {
 } from '@/types/nodeType';
 
 // 画布数据的通用接口（WorkflowDef 和 AssembleDef 都满足）
+// variables 在两类图里都存在；声明为可选便于 GraphDef 适配执行详情等只读视图
 export interface GraphDef {
   nodes: NodeInstance[];
   edges: EdgeConfig[];
+  variables?: VariableDef[];
 }
 
 // React Flow 节点 data 直接用 NodeInstance（已改为 type，满足 Record 约束）

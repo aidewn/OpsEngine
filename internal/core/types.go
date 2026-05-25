@@ -17,10 +17,11 @@ const (
 	// 动态类型（由节点 config 决定真实类型）
 	PortTypeDynamic       PortType = "Dynamic"
 	// 业务句柄类型
-	PortTypeLinuxSsh      PortType = "LinuxSshConnection"
-	PortTypeDockerContext PortType = "DockerContext"
-	PortTypeK8sContext    PortType = "K8sContext"
-	PortTypeNginxInstance PortType = "NginxInstance"
+	PortTypeLinuxSsh        PortType = "LinuxSshConnection"
+	PortTypeLinuxFileHandle PortType = "LinuxFileHandle"
+	PortTypeDockerContext   PortType = "DockerContext"
+	PortTypeK8sContext      PortType = "K8sContext"
+	PortTypeNginxInstance   PortType = "NginxInstance"
 )
 
 // ── 节点分类 ──────────────────────────────────────────────

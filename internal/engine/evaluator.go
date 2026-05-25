@@ -114,6 +114,40 @@ func (r *Runtime) executeFlow(ctx context.Context, frame *Frame, nodes []core.No
 			continue
 		}
 
+		// ── 引擎特判：branch ─────────────────────────────
+		if node.TypeID == "branch" {
+			port, err := r.runBranch(ctx, frame, *node, nodes, edges)
+			if err != nil {
+				r.setNodeState(frame, cur, core.NodeStateFailed, err.Error())
+				return err
+			}
+			r.setNodeState(frame, cur, core.NodeStateSuccess, "")
+			cur = r.findNextExec(edges, cur, port)
+			continue
+		}
+
+		// ── 引擎特判：for_loop ───────────────────────────
+		if node.TypeID == "for_loop" {
+			if err := r.runFor(ctx, frame, *node, nodes, edges); err != nil {
+				r.setNodeState(frame, cur, core.NodeStateFailed, err.Error())
+				return err
+			}
+			r.setNodeState(frame, cur, core.NodeStateSuccess, "")
+			cur = r.findNextExec(edges, cur, "exec_out_done")
+			continue
+		}
+
+		// ── 引擎特判：while_loop ─────────────────────────
+		if node.TypeID == "while_loop" {
+			if err := r.runWhile(ctx, frame, *node, nodes, edges); err != nil {
+				r.setNodeState(frame, cur, core.NodeStateFailed, err.Error())
+				return err
+			}
+			r.setNodeState(frame, cur, core.NodeStateSuccess, "")
+			cur = r.findNextExec(edges, cur, "exec_out_done")
+			continue
+		}
+
 		// ── 引擎特判：break ──────────────────────────────
 		if node.TypeID == "break" {
 			r.setNodeState(frame, cur, core.NodeStateSuccess, "")

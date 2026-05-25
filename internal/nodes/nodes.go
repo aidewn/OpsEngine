@@ -5,11 +5,23 @@
 package nodes
 
 import (
+	_ "OpsEngine/internal/nodes/arith"
 	_ "OpsEngine/internal/nodes/assemble_end"
 	_ "OpsEngine/internal/nodes/assemble_param"
 	_ "OpsEngine/internal/nodes/assemble_start"
+	_ "OpsEngine/internal/nodes/branch_node"
 	_ "OpsEngine/internal/nodes/break_node"
+	_ "OpsEngine/internal/nodes/compare"
+	_ "OpsEngine/internal/nodes/for_loop"
+	_ "OpsEngine/internal/nodes/linux_download_file"
 	_ "OpsEngine/internal/nodes/linux_exec_command"
+	_ "OpsEngine/internal/nodes/linux_exec_script"
+	_ "OpsEngine/internal/nodes/linux_file_append"
+	_ "OpsEngine/internal/nodes/linux_file_replace"
+	_ "OpsEngine/internal/nodes/linux_file_write"
+	_ "OpsEngine/internal/nodes/linux_find_file"
+	_ "OpsEngine/internal/nodes/linux_open_file"
+	_ "OpsEngine/internal/nodes/logic"
 	_ "OpsEngine/internal/nodes/parallel"
 	_ "OpsEngine/internal/nodes/print"
 	_ "OpsEngine/internal/nodes/ssh_with_linux"
@@ -19,4 +31,5 @@ import (
 	_ "OpsEngine/internal/nodes/thread"
 	_ "OpsEngine/internal/nodes/varget"
 	_ "OpsEngine/internal/nodes/varset"
+	_ "OpsEngine/internal/nodes/while_loop"
 )

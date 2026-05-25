@@ -2,6 +2,8 @@
 // 校验项：
 //   - 单例节点（system_ready/update/over 等）至多 1 个
 //   - 每个 exec 输出端口至多连 1 条边
+//   - 每个输入端口至多 1 条入边
+//   - var_set / var_get 引用的变量必须在 Variables 列表中定义
 
 package engine
 
@@ -11,6 +13,12 @@ import (
 
 	"OpsEngine/internal/core"
 )
+
+// 引用变量的节点类型，对应配置字段固定为 "var_name"
+var variableRefTypes = map[string]bool{
+	"var_set": true,
+	"var_get": true,
+}
 
 // 工作流中受单例约束的节点类型
 var workflowSingletonTypes = []string{
@@ -36,6 +44,9 @@ func ValidateWorkflow(wf core.WorkflowDef) error {
 	if err := validateInputSingle(wf.Edges); err != nil {
 		return err
 	}
+	if err := validateVariableRefs(wf.Nodes, wf.Variables); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -48,6 +59,9 @@ func ValidateAssemble(asm core.AssembleDef) error {
 		return err
 	}
 	if err := validateInputSingle(asm.Edges); err != nil {
+		return err
+	}
+	if err := validateVariableRefs(asm.Nodes, asm.Variables); err != nil {
 		return err
 	}
 	return nil
@@ -96,6 +110,30 @@ func validateInputSingle(edges []core.EdgeConfig) error {
 		counts[key]++
 		if counts[key] > 1 {
 			return fmt.Errorf("输入端口 %s 只能接收 1 条边", e.To.Port)
+		}
+	}
+	return nil
+}
+
+// validateVariableRefs var_set / var_get 引用的变量必须在 Variables 列表中定义
+// 防止用户删除变量后保存留下悬空引用
+func validateVariableRefs(nodes []core.NodeInstance, variables []core.VariableDef) error {
+	defined := make(map[string]bool, len(variables))
+	for _, v := range variables {
+		defined[v.Name] = true
+	}
+	for _, n := range nodes {
+		if !variableRefTypes[n.TypeID] {
+			continue
+		}
+		nameRaw := n.Config["var_name"]
+		name, _ := nameRaw.(string)
+		name = strings.TrimSpace(name)
+		if name == "" {
+			return fmt.Errorf("%s 节点 %s 的 var_name 未配置", n.TypeID, n.InstanceID)
+		}
+		if !defined[name] {
+			return fmt.Errorf("%s 节点 %s 引用的变量 %q 未定义", n.TypeID, n.InstanceID, name)
 		}
 	}
 	return nil

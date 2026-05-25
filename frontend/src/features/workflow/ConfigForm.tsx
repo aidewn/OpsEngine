@@ -1,5 +1,5 @@
 // 节点配置表单：根据 ConfigSchema 动态渲染
-// 字段类型：text / password / number / select / toggle / textarea
+// 字段类型：text / password / number / select / toggle / textarea / variable_select
 //
 // 数据流：
 //   - 内部 local state（避免外部 controlled 模式下每次按键都触发 onChange）
@@ -13,14 +13,17 @@ import { Textarea } from '@/components/ui/Textarea';
 import { Label } from '@/components/ui/Label';
 import { cn } from '@/lib/cn';
 import type { FieldSchema } from '@/types/nodeType';
+import type { VariableDef } from '@/types/workflow';
 
 interface Props {
   schema: FieldSchema[];
   value: Record<string, unknown>;
   onChange: (next: Record<string, unknown>) => void;
+  // 当前图（workflow / assemble）已定义变量；variable_select 字段从中取选项
+  variables?: VariableDef[];
 }
 
-export function ConfigForm({ schema, value, onChange }: Props) {
+export function ConfigForm({ schema, value, onChange, variables }: Props) {
   const [local, setLocal] = useState<Record<string, unknown>>(value);
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
@@ -66,6 +69,13 @@ export function ConfigForm({ schema, value, onChange }: Props) {
     return <div className="text-xs text-slate-400">（无配置项）</div>;
   }
 
+  // 单 key 更新（多数字段）
+  const setOne = (id: string, v: unknown) =>
+    setLocal((prev) => ({ ...prev, [id]: v }));
+  // 多 key 合并（如 variable_select 同时写 var_name + var_type）
+  const setPatch = (patch: Record<string, unknown>) =>
+    setLocal((prev) => ({ ...prev, ...patch }));
+
   return (
     <div className="space-y-3">
       {schema.map((field) => (
@@ -73,9 +83,9 @@ export function ConfigForm({ schema, value, onChange }: Props) {
           key={field.id}
           field={field}
           value={local[field.id]}
-          onChange={(v) =>
-            setLocal((prev) => ({ ...prev, [field.id]: v }))
-          }
+          onChange={(v) => setOne(field.id, v)}
+          onPatch={setPatch}
+          variables={variables}
         />
       ))}
     </div>
@@ -87,10 +97,14 @@ function FieldRow({
   field,
   value,
   onChange,
+  onPatch,
+  variables,
 }: {
   field: FieldSchema;
   value: unknown;
   onChange: (v: unknown) => void;
+  onPatch: (patch: Record<string, unknown>) => void;
+  variables?: VariableDef[];
 }) {
   return (
     <div className="space-y-1">
@@ -98,7 +112,13 @@ function FieldRow({
         {field.label}
         {field.required && <span className="ml-0.5 text-red-500">*</span>}
       </Label>
-      <FieldControl field={field} value={value} onChange={onChange} />
+      <FieldControl
+        field={field}
+        value={value}
+        onChange={onChange}
+        onPatch={onPatch}
+        variables={variables}
+      />
     </div>
   );
 }
@@ -108,10 +128,14 @@ function FieldControl({
   field,
   value,
   onChange,
+  onPatch,
+  variables,
 }: {
   field: FieldSchema;
   value: unknown;
   onChange: (v: unknown) => void;
+  onPatch: (patch: Record<string, unknown>) => void;
+  variables?: VariableDef[];
 }) {
   switch (field.type) {
     case 'textarea':
@@ -187,6 +211,17 @@ function FieldControl({
           </span>
         </label>
       );
+    case 'variable_select':
+      return (
+        <VariableSelect
+          id={field.id}
+          value={(value as string) ?? ''}
+          variables={variables ?? []}
+          onPick={(v) =>
+            onPatch({ var_name: v?.name ?? '', var_type: v?.var_type ?? '' })
+          }
+        />
+      );
     case 'text':
     default:
       return (
@@ -199,6 +234,63 @@ function FieldControl({
         />
       );
   }
+}
+
+// variable_select 控件：从当前图变量列表挑选；选中后同时写 var_name 与 var_type
+// 引用未定义变量时仍保留原值，提示用户重新选择
+function VariableSelect({
+  id,
+  value,
+  variables,
+  onPick,
+}: {
+  id: string;
+  value: string;
+  variables: VariableDef[];
+  onPick: (v: VariableDef | null) => void;
+}) {
+  const exists = variables.some((v) => v.name === value);
+  const isOrphan = value !== '' && !exists;
+
+  if (variables.length === 0) {
+    return (
+      <div className="rounded border border-amber-300 bg-amber-50 px-2 py-1.5 text-xs text-amber-700">
+        当前图没有定义任何变量，请先在左侧变量面板添加
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-1">
+      <select
+        id={id}
+        value={value}
+        onChange={(e) => {
+          const picked = variables.find((v) => v.name === e.target.value);
+          onPick(picked ?? null);
+        }}
+        className={cn(
+          'w-full rounded border bg-white px-2 py-1.5 text-xs',
+          isOrphan ? 'border-red-400' : 'border-slate-300',
+        )}
+      >
+        <option value="">（请选择变量）</option>
+        {isOrphan && (
+          <option value={value}>未定义：{value}</option>
+        )}
+        {variables.map((v) => (
+          <option key={v.name} value={v.name}>
+            {v.name} ({v.var_type})
+          </option>
+        ))}
+      </select>
+      {isOrphan && (
+        <div className="text-[11px] text-red-600">
+          引用的变量已不存在，保存前请重新选择
+        </div>
+      )}
+    </div>
+  );
 }
 
 // 浅相等判断（map 顶层 key 一一对比）

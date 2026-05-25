@@ -34,27 +34,29 @@ export function GenericNode({ data, selected }: Props) {
       title={def?.display_name ?? data.type_id}
       execState={execState}
     >
-      {/* 端口行：每行最多一个 input + 一个 output；显示「类型」而非「名字」 */}
+      {/* 端口行：每行最多一个 input + 一个 output；显示端口 label，类型靠 handle 颜色 + tooltip 表达 */}
       {Array.from({ length: rowCount }).map((_, idx) => {
         const inputPort = inputPorts[idx];
         const outputPort = outputPorts[idx];
-        const inputType = inputPort
-          ? resolvePortType(inputPort, data.config)
-          : null;
-        const outputType = outputPort
-          ? resolvePortType(outputPort, data.config)
-          : null;
+        const inputText = portRowText(inputPort, data.config);
+        const outputText = portRowText(outputPort, data.config);
         return (
           <div
             key={idx}
-            className="flex items-center justify-between text-[10px] text-slate-700"
+            className="flex items-center justify-between gap-3 text-[10px] text-slate-700"
             style={{ height: ROW_HEIGHT }}
           >
-            <span className="truncate pl-2.5 font-medium">
-              {inputType && inputType !== 'Exec' ? inputType : ''}
+            <span
+              className="min-w-0 flex-1 truncate pl-2.5 text-left font-medium"
+              title={inputPort ? portTooltip(inputPort, data.config) : undefined}
+            >
+              {inputText}
             </span>
-            <span className="truncate pr-2.5 font-medium">
-              {outputType && outputType !== 'Exec' ? outputType : ''}
+            <span
+              className="min-w-0 flex-1 truncate pr-2.5 text-right font-medium"
+              title={outputPort ? portTooltip(outputPort, data.config) : undefined}
+            >
+              {outputText}
             </span>
           </div>
         );
@@ -81,6 +83,25 @@ export function GenericNode({ data, selected }: Props) {
       ))}
     </BaseNode>
   );
+}
+
+// portRowText 端口行内显示的文字
+// 显示 label（label 为空时回退到 port.id）；Exec 端口与未定义端口返回空字符串
+function portRowText(
+  port: PortDef | undefined,
+  config: Record<string, unknown>,
+): string {
+  if (!port) return '';
+  if (resolvePortType(port, config) === 'Exec') return '';
+  return port.label || port.id;
+}
+
+// portTooltip handle 区文字的 hover 提示：label (Type)
+function portTooltip(
+  port: PortDef,
+  config: Record<string, unknown>,
+): string {
+  return `${port.label || port.id} (${resolvePortType(port, config)})`;
 }
 
 // effectiveOutputPorts 计算节点实际可见的输出端口列表

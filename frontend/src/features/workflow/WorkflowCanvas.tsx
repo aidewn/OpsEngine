@@ -31,6 +31,11 @@ import { buildDefaultConfig, resolvePortType } from '@/types/nodeType';
 import { newUUID } from '@/lib/uuid';
 import { readDragPayload } from './dragNode';
 import { effectiveBranchCount } from './cleanupParallel';
+import {
+  PortContextMenu,
+  type PortContextMenuState,
+} from './PortContextMenu';
+import { promoteToVariable } from './promoteToVariable';
 
 // 拖线到空白时记录的上下文信息
 export interface PendingConnection {
@@ -96,6 +101,9 @@ export function WorkflowCanvas<T extends GraphDef>({
     initial.nodes,
   );
   const [edges, setEdges, onEdgesChange] = useEdgesState(initial.edges);
+
+  // 端口右键菜单状态：null = 不显示
+  const [portMenu, setPortMenu] = useState<PortContextMenuState | null>(null);
 
   // 推送 RF 选中节点集合给父组件（用于复制粘贴）
   // 关键：避免每次 nodes 变化（即使内容相同）都创建新 Set 推送
@@ -347,6 +355,67 @@ export function WorkflowCanvas<T extends GraphDef>({
     [rf, nodeTypes, onGraphChange],
   );
 
+  // ── 端口右键：识别 handle DOM，定位端口与节点，弹出 PortContextMenu ──
+  // 仅对数据 output 有效；exec / 输入 / 未注册类型直接放过
+  const onContextMenuCapture = useCallback(
+    (event: React.MouseEvent) => {
+      if (readOnly || !nodeTypes) return;
+      const target = event.target as HTMLElement | null;
+      if (!target) return;
+      const handleEl = target.closest('.react-flow__handle') as HTMLElement | null;
+      if (!handleEl) return;
+
+      const isSource = handleEl.classList.contains('source');
+      if (!isSource) return;
+
+      const portId =
+        handleEl.getAttribute('data-handleid') ?? handleEl.id ?? '';
+      if (!portId) return;
+
+      const nodeEl = handleEl.closest('.react-flow__node') as HTMLElement | null;
+      const nodeId = nodeEl?.getAttribute('data-id') ?? '';
+      if (!nodeId) return;
+
+      const g = graphRef.current;
+      const node = g.nodes.find((n) => n.instance_id === nodeId);
+      const def = node && nodeTypes.find((t) => t.type_id === node.type_id);
+      const portDef = def?.output_ports.find((p) => p.id === portId);
+      if (!node || !def || !portDef) return;
+
+      const realType = resolvePortType(portDef, node.config);
+      if (realType === 'Exec') return;
+
+      event.preventDefault();
+      setPortMenu({
+        x: event.clientX,
+        y: event.clientY,
+        nodeId,
+        portId,
+        portLabel: portDef.label || portDef.id,
+        portType: realType,
+      });
+    },
+    [readOnly, nodeTypes],
+  );
+
+  // 执行端口的 Promote 动作：调用纯函数生成新 graph 并保存
+  const onPromote = useCallback(() => {
+    if (!portMenu || !onGraphChange) return;
+    const g = graphRef.current;
+    const sourceNode = g.nodes.find((n) => n.instance_id === portMenu.nodeId);
+    if (!sourceNode) return;
+    const result = promoteToVariable(
+      g,
+      portMenu.nodeId,
+      portMenu.portId,
+      portMenu.portType as never,
+      portMenu.portLabel,
+      sourceNode.position,
+    );
+    if (!result) return;
+    onGraphChange(result.graph as T);
+  }, [portMenu, onGraphChange]);
+
   // ── 删除节点 / 连线（统一回调，避免 onNodesDelete + onEdgesDelete 竞争同一 graphRef） ──
   // RF v12 删除一个节点时会同时触发节点 + 被波及连线，旧实现分两个 callback 各自读 graphRef.current
   // 第二个回调读到的还是旧 graph → 覆盖第一个的更新 → 用户感受为需要再按一次 Delete
@@ -371,7 +440,11 @@ export function WorkflowCanvas<T extends GraphDef>({
   );
 
   return (
-    <ReactFlow
+    <div
+      className="relative h-full w-full"
+      onContextMenuCapture={readOnly ? undefined : onContextMenuCapture}
+    >
+      <ReactFlow
       nodes={nodes}
       edges={edges}
       onNodesChange={readOnly ? undefined : onNodesChange}
@@ -416,6 +489,14 @@ export function WorkflowCanvas<T extends GraphDef>({
         setNodes={setNodes}
       />
     </ReactFlow>
+      {portMenu && (
+        <PortContextMenu
+          state={portMenu}
+          onClose={() => setPortMenu(null)}
+          onPromote={onPromote}
+        />
+      )}
+    </div>
   );
 }
 

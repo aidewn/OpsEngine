@@ -11,6 +11,7 @@ var VarTypeOptions = []string{
 	"Float",
 	"Bool",
 	"LinuxSshConnection",
+	"LinuxFileHandle",
 	"DockerContext",
 	"K8sContext",
 	"NginxInstance",

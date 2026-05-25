@@ -112,3 +112,57 @@ func TestValidateAssemble_Singletons(t *testing.T) {
 		t.Fatal("期望失败，但通过了校验")
 	}
 }
+
+// TestValidateWorkflow_VariableRefs var_set / var_get 引用的变量必须存在
+func TestValidateWorkflow_VariableRefs(t *testing.T) {
+	// 缺 var_name
+	wf := core.WorkflowDef{
+		Nodes: []core.NodeInstance{
+			{InstanceID: "n1", TypeID: "var_set", Config: map[string]any{}},
+		},
+	}
+	if err := ValidateWorkflow(wf); err == nil ||
+		!strings.Contains(err.Error(), "var_name 未配置") {
+		t.Fatalf("期望 var_name 未配置错误，实际: %v", err)
+	}
+
+	// 引用未定义变量
+	wf = core.WorkflowDef{
+		Nodes: []core.NodeInstance{
+			{InstanceID: "n1", TypeID: "var_get",
+				Config: map[string]any{"var_name": "ghost"}},
+		},
+	}
+	if err := ValidateWorkflow(wf); err == nil ||
+		!strings.Contains(err.Error(), "ghost") {
+		t.Fatalf("期望 ghost 未定义错误，实际: %v", err)
+	}
+
+	// 引用已定义变量 → 通过
+	wf = core.WorkflowDef{
+		Variables: []core.VariableDef{{Name: "count", VarType: core.PortTypeInt}},
+		Nodes: []core.NodeInstance{
+			{InstanceID: "n1", TypeID: "var_set",
+				Config: map[string]any{"var_name": "count"}},
+			{InstanceID: "n2", TypeID: "var_get",
+				Config: map[string]any{"var_name": "count"}},
+		},
+	}
+	if err := ValidateWorkflow(wf); err != nil {
+		t.Fatalf("期望通过，实际失败: %v", err)
+	}
+}
+
+// TestValidateAssemble_VariableRefs 集合也走同一套校验
+func TestValidateAssemble_VariableRefs(t *testing.T) {
+	asm := core.AssembleDef{
+		Nodes: []core.NodeInstance{
+			{InstanceID: "n1", TypeID: "var_set",
+				Config: map[string]any{"var_name": "missing"}},
+		},
+	}
+	if err := ValidateAssemble(asm); err == nil ||
+		!strings.Contains(err.Error(), "missing") {
+		t.Fatalf("期望 missing 未定义错误，实际: %v", err)
+	}
+}

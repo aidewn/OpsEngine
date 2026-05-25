@@ -4,7 +4,7 @@
 // - 传入 executionID 时，Logs tab 从 ExecutionStore 读实时日志
 
 import { useState, type ReactNode } from 'react';
-import type { NodeInstance } from '@/types/workflow';
+import type { NodeInstance, VariableDef } from '@/types/workflow';
 import type { GraphDef } from './canvasMapping';
 import { useNodeTypes } from '@/api/nodeTypes';
 import { isInternalNodeType, type NodeTypeDef } from '@/types/nodeType';
@@ -14,7 +14,12 @@ import { ConfigForm } from './ConfigForm';
 import { cn } from '@/lib/cn';
 
 interface NodeDetailPanelProps {
-  graph: GraphDef & { id?: string; name?: string; description?: string };
+  graph: GraphDef & {
+    id?: string;
+    name?: string;
+    description?: string;
+    variables?: VariableDef[];
+  };
   selectedNodeId: string | null;
   // 若传入，节点的 Logs tab 显示此 execution 的实时日志
   executionID?: string;
@@ -49,6 +54,7 @@ export function NodeDetailPanel({
             executionID={executionID}
             framePath={framePath}
             onConfigChange={onConfigChange}
+            variables={graph.variables}
           />
         ) : (
           <div className="px-4 py-3">
@@ -69,11 +75,13 @@ function NodeTabs({
   executionID,
   framePath,
   onConfigChange,
+  variables,
 }: {
   node: NodeInstance;
   executionID?: string;
   framePath: string[];
   onConfigChange?: (nodeId: string, config: Record<string, unknown>) => void;
+  variables?: VariableDef[];
 }) {
   const [tab, setTab] = useState<Tab>(executionID ? 'logs' : 'config');
   const exec = useExecution(executionID);
@@ -115,6 +123,7 @@ function NodeTabs({
             node={node}
             nodeType={nodeType}
             onConfigChange={onConfigChange}
+            variables={variables}
           />
         )}
         {tab === 'logs' && (
@@ -161,10 +170,12 @@ function ConfigTab({
   node,
   nodeType,
   onConfigChange,
+  variables,
 }: {
   node: NodeInstance;
   nodeType: NodeTypeDef | undefined;
   onConfigChange?: (nodeId: string, config: Record<string, unknown>) => void;
+  variables?: VariableDef[];
 }) {
   const schema = nodeType?.config_schema ?? [];
   if (schema.length === 0) {
@@ -183,6 +194,7 @@ function ConfigTab({
       schema={schema}
       value={node.config}
       onChange={(next) => onConfigChange(node.instance_id, next)}
+      variables={variables}
     />
   );
 }

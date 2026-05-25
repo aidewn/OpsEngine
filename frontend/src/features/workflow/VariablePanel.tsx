@@ -35,6 +35,7 @@ const TYPE_OPTIONS = [
   'Float',
   'Bool',
   'LinuxSshConnection',
+  'LinuxFileHandle',
   'DockerContext',
   'K8sContext',
   'NginxInstance',

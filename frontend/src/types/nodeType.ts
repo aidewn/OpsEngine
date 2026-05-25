@@ -7,8 +7,12 @@
 export type PortType =
   | 'Exec'
   | 'String'
+  | 'Int'
+  | 'Float'
+  | 'Bool'
   | 'Dynamic'
   | 'LinuxSshConnection'
+  | 'LinuxFileHandle'
   | 'DockerContext'
   | 'K8sContext'
   | 'NginxInstance';
@@ -20,7 +24,15 @@ export type NodeKind = 'event' | 'action' | 'pure' | 'flow_control';
 export type ExecutionMode = 'remote_cmd' | 'agent' | 'flow';
 
 // 字段类型，对应后端 FieldSchema.Type
-export type FieldType = 'text' | 'password' | 'number' | 'select' | 'toggle' | 'textarea';
+// variable_select：从当前图（workflow / assemble）已定义的变量中挑选，选中时同步 var_type
+export type FieldType =
+  | 'text'
+  | 'password'
+  | 'number'
+  | 'select'
+  | 'toggle'
+  | 'textarea'
+  | 'variable_select';
 
 export interface PortDef {
   id: string;
@@ -110,6 +122,7 @@ const PORT_COLORS: Record<string, string> = {
   Dynamic: '#a855f7',           // 紫色
   // 业务句柄
   LinuxSshConnection: '#3b82f6', // 蓝色
+  LinuxFileHandle: '#eab308',   // 金黄（远程文件句柄）
   DockerContext: '#8b5cf6',     // 紫蓝
   K8sContext: '#06b6d4',        // 青色
   NginxInstance: '#f97316',     // 橙色

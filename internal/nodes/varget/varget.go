@@ -28,9 +28,8 @@ func (Node) TypeDef() core.NodeTypeDef {
 			{ID: "value", Label: "值", PortType: core.PortTypeDynamic},
 		},
 		ConfigSchema: []core.FieldSchema{
-			{Type: "text", ID: "var_name", Label: "变量名", Required: true},
-			{Type: "select", ID: "var_type", Label: "类型",
-				Options: engine.VarTypeOptions, Default: "String"},
+			// variable_select：前端从当前图的 variables 列表挑选；选中时自动同步 var_type
+			{Type: "variable_select", ID: "var_name", Label: "变量", Required: true},
 		},
 		ExecutionMode: core.ExecutionModeFlow,
 	}

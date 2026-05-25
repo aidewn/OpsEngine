@@ -229,9 +229,9 @@ func (r *Runtime) markFrameTerminated(frame *Frame) {
 
 // ── 终态标记 ──────────────────────────────────────────────
 
-func (r *Runtime) markSuccess()    { r.markFinished(core.WorkflowStatusSuccess, "") }
+func (r *Runtime) markSuccess()        { r.markFinished(core.WorkflowStatusSuccess, "") }
 func (r *Runtime) markFailed(e string) { r.markFinished(core.WorkflowStatusFailed, e) }
-func (r *Runtime) markTerminated() { r.markFinished(core.WorkflowStatusTerminated, "") }
+func (r *Runtime) markTerminated()     { r.markFinished(core.WorkflowStatusTerminated, "") }
 
 func (r *Runtime) markFinished(status core.WorkflowStatus, errMsg string) {
 	t := time.Now()
