@@ -174,6 +174,17 @@ npm install
 npm run dev
 ```
 
+## 文档
+
+完整技术文档见 **[docs/](docs/README.md)**：
+
+| 文档 | 内容 |
+|------|------|
+| [introduction.md](docs/introduction.md) | 项目完整介绍、概念与内置节点 |
+| [architecture.md](docs/architecture.md) | 架构分层、执行/事件/Frame 调用分析 |
+| [node-development.md](docs/node-development.md) | 新增内置节点开发手册 |
+| [source-reading.md](docs/source-reading.md) | 源码阅读顺序与调试入口 |
+
 ## 路线图
 
 MVP（Phase 0–7）已完成。后续体验与能力见 [docs/phase8-13-plan.md](docs/phase8-13-plan.md)，包括端口重连、配置表单、Frame 树 UI、框选复制等。

@@ -78,8 +78,21 @@ export function useUpdateWorkflow(): UseMutationResult<
   return useMutation({
     // Wails 绑定接收 Go 结构体对应的 JS 对象，自动序列化
     mutationFn: (workflow) => UpdateWorkflow(workflow as never),
-    onSuccess: (_, workflow) => {
-      qc.invalidateQueries({ queryKey: KEY.detail(workflow.id) });
+    // 乐观写入缓存，避免保存后 invalidate 重拉期间用旧 workflow 覆盖画布/ConfigForm
+    onMutate: async (workflow) => {
+      const detailKey = KEY.detail(workflow.id);
+      await qc.cancelQueries({ queryKey: detailKey });
+      const prev = qc.getQueryData<WorkflowDef>(detailKey);
+      qc.setQueryData(detailKey, workflow);
+      return { prev };
+    },
+    onError: (_err, workflow, ctx) => {
+      if (ctx?.prev !== undefined) {
+        qc.setQueryData(KEY.detail(workflow.id), ctx.prev);
+      }
+    },
+    onSuccess: (_data, workflow) => {
+      qc.setQueryData(KEY.detail(workflow.id), workflow);
       qc.invalidateQueries({ queryKey: KEY.list });
     },
   });

@@ -76,10 +76,21 @@ export function useUpdateAssemble(): UseMutationResult<
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (assemble) => UpdateAssemble(assemble as never),
-    onSuccess: (_, assemble) => {
-      qc.invalidateQueries({ queryKey: KEY.detail(assemble.id) });
+    onMutate: async (assemble) => {
+      const detailKey = KEY.detail(assemble.id);
+      await qc.cancelQueries({ queryKey: detailKey });
+      const prev = qc.getQueryData<AssembleDef>(detailKey);
+      qc.setQueryData(detailKey, assemble);
+      return { prev };
+    },
+    onError: (_err, assemble, ctx) => {
+      if (ctx?.prev !== undefined) {
+        qc.setQueryData(KEY.detail(assemble.id), ctx.prev);
+      }
+    },
+    onSuccess: (_data, assemble) => {
+      qc.setQueryData(KEY.detail(assemble.id), assemble);
       qc.invalidateQueries({ queryKey: KEY.list });
-      // 集合名称/参数变化会影响动态节点类型
       qc.invalidateQueries({ queryKey: NODE_TYPES_KEY });
     },
   });

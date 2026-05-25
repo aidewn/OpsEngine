@@ -2,7 +2,6 @@ id = "cd6a1237-aef4-43d8-bb53-446aad7cba59"
 name = "test"
 description = ""
 variables = []
-edges = []
 
 [[nodes]]
   id = "de27339a-bc16-46d3-951f-67a09039bf0d"
@@ -29,3 +28,24 @@ edges = []
   [nodes.position]
     x = 80.0
     y = 480.0
+
+[[nodes]]
+  id = "0a87ac7c-b531-429c-ade3-2ebf380365b0"
+  type = "ssh_with_linux"
+  [nodes.config]
+    host = "192.168.112.138"
+    password = "199932"
+    port = 22.0
+    timeout_seconds = 10.0
+    user = "root"
+  [nodes.position]
+    x = 303.4399672946731
+    y = 57.331636893180715
+
+[[edges]]
+  [edges.from]
+    node = "de27339a-bc16-46d3-951f-67a09039bf0d"
+    port = "exec_out"
+  [edges.to]
+    node = "0a87ac7c-b531-429c-ade3-2ebf380365b0"
+    port = "exec_in"

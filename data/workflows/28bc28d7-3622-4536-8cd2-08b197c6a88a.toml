@@ -55,7 +55,7 @@ description = ""
   id = "e1016acf-c881-4236-a0ec-bd6c35ce790d"
   type = "parallel"
   [nodes.config]
-    branch_count = 4.0
+    branch_count = 3.0
   [nodes.position]
     x = 792.7696671808419
     y = 79.13780605145277
@@ -113,6 +113,16 @@ description = ""
   [nodes.position]
     x = 1173.9683392014113
     y = 371.68364914259433
+
+[[nodes]]
+  id = "366944f6-4df4-4480-9267-94addd9c2247"
+  type = "ssh_with_linux"
+  [nodes.config]
+    port = 22.0
+    timeout_seconds = 10.0
+  [nodes.position]
+    x = 1395.0638320810688
+    y = -86.43556816900441
 
 [[edges]]
   [edges.from]
@@ -184,4 +194,12 @@ description = ""
     port = "exec_out_3"
   [edges.to]
     node = "7a166fdd-49a5-4b4a-adce-66523deeb4d5"
+    port = "exec_in"
+
+[[edges]]
+  [edges.from]
+    node = "0c2f21ff-4283-4d54-aa94-a7d8d1a3c277"
+    port = "exec_out"
+  [edges.to]
+    node = "366944f6-4df4-4480-9267-94addd9c2247"
     port = "exec_in"

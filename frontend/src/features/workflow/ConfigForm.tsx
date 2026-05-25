@@ -25,12 +25,21 @@ export function ConfigForm({ schema, value, onChange }: Props) {
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
   const lastFlushedRef = useRef(value);
+  // unmount cleanup 必须读最新 local；空依赖 effect 里的 local 会停在首次渲染的值
+  const localRef = useRef(local);
+  localRef.current = local;
 
-  // 外部 value 切换（切节点时） → 重置 local
+  // 外部 value 同步策略：
+  // - 仅当与上次 debounce flush 的内容一致时才采纳（服务端/缓存回显）
+  // - 避免 mutate 尚未更新 query 时，旧 workflow 引用触发 effect 把 local 打回旧 config
+  // 切换节点由 ConfigTab 的 key={instance_id} 卸载重建，不在此处理
+  const valueKey = JSON.stringify(value);
   useEffect(() => {
-    setLocal(value);
-    lastFlushedRef.current = value;
-  }, [value]);
+    if (shallowEq(value, lastFlushedRef.current)) {
+      setLocal(value);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [valueKey]);
 
   // 500ms debounce flush
   useEffect(() => {
@@ -42,14 +51,15 @@ export function ConfigForm({ schema, value, onChange }: Props) {
     return () => clearTimeout(timer);
   }, [local]);
 
-  // unmount 时立即 flush
+  // 失焦/切节点/点画布取消选中时会卸载：flush 尚未 debounce 的修改
   useEffect(() => {
     return () => {
-      if (!shallowEq(local, lastFlushedRef.current)) {
-        onChangeRef.current(local);
+      const pending = localRef.current;
+      if (!shallowEq(pending, lastFlushedRef.current)) {
+        onChangeRef.current(pending);
+        lastFlushedRef.current = pending;
       }
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   if (schema.length === 0) {
@@ -63,7 +73,9 @@ export function ConfigForm({ schema, value, onChange }: Props) {
           key={field.id}
           field={field}
           value={local[field.id]}
-          onChange={(v) => setLocal({ ...local, [field.id]: v })}
+          onChange={(v) =>
+            setLocal((prev) => ({ ...prev, [field.id]: v }))
+          }
         />
       ))}
     </div>

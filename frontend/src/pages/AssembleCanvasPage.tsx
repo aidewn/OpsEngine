@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ReactFlowProvider } from '@xyflow/react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useAssemble, useUpdateAssemble } from '@/api/assembles';
 import {
   WorkflowCanvas,
@@ -39,6 +40,7 @@ function AssembleCanvasInner({ assembleId: id }: { assembleId: string | undefine
   const navigate = useNavigate();
   const { data: assemble, isLoading, error } = useAssemble(id);
   const update = useUpdateAssemble();
+  const queryClient = useQueryClient();
   const { openTab } = useTabs();
 
   // 进入页面 / 切到该路由时 upsert tab
@@ -74,16 +76,19 @@ function AssembleCanvasInner({ assembleId: id }: { assembleId: string | undefine
 
   const handleConfigChange = useCallback(
     (nodeId: string, config: Record<string, unknown>) => {
-      if (!assemble) return;
-      const next = {
-        ...assemble,
-        nodes: assemble.nodes.map((n) =>
+      if (!id) return;
+      const detailKey = ['assembles', id] as const;
+      const prev = queryClient.getQueryData<AssembleDef>(detailKey);
+      if (!prev) return;
+      const next: AssembleDef = {
+        ...prev,
+        nodes: prev.nodes.map((n) =>
           n.instance_id === nodeId ? { ...n, config } : n,
         ),
       };
       handleAssembleChange(next);
     },
-    [assemble, handleAssembleChange],
+    [id, queryClient, handleAssembleChange],
   );
 
   function handleAddButtonClick() {

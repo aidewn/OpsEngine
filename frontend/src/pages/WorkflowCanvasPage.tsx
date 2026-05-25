@@ -3,7 +3,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ReactFlowProvider } from '@xyflow/react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useUpdateWorkflow, useWorkflow } from '@/api/workflows';
+import type { WorkflowDef } from '@/types/workflow';
 import {
   WorkflowCanvas,
   addNodeToGraph,
@@ -15,7 +17,6 @@ import { AddNodeDialog } from '@/features/workflow/AddNodeDialog';
 import { WorkflowSidebar } from '@/features/workflow/WorkflowSidebar';
 import { cleanupParallelEdges } from '@/features/workflow/cleanupParallel';
 import { Button } from '@/components/ui/Button';
-import type { WorkflowDef } from '@/types/workflow';
 import { buildDefaultConfig, type NodeTypeDef } from '@/types/nodeType';
 import { CenteredMessage } from '@/components/ui/CenteredMessage';
 import { TabBar } from '@/features/tabs/TabBar';
@@ -40,6 +41,7 @@ function WorkflowCanvasInner({ workflowId: id }: { workflowId: string | undefine
   const navigate = useNavigate();
   const { data: workflow, isLoading, error } = useWorkflow(id);
   const update = useUpdateWorkflow();
+  const queryClient = useQueryClient();
   const { openTab } = useTabs();
   const runMutation = useRunWorkflow();
 
@@ -80,16 +82,19 @@ function WorkflowCanvasInner({ workflowId: id }: { workflowId: string | undefine
   // 节点 config 修改回调（由 NodeDetailPanel.ConfigForm 触发）
   const handleConfigChange = useCallback(
     (nodeId: string, config: Record<string, unknown>) => {
-      if (!workflow) return;
-      const next = {
-        ...workflow,
-        nodes: workflow.nodes.map((n) =>
+      if (!id) return;
+      const detailKey = ['workflows', id] as const;
+      const prev = queryClient.getQueryData<WorkflowDef>(detailKey);
+      if (!prev) return;
+      const next: WorkflowDef = {
+        ...prev,
+        nodes: prev.nodes.map((n) =>
           n.instance_id === nodeId ? { ...n, config } : n,
         ),
       };
       handleWorkflowChange(next);
     },
-    [workflow, handleWorkflowChange],
+    [id, queryClient, handleWorkflowChange],
   );
 
   function handleAddButtonClick() {
