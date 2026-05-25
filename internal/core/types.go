@@ -22,6 +22,7 @@ const (
 	PortTypeLinuxSsh        PortType = "LinuxSshConnection"
 	PortTypeLinuxFileHandle PortType = "LinuxFileHandle"
 	PortTypeDockerContext   PortType = "DockerContext"
+	PortTypeDockerContainer PortType = "DockerContainerHandle"
 	PortTypeK8sContext      PortType = "K8sContext"
 	PortTypeNginxInstance   PortType = "NginxInstance"
 )

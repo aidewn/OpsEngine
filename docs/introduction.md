@@ -10,7 +10,7 @@
 - 编排模型接近**蓝图**（Unreal Blueprint / 节点编辑器）：**执行流（Exec）** 与 **数据流（Data）** 分离；
 - 通过 **集合（Assemble）** 实现子流程复用，类似「可嵌套调用的函数模块」。
 
-当前阶段为 **MVP + 体验迭代**：流程控制、变量、集合调用、实时执行监控已可用；面向 SSH / Docker / K8s 等业务节点类型已在 `PortType` 中预留，具体业务能力需通过扩展节点逐步实现。
+当前阶段为 **MVP + 体验迭代**：流程控制、变量、集合调用、实时执行监控、执行详情调用栈侧栏已可用；内置 **Docker**（SSH 隧道连 daemon、拉镜像、运行容器）与 **K8s 连接** 节点已落地。后续方向见 [配置环境](./environment-plan.md)、[插件平台](./plugin-platform.md)。
 
 ## 2. 核心概念
 
@@ -57,7 +57,7 @@
 
 ### 2.5 端口类型与连线规则
 
-**端口类型**（`core.PortType`）：`Exec`、`String`、`Int`、`Bool`、`Dynamic`，以及 `LinuxSshConnection`、`DockerContext` 等业务句柄（预留）。
+**端口类型**（`core.PortType`）：`Exec`、`String`、`Int`、`Bool`、`Dynamic`、`Any`，以及 `LinuxSshConnection`、`LinuxFileHandle`、`DockerContext`、`K8sContext` 等业务句柄。
 
 **连线规则**（保存时后端校验 + 画布前端约束）：
 
@@ -95,6 +95,12 @@
 | `break` | flow_control | 取消执行上下文 |
 | `varset` / `varget` | pure/action | 变量读写 |
 | `print` | action | 调试日志输出 |
+| `to_string` | pure | 任意类型转字符串 |
+| `linux_*` | action/pure | 远程文件与命令（SSH） |
+| `docker_connect` | action | SSH 隧道连远端 Docker socket，输出 `DockerContext` |
+| `docker_pull` / `docker_run` / `docker_ps` / `docker_logs` / `docker_exec` / `docker_stop` / `docker_rm` / `docker_filter` | action | Docker 容器与镜像运维 |
+| `k8s_connect` | action | kubeconfig 连接，输出 `K8sContext` |
+| `arith` / `compare` / `logic` / `branch` / `for_loop` / `while_loop` | pure/flow | 表达式与流程控制 |
 
 集合调用节点：`assemble:<uuid>`（非 `internal/nodes` 包，由 `app.go` 动态构造 TypeDef）。
 
@@ -140,10 +146,16 @@
 
 ## 7. 路线图
 
-后续 Phase 8–13 计划见 [phase8-13-plan.md](./phase8-13-plan.md)，包括：端口重连体验、配置表单、Frame 树 UI、框选复制等。
+| 文档 | 内容 |
+|------|------|
+| [phase8-13-plan.md](./phase8-13-plan.md) | 历史 Phase 8–13（端口重连、框选复制等） |
+| [execution-ux-plan.md](./execution-ux-plan.md) | 执行列表/详情体验（**Phase 1–5 已完成**） |
+| [environment-plan.md](./environment-plan.md) | 配置环境、连接/探测节点（待做） |
+| [plugin-platform.md](./plugin-platform.md) | 插件生态：Lua 扩展节点与 UI 定制（待做） |
 
 ## 8. 相关文档
 
 - [架构与调用分析](./architecture.md)
 - [节点开发手册](./node-development.md)
 - [源码阅读说明](./source-reading.md)
+- [文档索引](./README.md)

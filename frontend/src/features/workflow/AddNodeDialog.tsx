@@ -8,7 +8,12 @@ import { Dialog } from '@/components/ui/Dialog';
 import { Input } from '@/components/ui/Input';
 import { useNodeTypes } from '@/api/nodeTypes';
 import type { NodeTypeDef } from '@/types/nodeType';
-import { isInternalNodeType, portTypesConnectable, resolvePortType } from '@/types/nodeType';
+import {
+  isBindingNodeType,
+  isInternalNodeType,
+  portTypesConnectable,
+  resolvePortType,
+} from '@/types/nodeType';
 import type { PendingConnection } from './WorkflowCanvas';
 
 interface AddNodeDialogProps {
@@ -33,7 +38,14 @@ export function AddNodeDialog({
   const filtered = useMemo(() => {
     if (!nodeTypes) return [];
 
-    let types = nodeTypes.filter((t) => !isInternalNodeType(t.type_id));
+    // 排除：
+    //   1. 单例 / 系统节点（system_*、assemble_start/end）
+    //   2. 绑定型节点（var_get/set、assemble_param、return_set）——这些必须从侧栏拖入，
+    //      不然新建时 var_name/param_name/return_name 空，后端 validate*Refs 会拒收，
+    //      节点会被乐观写入回滚而「消失」
+    let types = nodeTypes.filter(
+      (t) => !isInternalNodeType(t.type_id) && !isBindingNodeType(t.type_id),
+    );
 
     // 搜索过滤
     if (search.trim()) {

@@ -12,6 +12,8 @@
 | [source-reading.md](./source-reading.md) | **源码阅读说明**：推荐阅读顺序、关键文件、调试与测试入口 | 贡献者 |
 | [phase8-13-plan.md](./phase8-13-plan.md) | **迭代计划**（Phase 8–13） | 维护者 |
 | [execution-ux-plan.md](./execution-ux-plan.md) | **执行体验改进**：白屏修复（已完成）、调用栈侧栏、详情页稳健性 | 前端 / 全栈 |
+| [environment-plan.md](./environment-plan.md) | **配置环境**：按项目集中凭证、连接/探测节点、编辑态 Probe 绑定变量 | 全栈 / 节点开发者 |
+| [plugin-platform.md](./plugin-platform.md) | **插件平台**：Lua 扩展节点、主题/连线/UI 定制、宿主 API、迭代路线图 | 架构师 / 插件开发者 |
 
 ## 建议阅读路径
 
@@ -24,6 +26,12 @@
 
 要改前端画布 / 执行 UI
   └─ architecture.md（事件与 Frame）→ execution-ux-plan.md → source-reading.md（前端章节）
+
+要做配置环境 / 探测节点
+  └─ environment-plan.md → node-development.md → internal/clients
+
+要做插件 / 定制 UI / 扩展节点生态
+  └─ plugin-platform.md → node-development.md → architecture.md
 ```
 
 ## 文档约定

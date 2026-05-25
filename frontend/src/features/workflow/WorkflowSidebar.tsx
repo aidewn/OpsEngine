@@ -16,11 +16,16 @@ export function WorkflowSidebar({ workflow, onVariablesChange }: Props) {
         items={workflow.variables ?? []}
         onChange={onVariablesChange}
         showDefault
-        // 变量拖入画布 → var_get 节点
+        // 整行拖入画布 → var_get；行内 Set chip 拖入 → var_set
         dragPayload={(item) => ({
           type_id: 'var_get',
           config: { var_name: item.name, var_type: item.var_type },
         })}
+        secondaryDragPayload={(item) => ({
+          type_id: 'var_set',
+          config: { var_name: item.name, var_type: item.var_type },
+        })}
+        secondaryLabel="Set"
       />
     </aside>
   );

@@ -81,7 +81,6 @@ export const ASSEMBLE_END = 'assemble_end';
 export const ASSEMBLE_PARAM = 'assemble_param';
 
 // 不可由用户在 AddNodeDialog 中手动添加、且不可删除的单例节点
-// assemble_param / return_set 由侧栏拖入，与 var_get / var_set 一样可删
 const INTERNAL_NODE_TYPES = new Set([
   SYSTEM_READY,
   SYSTEM_UPDATE,
@@ -90,9 +89,24 @@ const INTERNAL_NODE_TYPES = new Set([
   ASSEMBLE_END,
 ]);
 
+// 「绑定型」节点：config 必填一个绑定名（var_name / param_name / return_name），
+// 否则保存时后端 validate*Refs 会拒收，AddNodeDialog 里裸建必失败。
+// 这些节点全部走左侧栏拖入（自动带绑定）；可删除，但不能从 AddNodeDialog 创建。
+const BINDING_NODE_TYPES = new Set([
+  'var_get',
+  'var_set',
+  'assemble_param',
+  'return_set',
+]);
+
 // 判断是否为系统/内部节点类型（不可手动添加、不可删除）
 export function isInternalNodeType(typeId: string): boolean {
   return INTERNAL_NODE_TYPES.has(typeId);
+}
+
+// 判断是否为「绑定型」节点（不可从 AddNodeDialog 添加；走侧栏拖入）
+export function isBindingNodeType(typeId: string): boolean {
+  return BINDING_NODE_TYPES.has(typeId);
 }
 
 // 判断是否为工作流事件源节点
@@ -125,6 +139,7 @@ const PORT_COLORS: Record<string, string> = {
   LinuxSshConnection: '#3b82f6', // 蓝色
   LinuxFileHandle: '#eab308',   // 金黄（远程文件句柄）
   DockerContext: '#8b5cf6',     // 紫蓝
+  DockerContainerHandle: '#7c3aed', // 深紫（容器引用，与 DockerContext 同色系）
   K8sContext: '#06b6d4',        // 青色
   NginxInstance: '#f97316',     // 橙色
 };

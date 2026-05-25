@@ -24,8 +24,12 @@ interface Props<T extends VarItem> {
   showDefault?: boolean;
   // 默认新建项的工厂（便于扩展自定义字段）
   factory?: () => T;
-  // 拖拽到画布的 payload 生成器；返回 null 表示该面板不可拖拽
+  // 主拖拽 payload（整行可拖；变量面板用作 Get）；返回 null 表示不拖
   dragPayload?: (item: T) => DragNodePayload | null;
+  // 次级拖拽 payload（行内额外的小 chip；变量面板用作 Set）
+  // 提供时在行尾显示带 secondaryLabel 文字的可拖 chip
+  secondaryDragPayload?: (item: T) => DragNodePayload | null;
+  secondaryLabel?: string;
 }
 
 // 类型选项（与后端 PortType 一致，排除 Exec/Dynamic）
@@ -48,6 +52,8 @@ export function VariablePanel<T extends VarItem>({
   showDefault = false,
   factory,
   dragPayload,
+  secondaryDragPayload,
+  secondaryLabel = 'Set',
 }: Props<T>) {
   const [adding, setAdding] = useState(false);
   const [editingIdx, setEditingIdx] = useState<number | null>(null);
@@ -107,6 +113,9 @@ export function VariablePanel<T extends VarItem>({
             );
           }
           const payload = dragPayload ? dragPayload(item) : null;
+          const secondaryPayload = secondaryDragPayload
+            ? secondaryDragPayload(item)
+            : null;
           const draggable = !!payload;
           return (
             <li
@@ -116,12 +125,13 @@ export function VariablePanel<T extends VarItem>({
                 if (payload) setDragPayload(e, payload);
               }}
               onClick={(e) => {
-                // 点击删除按钮区域 → 不进入编辑（含 visibility 隐藏时占位区域）
+                // 点击删除按钮 / 次级拖拽 chip 区域 → 不进入编辑
                 const el =
                   e.target instanceof Element
                     ? e.target
                     : (e.target as Node).parentElement;
                 if (el?.closest('[data-var-delete]')) return;
+                if (el?.closest('[data-var-secondary]')) return;
                 setEditingIdx(idx);
                 setAdding(false);
               }}
@@ -140,6 +150,21 @@ export function VariablePanel<T extends VarItem>({
                 {item.name}
               </span>
               <span className="text-[10px] text-slate-400">{item.var_type}</span>
+              {secondaryPayload && (
+                <span
+                  data-var-secondary
+                  draggable
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onDragStart={(e) => {
+                    e.stopPropagation();
+                    setDragPayload(e, secondaryPayload);
+                  }}
+                  className="shrink-0 cursor-grab rounded bg-slate-100 px-1 py-px text-[9px] font-medium text-slate-600 hover:bg-slate-200 active:cursor-grabbing"
+                  title={`拖到画布添加 ${secondaryLabel} 节点`}
+                >
+                  {secondaryLabel}
+                </span>
+              )}
               <button
                 type="button"
                 data-var-delete
