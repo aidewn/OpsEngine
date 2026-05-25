@@ -17,7 +17,8 @@ export function RunningBadge({ workflowID }: Props) {
   const [open, setOpen] = useState(false);
   const navigate = useNavigate();
   const { openTab } = useTabs();
-  const { data: execs = [] } = useExecutionsByWorkflow(workflowID);
+  const { data } = useExecutionsByWorkflow(workflowID);
+  const execs = Array.isArray(data) ? data : [];
 
   const runningCount = execs.filter((e) => e.status === 'Running').length;
   if (execs.length === 0) return null;

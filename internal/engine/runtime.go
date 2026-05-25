@@ -155,6 +155,16 @@ func (r *Runtime) getParam(frame *Frame, name string) (any, bool) {
 	return v, ok
 }
 
+// setReturn 写 frame 的返回值（assemble frame 内由 return_set 节点调用）
+func (r *Runtime) setReturn(frame *Frame, name string, value any) {
+	if frame == nil || frame.Returns == nil {
+		return
+	}
+	r.mu.Lock()
+	frame.Returns[name] = value
+	r.mu.Unlock()
+}
+
 // ── 节点状态推送（按 frame） ──────────────────────────────
 
 func (r *Runtime) setNodeState(frame *Frame, nodeID string, state core.NodeState, errMsg string) {

@@ -107,3 +107,16 @@ func (r *Runtime) runAssembleEnd(
 func isAssembleCallType(typeID string) bool {
 	return strings.HasPrefix(typeID, "assemble:")
 }
+
+// evalAssembleStartParamOutput 求 assemble_start 的 param_<name> 输出
+// 调用方传入的参数在 execAssembleCall 时已写入 child.Params
+func (r *Runtime) evalAssembleStartParamOutput(frame *Frame, portID string) (any, bool) {
+	if !strings.HasPrefix(portID, "param_") {
+		return nil, false
+	}
+	name := strings.TrimPrefix(portID, "param_")
+	if name == "" {
+		return nil, false
+	}
+	return r.getParam(frame, name)
+}

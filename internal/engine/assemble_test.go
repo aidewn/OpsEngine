@@ -262,3 +262,108 @@ func TestAssembleCall_VariableIsolation(t *testing.T) {
 		t.Errorf("print 日志期望 %q，实际 %q", want, logs[0].Message)
 	}
 }
+
+// TestAssembleCall_StartParamPort 从 assemble_start.param_* 直接取参（无需 assemble_param 节点）
+func TestAssembleCall_StartParamPort(t *testing.T) {
+	tmpDir := t.TempDir()
+	wfDir := filepath.Join(tmpDir, "workflows")
+	asDir := filepath.Join(tmpDir, "assembles")
+	_ = os.MkdirAll(wfDir, 0755)
+	_ = os.MkdirAll(asDir, 0755)
+
+	ws := store.NewWorkflowStore(wfDir)
+	as := store.NewAssembleStore(asDir)
+
+	asm := core.AssembleDef{
+		ID:   "asm-start-param",
+		Name: "StartParam",
+		Params: []core.ParamDef{
+			{Name: "input", VarType: core.PortTypeString},
+		},
+		Returns: []core.ParamDef{
+			{Name: "result", VarType: core.PortTypeString},
+		},
+		Nodes: []core.NodeInstance{
+			{InstanceID: "start", TypeID: "assemble_start", Config: map[string]any{}},
+			{InstanceID: "print", TypeID: "print", Config: map[string]any{"prefix": "[ASM]"}},
+			{InstanceID: "end", TypeID: "assemble_end", Config: map[string]any{}},
+		},
+		Edges: []core.EdgeConfig{
+			{From: core.PortRef{Node: "start", Port: "exec_out"},
+				To: core.PortRef{Node: "print", Port: "exec_in"}},
+			{From: core.PortRef{Node: "print", Port: "exec_out"},
+				To: core.PortRef{Node: "end", Port: "exec_in"}},
+			{From: core.PortRef{Node: "start", Port: "param_input"},
+				To: core.PortRef{Node: "print", Port: "message"}},
+			{From: core.PortRef{Node: "start", Port: "param_input"},
+				To: core.PortRef{Node: "end", Port: "return_result"}},
+		},
+	}
+	if err := as.Save(asm); err != nil {
+		t.Fatal(err)
+	}
+
+	wf := core.WorkflowDef{
+		ID:   "wf-start-param",
+		Name: "StartParamCall",
+		Variables: []core.VariableDef{
+			{Name: "msg", VarType: core.PortTypeString, Default: "via-start"},
+		},
+		Nodes: []core.NodeInstance{
+			{InstanceID: "ready", TypeID: "system_ready", Config: map[string]any{}},
+			{InstanceID: "get", TypeID: "var_get", Config: map[string]any{
+				"var_name": "msg", "var_type": "String",
+			}},
+			{InstanceID: "call", TypeID: "assemble:asm-start-param", Config: map[string]any{}},
+			{InstanceID: "print2", TypeID: "print", Config: map[string]any{"prefix": "[MAIN]"}},
+		},
+		Edges: []core.EdgeConfig{
+			{From: core.PortRef{Node: "ready", Port: "exec_out"},
+				To: core.PortRef{Node: "call", Port: "exec_in"}},
+			{From: core.PortRef{Node: "call", Port: "exec_out"},
+				To: core.PortRef{Node: "print2", Port: "exec_in"}},
+			{From: core.PortRef{Node: "get", Port: "value"},
+				To: core.PortRef{Node: "call", Port: "param_input"}},
+			{From: core.PortRef{Node: "call", Port: "return_result"},
+				To: core.PortRef{Node: "print2", Port: "message"}},
+		},
+	}
+	if err := ws.Save(wf); err != nil {
+		t.Fatal(err)
+	}
+
+	collector := &collectorEmitter{}
+	e := engine.New(ws, as, nil, collector)
+	execID, err := e.Run(wf.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		rt, _ := e.Get(execID)
+		if rt.Status() != core.WorkflowStatusRunning {
+			break
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	rt, _ := e.Get(execID)
+	if got := rt.Status(); got != core.WorkflowStatusSuccess {
+		t.Fatalf("期望 Success，实际 %s（错误: %s）", got, rt.Record().Error)
+	}
+
+	record := rt.Record()
+	callFrame := record.RootFrame.Children["call"]
+	if callFrame == nil {
+		t.Fatal("找不到集合 frame")
+	}
+	if len(callFrame.NodeLogs["print"]) == 0 ||
+		callFrame.NodeLogs["print"][0].Message != "[ASM] via-start" {
+		t.Errorf("集合 print 日志不对: %v", callFrame.NodeLogs["print"])
+	}
+	if len(record.RootFrame.NodeLogs["print2"]) == 0 ||
+		record.RootFrame.NodeLogs["print2"][0].Message != "[MAIN] via-start" {
+		t.Errorf("主流 print2 日志不对: %v", record.RootFrame.NodeLogs["print2"])
+	}
+}

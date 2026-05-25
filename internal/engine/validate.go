@@ -64,6 +64,12 @@ func ValidateAssemble(asm core.AssembleDef) error {
 	if err := validateVariableRefs(asm.Nodes, asm.Variables); err != nil {
 		return err
 	}
+	if err := validateParamRefs(asm.Nodes, asm.Params); err != nil {
+		return err
+	}
+	if err := validateReturnRefs(asm.Nodes, asm.Returns); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -134,6 +140,52 @@ func validateVariableRefs(nodes []core.NodeInstance, variables []core.VariableDe
 		}
 		if !defined[name] {
 			return fmt.Errorf("%s 节点 %s 引用的变量 %q 未定义", n.TypeID, n.InstanceID, name)
+		}
+	}
+	return nil
+}
+
+// validateParamRefs assemble_param 引用的参数必须在 Params 列表中定义
+func validateParamRefs(nodes []core.NodeInstance, params []core.ParamDef) error {
+	defined := make(map[string]bool, len(params))
+	for _, p := range params {
+		defined[p.Name] = true
+	}
+	for _, n := range nodes {
+		if n.TypeID != "assemble_param" {
+			continue
+		}
+		nameRaw := n.Config["param_name"]
+		name, _ := nameRaw.(string)
+		name = strings.TrimSpace(name)
+		if name == "" {
+			return fmt.Errorf("assemble_param 节点 %s 的 param_name 未配置", n.InstanceID)
+		}
+		if !defined[name] {
+			return fmt.Errorf("assemble_param 节点 %s 引用的参数 %q 未定义", n.InstanceID, name)
+		}
+	}
+	return nil
+}
+
+// validateReturnRefs return_set 引用的返回值必须在 Returns 列表中定义
+func validateReturnRefs(nodes []core.NodeInstance, returns []core.ParamDef) error {
+	defined := make(map[string]bool, len(returns))
+	for _, r := range returns {
+		defined[r.Name] = true
+	}
+	for _, n := range nodes {
+		if n.TypeID != "return_set" {
+			continue
+		}
+		nameRaw := n.Config["return_name"]
+		name, _ := nameRaw.(string)
+		name = strings.TrimSpace(name)
+		if name == "" {
+			return fmt.Errorf("return_set 节点 %s 的 return_name 未配置", n.InstanceID)
+		}
+		if !defined[name] {
+			return fmt.Errorf("return_set 节点 %s 引用的返回值 %q 未定义", n.InstanceID, name)
 		}
 	}
 	return nil

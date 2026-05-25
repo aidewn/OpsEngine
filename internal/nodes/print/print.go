@@ -6,6 +6,7 @@ package print
 import (
 	"OpsEngine/internal/core"
 	"OpsEngine/internal/engine"
+	"OpsEngine/internal/nodes/exprhelper"
 )
 
 func init() { engine.Register(&Node{}) }
@@ -24,7 +25,7 @@ func (Node) TypeDef() core.NodeTypeDef {
 		Description: "打印消息到执行日志",
 		InputPorts: []core.PortDef{
 			{ID: "exec_in", Label: "▶", PortType: core.PortTypeExec, Required: true},
-			{ID: "message", Label: "消息", PortType: core.PortTypeString},
+			{ID: "message", Label: "消息", PortType: core.PortTypeAny},
 		},
 		OutputPorts: []core.PortDef{
 			{ID: "exec_out", Label: "▶", PortType: core.PortTypeExec},
@@ -50,6 +51,6 @@ func (Node) Execute(ctx engine.ExecContext) (engine.Outputs, error) {
 	if prefix == "" {
 		prefix = "[INFO]"
 	}
-	ctx.Info("%s %v", prefix, msg)
+	ctx.Info("%s %s", prefix, exprhelper.FormatValue(msg))
 	return nil, nil
 }

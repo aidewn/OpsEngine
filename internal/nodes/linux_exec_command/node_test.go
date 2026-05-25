@@ -134,6 +134,7 @@ func (c fakeContext) ConfigBool(fieldID string) bool {
 func (c fakeContext) GetVariable(string) (any, bool) { return nil, false }
 func (c fakeContext) SetVariable(string, any)        {}
 func (c fakeContext) GetParam(string) (any, bool)    { return nil, false }
+func (c fakeContext) SetReturn(string, any)          {}
 func (c fakeContext) Info(string, ...any)            {}
 func (c fakeContext) Warn(string, ...any)            {}
 func (c fakeContext) Error(string, ...any)           {}

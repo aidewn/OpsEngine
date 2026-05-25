@@ -27,7 +27,8 @@ import {
   graphToRf,
   toRfEdge,
 } from './canvasMapping';
-import { buildDefaultConfig, resolvePortType } from '@/types/nodeType';
+import { resolveGraphPort } from './resolveGraphPort';
+import { buildDefaultConfig, portTypesConnectable } from '@/types/nodeType';
 import { newUUID } from '@/lib/uuid';
 import { readDragPayload } from './dragNode';
 import { effectiveBranchCount } from './cleanupParallel';
@@ -174,26 +175,27 @@ export function WorkflowCanvas<T extends GraphDef>({
       );
       if (!sourceNode || !targetNode) return false;
 
-      const sourceDef = nodeTypes.find(
-        (t) => t.type_id === sourceNode.type_id,
+      const sourcePort = resolveGraphPort(
+        g,
+        sourceNode,
+        connection.sourceHandle ?? '',
+        nodeTypes,
       );
-      const targetDef = nodeTypes.find(
-        (t) => t.type_id === targetNode.type_id,
-      );
-      if (!sourceDef || !targetDef) return true; // 未注册类型，允许连接
-
-      const sourcePort = sourceDef.output_ports.find(
-        (p) => p.id === connection.sourceHandle,
-      );
-      const targetPort = targetDef.input_ports.find(
-        (p) => p.id === connection.targetHandle,
+      const targetPort = resolveGraphPort(
+        g,
+        targetNode,
+        connection.targetHandle ?? '',
+        nodeTypes,
       );
       if (!sourcePort || !targetPort) return false;
-
-      // 解析动态端口类型后比较
-      const srcType = resolvePortType(sourcePort, sourceNode.config);
-      const tgtType = resolvePortType(targetPort, targetNode.config);
-      if (srcType !== tgtType) return false;
+      if (sourcePort.direction !== 'output' || targetPort.direction !== 'input') {
+        return false;
+      }
+      if (
+        !portTypesConnectable(sourcePort.portType, targetPort.portType)
+      ) {
+        return false;
+      }
 
       // parallel 节点的 exec_out_<i> 限制：超出 branch_count 的端口拒绝连接
       if (sourceNode.type_id === 'parallel') {
@@ -282,15 +284,17 @@ export function WorkflowCanvas<T extends GraphDef>({
       const fromNode = g.nodes.find((n) => n.instance_id === fromNodeId);
       if (!fromNode) return;
 
-      const fromDef = nodeTypes.find((t) => t.type_id === fromNode.type_id);
-      if (!fromDef) return;
+      const resolved = resolveGraphPort(
+        g,
+        fromNode,
+        fromHandleId,
+        nodeTypes,
+      );
+      if (!resolved) return;
 
       const isOutput = fromHandleType === 'source';
-      const portList = isOutput ? fromDef.output_ports : fromDef.input_ports;
-      const portDef = portList.find((p) => p.id === fromHandleId);
-      if (!portDef) return;
-
-      const realType = resolvePortType(portDef, fromNode.config);
+      if (isOutput && resolved.direction !== 'output') return;
+      if (!isOutput && resolved.direction !== 'input') return;
 
       // 取松手时的鼠标/触控屏幕坐标
       let clientX: number;
@@ -309,7 +313,7 @@ export function WorkflowCanvas<T extends GraphDef>({
       const flowPos = rf.screenToFlowPosition({ x: clientX, y: clientY });
 
       onPendingConnection?.({
-        sourcePortType: realType,
+        sourcePortType: resolved.portType,
         sourceDirection: isOutput ? 'output' : 'input',
         nodeId: fromNodeId,
         portId: fromHandleId,
@@ -378,12 +382,11 @@ export function WorkflowCanvas<T extends GraphDef>({
 
       const g = graphRef.current;
       const node = g.nodes.find((n) => n.instance_id === nodeId);
-      const def = node && nodeTypes.find((t) => t.type_id === node.type_id);
-      const portDef = def?.output_ports.find((p) => p.id === portId);
-      if (!node || !def || !portDef) return;
+      if (!node) return;
 
-      const realType = resolvePortType(portDef, node.config);
-      if (realType === 'Exec') return;
+      const resolved = resolveGraphPort(g, node, portId, nodeTypes);
+      if (!resolved || resolved.direction !== 'output') return;
+      if (resolved.portType === 'Exec') return;
 
       event.preventDefault();
       setPortMenu({
@@ -391,8 +394,8 @@ export function WorkflowCanvas<T extends GraphDef>({
         y: event.clientY,
         nodeId,
         portId,
-        portLabel: portDef.label || portDef.id,
-        portType: realType,
+        portLabel: resolved.label,
+        portType: resolved.portType,
       });
     },
     [readOnly, nodeTypes],

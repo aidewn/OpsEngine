@@ -3,7 +3,12 @@
 
 package exprhelper
 
-import "testing"
+import (
+	"strings"
+	"testing"
+
+	"OpsEngine/internal/clients"
+)
 
 func TestToInt64(t *testing.T) {
 	cases := []struct {
@@ -120,5 +125,36 @@ func TestToString(t *testing.T) {
 					c.in, got, ok, c.want, c.wantOk)
 			}
 		})
+	}
+}
+
+func TestFormatValue(t *testing.T) {
+	cases := []struct {
+		name string
+		in   any
+		want string
+	}{
+		{"nil", nil, "<nil>"},
+		{"string", "hello", "hello"},
+		{"int64", int64(42), "42"},
+		{"bool", true, "true"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			if got := FormatValue(c.in); got != c.want {
+				t.Errorf("FormatValue(%v) = %q, want %q", c.in, got, c.want)
+			}
+		})
+	}
+}
+
+func TestFormatValue_SshHandle(t *testing.T) {
+	ssh := clients.NewLinuxSshClient(nil, "10.0.0.1", 22, "ops")
+	got := FormatValue(ssh)
+	if got == "" || got[0] != '{' {
+		t.Fatalf("FormatValue(ssh) = %q, want JSON object", got)
+	}
+	if !strings.Contains(got, "10.0.0.1") || !strings.Contains(got, "LinuxSshConnection") {
+		t.Fatalf("FormatValue(ssh) = %q", got)
 	}
 }

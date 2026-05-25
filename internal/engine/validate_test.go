@@ -166,3 +166,31 @@ func TestValidateAssemble_VariableRefs(t *testing.T) {
 		t.Fatalf("期望 missing 未定义错误，实际: %v", err)
 	}
 }
+
+// TestValidateAssemble_ParamReturnRefs assemble_param / return_set 引用必须存在
+func TestValidateAssemble_ParamReturnRefs(t *testing.T) {
+	asm := core.AssembleDef{
+		Params:  []core.ParamDef{{Name: "in", VarType: core.PortTypeString}},
+		Returns: []core.ParamDef{{Name: "out", VarType: core.PortTypeString}},
+		Nodes: []core.NodeInstance{
+			{InstanceID: "p1", TypeID: "assemble_param",
+				Config: map[string]any{"param_name": "ghost"}},
+			{InstanceID: "r1", TypeID: "return_set",
+				Config: map[string]any{"return_name": "ghost"}},
+		},
+	}
+	if err := ValidateAssemble(asm); err == nil ||
+		!strings.Contains(err.Error(), "ghost") {
+		t.Fatalf("期望 ghost 未定义错误，实际: %v", err)
+	}
+
+	asm.Nodes = []core.NodeInstance{
+		{InstanceID: "p1", TypeID: "assemble_param",
+			Config: map[string]any{"param_name": "in"}},
+		{InstanceID: "r1", TypeID: "return_set",
+			Config: map[string]any{"return_name": "out"}},
+	}
+	if err := ValidateAssemble(asm); err != nil {
+		t.Fatalf("期望通过，实际失败: %v", err)
+	}
+}

@@ -24,11 +24,24 @@ const KEY = {
   detail: (id: string) => ['executions', id] as const,
 };
 
+// normalizeExecutionList Wails/JSON 可能把 Go nil slice 序列化为 null，统一成数组
+async function normalizeExecutionList(): Promise<ExecutionSummary[]> {
+  const raw = await ListExecutions();
+  return (Array.isArray(raw) ? raw : []) as ExecutionSummary[];
+}
+
+async function normalizeExecutionListByWorkflow(
+  workflowID: string,
+): Promise<ExecutionSummary[]> {
+  const raw = await ListExecutionsByWorkflow(workflowID);
+  return (Array.isArray(raw) ? raw : []) as ExecutionSummary[];
+}
+
 // useExecutions 列出所有执行（首页第三 tab）
 export function useExecutions(): UseQueryResult<ExecutionSummary[]> {
   return useQuery({
     queryKey: KEY.list,
-    queryFn: () => ListExecutions() as Promise<ExecutionSummary[]>,
+    queryFn: normalizeExecutionList,
   });
 }
 
@@ -38,8 +51,7 @@ export function useExecutionsByWorkflow(
 ): UseQueryResult<ExecutionSummary[]> {
   return useQuery({
     queryKey: workflowID ? KEY.byWorkflow(workflowID) : ['executions', 'wf-undef'],
-    queryFn: () =>
-      ListExecutionsByWorkflow(workflowID!) as Promise<ExecutionSummary[]>,
+    queryFn: () => normalizeExecutionListByWorkflow(workflowID!),
     enabled: !!workflowID,
   });
 }

@@ -16,6 +16,8 @@ const (
 	PortTypeBool          PortType = "Bool"
 	// 动态类型（由节点 config 决定真实类型）
 	PortTypeDynamic       PortType = "Dynamic"
+	// 任意类型（调试 sink / 转换源；可连任意数据端口）
+	PortTypeAny           PortType = "Any"
 	// 业务句柄类型
 	PortTypeLinuxSsh        PortType = "LinuxSshConnection"
 	PortTypeLinuxFileHandle PortType = "LinuxFileHandle"

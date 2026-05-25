@@ -13,17 +13,28 @@ import { Textarea } from '@/components/ui/Textarea';
 import { Label } from '@/components/ui/Label';
 import { cn } from '@/lib/cn';
 import type { FieldSchema } from '@/types/nodeType';
+import type { ParamDef } from '@/types/assemble';
 import type { VariableDef } from '@/types/workflow';
 
 interface Props {
   schema: FieldSchema[];
   value: Record<string, unknown>;
   onChange: (next: Record<string, unknown>) => void;
-  // 当前图（workflow / assemble）已定义变量；variable_select 字段从中取选项
+  // 当前图已定义变量；variable_select 字段从中取选项
   variables?: VariableDef[];
+  // 集合 params / returns；param_select / return_select 从中取选项
+  params?: ParamDef[];
+  returns?: ParamDef[];
 }
 
-export function ConfigForm({ schema, value, onChange, variables }: Props) {
+export function ConfigForm({
+  schema,
+  value,
+  onChange,
+  variables,
+  params,
+  returns,
+}: Props) {
   const [local, setLocal] = useState<Record<string, unknown>>(value);
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
@@ -86,6 +97,8 @@ export function ConfigForm({ schema, value, onChange, variables }: Props) {
           onChange={(v) => setOne(field.id, v)}
           onPatch={setPatch}
           variables={variables}
+          params={params}
+          returns={returns}
         />
       ))}
     </div>
@@ -99,12 +112,16 @@ function FieldRow({
   onChange,
   onPatch,
   variables,
+  params,
+  returns,
 }: {
   field: FieldSchema;
   value: unknown;
   onChange: (v: unknown) => void;
   onPatch: (patch: Record<string, unknown>) => void;
   variables?: VariableDef[];
+  params?: ParamDef[];
+  returns?: ParamDef[];
 }) {
   return (
     <div className="space-y-1">
@@ -118,6 +135,8 @@ function FieldRow({
         onChange={onChange}
         onPatch={onPatch}
         variables={variables}
+        params={params}
+        returns={returns}
       />
     </div>
   );
@@ -130,12 +149,16 @@ function FieldControl({
   onChange,
   onPatch,
   variables,
+  params,
+  returns,
 }: {
   field: FieldSchema;
   value: unknown;
   onChange: (v: unknown) => void;
   onPatch: (patch: Record<string, unknown>) => void;
   variables?: VariableDef[];
+  params?: ParamDef[];
+  returns?: ParamDef[];
 }) {
   switch (field.type) {
     case 'textarea':
@@ -222,6 +245,31 @@ function FieldControl({
           }
         />
       );
+    case 'param_select':
+      return (
+        <ParamSelect
+          id={field.id}
+          value={(value as string) ?? ''}
+          params={params ?? []}
+          onPick={(p) =>
+            onPatch({ param_name: p?.name ?? '', var_type: p?.var_type ?? '' })
+          }
+        />
+      );
+    case 'return_select':
+      return (
+        <ReturnSelect
+          id={field.id}
+          value={(value as string) ?? ''}
+          returns={returns ?? []}
+          onPick={(r) =>
+            onPatch({
+              return_name: r?.name ?? '',
+              var_type: r?.var_type ?? '',
+            })
+          }
+        />
+      );
     case 'text':
     default:
       return (
@@ -287,6 +335,114 @@ function VariableSelect({
       {isOrphan && (
         <div className="text-[11px] text-red-600">
           引用的变量已不存在，保存前请重新选择
+        </div>
+      )}
+    </div>
+  );
+}
+
+// param_select：从集合 Params 列表挑选；选中后写 param_name + var_type
+function ParamSelect({
+  id,
+  value,
+  params,
+  onPick,
+}: {
+  id: string;
+  value: string;
+  params: ParamDef[];
+  onPick: (p: ParamDef | null) => void;
+}) {
+  const exists = params.some((p) => p.name === value);
+  const isOrphan = value !== '' && !exists;
+
+  if (params.length === 0) {
+    return (
+      <div className="rounded border border-amber-300 bg-amber-50 px-2 py-1.5 text-xs text-amber-700">
+        当前集合没有定义 Params，请先在 Start 节点或左侧 Params 面板添加
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-1">
+      <select
+        id={id}
+        value={value}
+        onChange={(e) => {
+          const picked = params.find((p) => p.name === e.target.value);
+          onPick(picked ?? null);
+        }}
+        className={cn(
+          'w-full rounded border bg-white px-2 py-1.5 text-xs',
+          isOrphan ? 'border-red-400' : 'border-slate-300',
+        )}
+      >
+        <option value="">（请选择参数）</option>
+        {isOrphan && <option value={value}>未定义：{value}</option>}
+        {params.map((p) => (
+          <option key={p.name} value={p.name}>
+            {p.name} ({p.var_type})
+          </option>
+        ))}
+      </select>
+      {isOrphan && (
+        <div className="text-[11px] text-red-600">
+          引用的参数已不存在，保存前请重新选择
+        </div>
+      )}
+    </div>
+  );
+}
+
+// return_select：从集合 Returns 列表挑选；选中后写 return_name + var_type
+function ReturnSelect({
+  id,
+  value,
+  returns,
+  onPick,
+}: {
+  id: string;
+  value: string;
+  returns: ParamDef[];
+  onPick: (r: ParamDef | null) => void;
+}) {
+  const exists = returns.some((r) => r.name === value);
+  const isOrphan = value !== '' && !exists;
+
+  if (returns.length === 0) {
+    return (
+      <div className="rounded border border-amber-300 bg-amber-50 px-2 py-1.5 text-xs text-amber-700">
+        当前集合没有定义 Returns，请先在 End 节点或左侧 Returns 面板添加
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-1">
+      <select
+        id={id}
+        value={value}
+        onChange={(e) => {
+          const picked = returns.find((r) => r.name === e.target.value);
+          onPick(picked ?? null);
+        }}
+        className={cn(
+          'w-full rounded border bg-white px-2 py-1.5 text-xs',
+          isOrphan ? 'border-red-400' : 'border-slate-300',
+        )}
+      >
+        <option value="">（请选择返回值）</option>
+        {isOrphan && <option value={value}>未定义：{value}</option>}
+        {returns.map((r) => (
+          <option key={r.name} value={r.name}>
+            {r.name} ({r.var_type})
+          </option>
+        ))}
+      </select>
+      {isOrphan && (
+        <div className="text-[11px] text-red-600">
+          引用的返回值已不存在，保存前请重新选择
         </div>
       )}
     </div>

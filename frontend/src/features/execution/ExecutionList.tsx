@@ -14,8 +14,9 @@ import { useTabs } from '@/features/tabs/TabsContext';
 
 export function ExecutionList() {
   const navigate = useNavigate();
-  // 数据源：后端 ListExecutions（含历史持久化 + 内存运行中）
-  const { data: execs = [], isLoading } = useExecutions();
+  const { data, isLoading, error } = useExecutions();
+  // Wails 空列表可能返回 null；解构默认值只对 undefined 生效
+  const execs = Array.isArray(data) ? data : [];
   const stopMutation = useStopExecution();
   const deleteMutation = useDeleteExecution();
   const { remove: removeFromStore } = useExecutionHydrator();
@@ -52,13 +53,31 @@ export function ExecutionList() {
       </header>
 
       <main className="flex-1">
-        {isLoading && execs.length === 0 ? (
+        {isLoading && execs.length === 0 && (
           <div className="text-sm text-slate-500">加载中...</div>
-        ) : execs.length === 0 ? (
-          <div className="rounded-lg border border-dashed border-slate-300 bg-white px-6 py-16 text-center text-sm text-slate-500">
-            还没有任何执行记录
+        )}
+        {error && (
+          <div className="rounded border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            加载失败：{error.message}
           </div>
-        ) : (
+        )}
+        {!isLoading && !error && execs.length === 0 && (
+          <div className="rounded-lg border border-dashed border-slate-300 bg-white px-6 py-16 text-center">
+            <p className="text-sm text-slate-500">还没有任何执行记录</p>
+            <p className="mt-2 text-xs text-slate-400">
+              在工作流编辑页点击「运行」后，记录会出现在这里
+            </p>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="mt-4"
+              onClick={() => navigate('/')}
+            >
+              返回工作流列表
+            </Button>
+          </div>
+        )}
+        {!error && execs.length > 0 && (
           <ul className="divide-y divide-slate-200 rounded-lg border border-slate-200 bg-white">
             {execs.map((e) => (
               <li key={e.id}>

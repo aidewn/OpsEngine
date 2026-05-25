@@ -5,12 +5,19 @@
 
 import { useState, type ReactNode } from 'react';
 import type { NodeInstance, VariableDef } from '@/types/workflow';
+import type { ParamDef } from '@/types/assemble';
 import type { GraphDef } from './canvasMapping';
 import { useNodeTypes } from '@/api/nodeTypes';
-import { isInternalNodeType, type NodeTypeDef } from '@/types/nodeType';
+import {
+  ASSEMBLE_END,
+  ASSEMBLE_START,
+  isInternalNodeType,
+  type NodeTypeDef,
+} from '@/types/nodeType';
 import { frameAt, useExecution } from '@/features/execution/ExecutionStore';
 import { NodeStatusIcon } from '@/features/execution/ExecutionStatus';
 import { ConfigForm } from './ConfigForm';
+import { VariablePanel } from './VariablePanel';
 import { cn } from '@/lib/cn';
 
 interface NodeDetailPanelProps {
@@ -19,6 +26,8 @@ interface NodeDetailPanelProps {
     name?: string;
     description?: string;
     variables?: VariableDef[];
+    params?: ParamDef[];
+    returns?: ParamDef[];
   };
   selectedNodeId: string | null;
   // 若传入，节点的 Logs tab 显示此 execution 的实时日志
@@ -27,6 +36,9 @@ interface NodeDetailPanelProps {
   framePath?: string[];
   // 节点 config 修改回调（仅编辑页传入，执行详情页不传 = 只读）
   onConfigChange?: (nodeId: string, config: Record<string, unknown>) => void;
+  // 集合编辑：选中 Start/End 时在 Config 中维护 params / returns
+  onParamsChange?: (items: ParamDef[]) => void;
+  onReturnsChange?: (items: ParamDef[]) => void;
 }
 
 export function NodeDetailPanel({
@@ -35,6 +47,8 @@ export function NodeDetailPanel({
   executionID,
   framePath = [],
   onConfigChange,
+  onParamsChange,
+  onReturnsChange,
 }: NodeDetailPanelProps) {
   const node = selectedNodeId
     ? (graph.nodes.find((n) => n.instance_id === selectedNodeId) ?? null)
@@ -55,6 +69,10 @@ export function NodeDetailPanel({
             framePath={framePath}
             onConfigChange={onConfigChange}
             variables={graph.variables}
+            params={graph.params}
+            returns={graph.returns}
+            onParamsChange={onParamsChange}
+            onReturnsChange={onReturnsChange}
           />
         ) : (
           <div className="px-4 py-3">
@@ -76,12 +94,20 @@ function NodeTabs({
   framePath,
   onConfigChange,
   variables,
+  params,
+  returns,
+  onParamsChange,
+  onReturnsChange,
 }: {
   node: NodeInstance;
   executionID?: string;
   framePath: string[];
   onConfigChange?: (nodeId: string, config: Record<string, unknown>) => void;
   variables?: VariableDef[];
+  params?: ParamDef[];
+  returns?: ParamDef[];
+  onParamsChange?: (items: ParamDef[]) => void;
+  onReturnsChange?: (items: ParamDef[]) => void;
 }) {
   const [tab, setTab] = useState<Tab>(executionID ? 'logs' : 'config');
   const exec = useExecution(executionID);
@@ -124,6 +150,10 @@ function NodeTabs({
             nodeType={nodeType}
             onConfigChange={onConfigChange}
             variables={variables}
+            params={params}
+            returns={returns}
+            onParamsChange={onParamsChange}
+            onReturnsChange={onReturnsChange}
           />
         )}
         {tab === 'logs' && (
@@ -171,12 +201,58 @@ function ConfigTab({
   nodeType,
   onConfigChange,
   variables,
+  params,
+  returns,
+  onParamsChange,
+  onReturnsChange,
 }: {
   node: NodeInstance;
   nodeType: NodeTypeDef | undefined;
   onConfigChange?: (nodeId: string, config: Record<string, unknown>) => void;
   variables?: VariableDef[];
+  params?: ParamDef[];
+  returns?: ParamDef[];
+  onParamsChange?: (items: ParamDef[]) => void;
+  onReturnsChange?: (items: ParamDef[]) => void;
 }) {
+  // Start / End：在节点详情里直接编辑 params / returns（与左侧栏同步，并反映到节点端口）
+  if (node.type_id === ASSEMBLE_START && onParamsChange) {
+    return (
+      <div className="-mx-4 -mt-3">
+        <p className="mb-2 px-4 text-xs text-slate-500">
+          入参定义会显示在 Start 节点的输出端口上；也可从左侧 Params 拖入 Get 参数节点。
+        </p>
+        <VariablePanel
+          title="Params"
+          items={params ?? []}
+          onChange={onParamsChange}
+          dragPayload={(item) => ({
+            type_id: 'assemble_param',
+            config: { param_name: item.name, var_type: item.var_type },
+          })}
+        />
+      </div>
+    );
+  }
+  if (node.type_id === ASSEMBLE_END && onReturnsChange) {
+    return (
+      <div className="-mx-4 -mt-3">
+        <p className="mb-2 px-4 text-xs text-slate-500">
+          返回值定义会显示在 End 节点的输入端口上；也可从左侧 Returns 拖入 Set 返回值节点。
+        </p>
+        <VariablePanel
+          title="Returns"
+          items={returns ?? []}
+          onChange={onReturnsChange}
+          dragPayload={(item) => ({
+            type_id: 'return_set',
+            config: { return_name: item.name, var_type: item.var_type },
+          })}
+        />
+      </div>
+    );
+  }
+
   const schema = nodeType?.config_schema ?? [];
   if (schema.length === 0) {
     return <div className="text-xs text-slate-400">（无配置项）</div>;
@@ -195,6 +271,8 @@ function ConfigTab({
       value={node.config}
       onChange={(next) => onConfigChange(node.instance_id, next)}
       variables={variables}
+      params={params}
+      returns={returns}
     />
   );
 }

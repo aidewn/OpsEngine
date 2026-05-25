@@ -1,5 +1,5 @@
 // assemble_end 节点：集合执行出口
-// input 端口 = exec_in + 每个 return 一个数据端口（动态根据 AssembleContext.returns 渲染）
+// 动态渲染 assemble.returns → return_<name> 数据输入端口；到达 End 时引擎收集到 frame.Returns
 
 import { Handle, Position, type NodeProps } from '@xyflow/react';
 import { BaseNode } from './BaseNode';
@@ -30,19 +30,21 @@ export function AssembleEndNode({ data, selected }: Props) {
       <div
         className="flex items-center text-[10px] text-slate-600"
         style={{ height: ROW_HEIGHT }}
-      />
+      >
+        <span className="pl-2.5">▶</span>
+      </div>
       {/* 每个 return 一行 */}
       {returns.map((r) => (
         <div
           key={r.name}
-          className="flex items-center text-[10px] text-slate-700"
+          className="flex items-center gap-2 text-[10px] text-slate-700"
           style={{ height: ROW_HEIGHT }}
         >
-          <span className="pl-2.5 font-medium">{r.var_type}</span>
+          <span className="pl-2.5 font-medium">{r.name}</span>
+          <span className="text-slate-400">{r.var_type}</span>
         </div>
       ))}
 
-      {/* exec_in handle */}
       <Handle
         type="target"
         position={Position.Left}
@@ -58,7 +60,6 @@ export function AssembleEndNode({ data, selected }: Props) {
         title="Exec In"
       />
 
-      {/* 每个 return 的 input handle */}
       {returns.map((r, idx) => (
         <Handle
           key={r.name}

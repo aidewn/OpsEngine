@@ -208,6 +208,12 @@ function AssembleCanvasInner({ assembleId: id }: { assembleId: string | undefine
             graph={assemble}
             selectedNodeId={selectedNodeId}
             onConfigChange={handleConfigChange}
+            onParamsChange={(params) =>
+              handleAssembleChange({ ...assemble, params })
+            }
+            onReturnsChange={(returns) =>
+              handleAssembleChange({ ...assemble, returns })
+            }
           />
         </div>
 

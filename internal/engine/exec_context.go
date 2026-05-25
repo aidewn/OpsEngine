@@ -85,6 +85,10 @@ func (c *execContextImpl) GetParam(name string) (any, bool) {
 	return c.runtime.getParam(c.frame, name)
 }
 
+func (c *execContextImpl) SetReturn(name string, value any) {
+	c.runtime.setReturn(c.frame, name, value)
+}
+
 func (c *execContextImpl) Info(format string, args ...any) {
 	c.runtime.appendLog(c.frame, c.node.InstanceID, "info", fmt.Sprintf(format, args...))
 }

@@ -2,6 +2,7 @@
 // 单向同步：拖动节点改变 position 后调用 mergeNodePositions 写回
 
 import { type Node as RfNode, type Edge as RfEdge } from '@xyflow/react';
+import type { ParamDef } from '@/types/assemble';
 import type { EdgeConfig, NodeInstance, VariableDef } from '@/types/workflow';
 import {
   isSystemNodeType,
@@ -15,6 +16,9 @@ export interface GraphDef {
   nodes: NodeInstance[];
   edges: EdgeConfig[];
   variables?: VariableDef[];
+  // 集合画布：Start/End 动态 param_* / return_* 端口解析用
+  params?: ParamDef[];
+  returns?: ParamDef[];
 }
 
 // React Flow 节点 data 直接用 NodeInstance（已改为 type，满足 Record 约束）

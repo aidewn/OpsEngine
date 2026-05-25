@@ -14,6 +14,7 @@ import {
   SYSTEM_OVER,
   ASSEMBLE_START,
   ASSEMBLE_END,
+  ASSEMBLE_PARAM,
 } from '@/types/nodeType';
 
 export const nodeTypeMap: NodeTypes = {
@@ -24,7 +25,8 @@ export const nodeTypeMap: NodeTypes = {
   // 集合内部节点
   [ASSEMBLE_START]: AssembleStartNode,
   [ASSEMBLE_END]: AssembleEndNode,
-  // assemble_param 走 GenericNode（有 Dynamic 端口，通用渲染即可）
+  // assemble_param：Dynamic 输出端口，复用 GenericNode 渲染
+  [ASSEMBLE_PARAM]: GenericNode,
   // 其他业务节点统一走 generic
   generic: GenericNode,
 };

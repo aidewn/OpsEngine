@@ -16,7 +16,7 @@ export function AssembleSidebar({ assemble, onChange }: Props) {
         title="Params"
         items={assemble.params}
         onChange={(items) => onChange({ ...assemble, params: items })}
-        // 参数拖入画布 → assemble_param 节点
+        // 参数拖入画布 → Get 参数（assemble_param），与 Variables 拖 var_get 对称
         dragPayload={(item) => ({
           type_id: 'assemble_param',
           config: { param_name: item.name, var_type: item.var_type },
@@ -26,7 +26,11 @@ export function AssembleSidebar({ assemble, onChange }: Props) {
         title="Returns"
         items={assemble.returns}
         onChange={(items) => onChange({ ...assemble, returns: items })}
-        // 返回值暂不支持拖入（设值方式后续设计 set_return 节点）
+        // 返回值拖入画布 → Set 返回值（return_set），与 Variables 拖 var_set 对称
+        dragPayload={(item) => ({
+          type_id: 'return_set',
+          config: { return_name: item.name, var_type: item.var_type },
+        })}
       />
       <VariablePanel<VariableDef>
         title="Variables"

@@ -8,7 +8,7 @@ import { Dialog } from '@/components/ui/Dialog';
 import { Input } from '@/components/ui/Input';
 import { useNodeTypes } from '@/api/nodeTypes';
 import type { NodeTypeDef } from '@/types/nodeType';
-import { isInternalNodeType, resolvePortType } from '@/types/nodeType';
+import { isInternalNodeType, portTypesConnectable, resolvePortType } from '@/types/nodeType';
 import type { PendingConnection } from './WorkflowCanvas';
 
 interface AddNodeDialogProps {
@@ -157,10 +157,12 @@ function findCompatiblePort(
       : typeDef.output_ports;
 
   for (const port of candidatePorts) {
-    // 对候选端口也需要解析 Dynamic 类型，但新节点 config 为空
-    // Dynamic 未配置时默认 String，所以只有 pending 也是 String 才匹配
     const portType = resolvePortType(port, {});
-    if (portType === pending.sourcePortType) {
+    if (
+      pending.sourceDirection === 'output'
+        ? portTypesConnectable(pending.sourcePortType, portType)
+        : portTypesConnectable(portType, pending.sourcePortType)
+    ) {
       return port.id;
     }
   }

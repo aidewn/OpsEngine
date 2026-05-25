@@ -16,22 +16,49 @@ const ROW_HEIGHT = 20;
 // BaseNode 标题区高度 + body padding-top（用于 handle 定位）
 const HEADER_OFFSET = 30;
 
+// nodeDisplayTitle 集合 getter/setter 在标题中附带绑定的 param/return 名
+function nodeDisplayTitle(
+  data: NodeInstance,
+  def: NodeTypeDef | undefined,
+): string {
+  const base = def?.display_name ?? data.type_id;
+  if (data.type_id === 'assemble_param') {
+    const name = data.config['param_name'];
+    if (typeof name === 'string' && name.trim()) {
+      return `${base}: ${name.trim()}`;
+    }
+  }
+  if (data.type_id === 'return_set') {
+    const name = data.config['return_name'];
+    if (typeof name === 'string' && name.trim()) {
+      return `${base}: ${name.trim()}`;
+    }
+  }
+  if (data.type_id === 'var_get' || data.type_id === 'var_set') {
+    const name = data.config['var_name'];
+    if (typeof name === 'string' && name.trim()) {
+      return `${base}: ${name.trim()}`;
+    }
+  }
+  return base;
+}
+
 export function GenericNode({ data, selected }: Props) {
   const { data: nodeTypes } = useNodeTypes();
   const def = nodeTypes?.find((t) => t.type_id === data.type_id);
   const execState = useNodeExecState(data.instance_id);
 
   const inputPorts = def?.input_ports ?? [];
-  // parallel 节点根据 config.branch_count 动态计算可见输出端口数
   const outputPorts = effectiveOutputPorts(data, def);
   const rowCount = Math.max(inputPorts.length, outputPorts.length);
+  const title = nodeDisplayTitle(data, def);
 
   return (
     <BaseNode
       tone="neutral"
       selected={selected}
       icon={def?.icon}
-      title={def?.display_name ?? data.type_id}
+      title={title}
       execState={execState}
     >
       {/* 端口行：每行最多一个 input + 一个 output；显示端口 label，类型靠 handle 颜色 + tooltip 表达 */}

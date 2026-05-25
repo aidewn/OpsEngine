@@ -58,6 +58,10 @@ type ExecContext interface {
 	// 仅 assemble frame 有 params；主流 frame 无 params，返回 (nil, false)
 	GetParam(name string) (any, bool)
 
+	// SetReturn 写当前 frame 的返回值
+	// 仅 assemble frame 有效；主流 frame 调用为 no-op
+	SetReturn(name string, value any)
+
 	// 日志（推送到前端 execution:log 事件）
 	Info(format string, args ...any)
 	Warn(format string, args ...any)

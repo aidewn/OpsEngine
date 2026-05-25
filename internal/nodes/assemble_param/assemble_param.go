@@ -18,19 +18,18 @@ type Node struct{}
 func (Node) TypeDef() core.NodeTypeDef {
 	return core.NodeTypeDef{
 		TypeID:      "assemble_param",
-		DisplayName: "参数",
+		DisplayName: "Get 参数",
 		Category:    "assemble",
 		NodeKind:    core.NodeKindPure,
-		Icon:        "📎",
-		Description: "输出集合的一个参数值",
+		Icon:        "📤",
+		Description: "读取集合入参（调用方通过 param 端口传入）",
 		InputPorts:  []core.PortDef{},
 		OutputPorts: []core.PortDef{
 			{ID: "value", Label: "值", PortType: core.PortTypeDynamic},
 		},
 		ConfigSchema: []core.FieldSchema{
-			{Type: "text", ID: "param_name", Label: "参数名", Required: true},
-			{Type: "select", ID: "var_type", Label: "类型",
-				Options: engine.VarTypeOptions, Default: "String"},
+			// param_select：前端从当前集合 Params 列表挑选；选中时同步 var_type
+			{Type: "param_select", ID: "param_name", Label: "参数", Required: true},
 		},
 		ExecutionMode: core.ExecutionModeFlow,
 	}

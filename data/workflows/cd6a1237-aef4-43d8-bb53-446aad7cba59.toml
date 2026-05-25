@@ -1,7 +1,10 @@
 id = "cd6a1237-aef4-43d8-bb53-446aad7cba59"
 name = "test"
 description = ""
-variables = []
+
+[[variables]]
+  name = "SSH"
+  var_type = "LinuxSshConnection"
 
 [[nodes]]
   id = "de27339a-bc16-46d3-951f-67a09039bf0d"
@@ -42,6 +45,14 @@ variables = []
     x = 303.4399672946731
     y = 57.331636893180715
 
+[[nodes]]
+  id = "6a071995-7eed-4d59-bf95-2b0a40f6b66c"
+  type = "assemble:6d9df07e-5853-4bb9-af14-f92b903601c6"
+  [nodes.config]
+  [nodes.position]
+    x = 540.2894650133966
+    y = 60.9746617421539
+
 [[edges]]
   [edges.from]
     node = "de27339a-bc16-46d3-951f-67a09039bf0d"
@@ -49,3 +60,19 @@ variables = []
   [edges.to]
     node = "0a87ac7c-b531-429c-ade3-2ebf380365b0"
     port = "exec_in"
+
+[[edges]]
+  [edges.from]
+    node = "0a87ac7c-b531-429c-ade3-2ebf380365b0"
+    port = "exec_out"
+  [edges.to]
+    node = "6a071995-7eed-4d59-bf95-2b0a40f6b66c"
+    port = "exec_in"
+
+[[edges]]
+  [edges.from]
+    node = "0a87ac7c-b531-429c-ade3-2ebf380365b0"
+    port = "client"
+  [edges.to]
+    node = "6a071995-7eed-4d59-bf95-2b0a40f6b66c"
+    port = "param_ssh"

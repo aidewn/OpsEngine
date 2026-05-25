@@ -11,6 +11,7 @@ export type PortType =
   | 'Float'
   | 'Bool'
   | 'Dynamic'
+  | 'Any'
   | 'LinuxSshConnection'
   | 'LinuxFileHandle'
   | 'DockerContext'
@@ -24,7 +25,8 @@ export type NodeKind = 'event' | 'action' | 'pure' | 'flow_control';
 export type ExecutionMode = 'remote_cmd' | 'agent' | 'flow';
 
 // 字段类型，对应后端 FieldSchema.Type
-// variable_select：从当前图（workflow / assemble）已定义的变量中挑选，选中时同步 var_type
+// variable_select：从当前图 variables 挑选，同步 var_type
+// param_select / return_select：集合内从 params / returns 挑选，同步 var_type
 export type FieldType =
   | 'text'
   | 'password'
@@ -32,7 +34,9 @@ export type FieldType =
   | 'select'
   | 'toggle'
   | 'textarea'
-  | 'variable_select';
+  | 'variable_select'
+  | 'param_select'
+  | 'return_select';
 
 export interface PortDef {
   id: string;
@@ -76,14 +80,14 @@ export const ASSEMBLE_START = 'assemble_start';
 export const ASSEMBLE_END = 'assemble_end';
 export const ASSEMBLE_PARAM = 'assemble_param';
 
-// 不可由用户在 AddNodeDialog 中手动添加的内置节点类型
+// 不可由用户在 AddNodeDialog 中手动添加、且不可删除的单例节点
+// assemble_param / return_set 由侧栏拖入，与 var_get / var_set 一样可删
 const INTERNAL_NODE_TYPES = new Set([
   SYSTEM_READY,
   SYSTEM_UPDATE,
   SYSTEM_OVER,
   ASSEMBLE_START,
   ASSEMBLE_END,
-  ASSEMBLE_PARAM,
 ]);
 
 // 判断是否为系统/内部节点类型（不可手动添加、不可删除）
@@ -100,13 +104,9 @@ export function isSystemNodeType(typeId: string): boolean {
   );
 }
 
-// 判断是否为集合内部节点
+// 判断是否为集合内部节点（Start/End 单例；param/return getter/setter 走 generic）
 export function isAssembleNodeType(typeId: string): boolean {
-  return (
-    typeId === ASSEMBLE_START ||
-    typeId === ASSEMBLE_END ||
-    typeId === ASSEMBLE_PARAM
-  );
+  return typeId === ASSEMBLE_START || typeId === ASSEMBLE_END;
 }
 
 // ── 端口颜色映射 ──────────────────────────────────────────
@@ -120,6 +120,7 @@ const PORT_COLORS: Record<string, string> = {
   Bool: '#ef4444',              // 红色
   // 动态类型
   Dynamic: '#a855f7',           // 紫色
+  Any: '#94a3b8',               // 灰（万能数据口）
   // 业务句柄
   LinuxSshConnection: '#3b82f6', // 蓝色
   LinuxFileHandle: '#eab308',   // 金黄（远程文件句柄）
@@ -147,6 +148,20 @@ export function resolvePortType(
     return 'String'; // 默认 fallback
   }
   return portDef.port_type;
+}
+
+// portTypesConnectable 判断数据端口类型是否可连线（Exec 必须同类；Any 可接任意数据类型）
+export function portTypesConnectable(
+  sourceType: PortType,
+  targetType: PortType,
+): boolean {
+  if (sourceType === 'Exec' || targetType === 'Exec') {
+    return sourceType === targetType;
+  }
+  if (sourceType === 'Any' || targetType === 'Any') {
+    return true;
+  }
+  return sourceType === targetType;
 }
 
 // ── 新建节点时构造默认 config ─────────────────────────────

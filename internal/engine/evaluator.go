@@ -24,17 +24,25 @@ func (r *Runtime) evalInput(ctx context.Context, frame *Frame, nodes []core.Node
 // action 节点：读 outputs 缓存
 // pure 节点：按需 Execute（不缓存）
 func (r *Runtime) evalOutput(ctx context.Context, frame *Frame, nodes []core.NodeInstance, edges []core.EdgeConfig, nodeID, portID string) (any, bool) {
-	r.mu.Lock()
-	cached, hasCache := frame.Outputs[nodeID]
-	r.mu.Unlock()
-	if hasCache {
-		v, ok := cached[portID]
-		return v, ok
-	}
-
 	node := findNode(nodes, nodeID)
 	if node == nil {
 		return nil, false
+	}
+
+	// assemble_start 的 param_<name> 输出：直接从 frame.Params 读取（与 assemble_param 等价）
+	// 须在 outputs 缓存之前处理：Execute 会写入 nil 缓存，否则会误判为已缓存
+	if node.TypeID == "assemble_start" {
+		if v, ok := r.evalAssembleStartParamOutput(frame, portID); ok {
+			return v, true
+		}
+	}
+
+	r.mu.Lock()
+	cached, hasCache := frame.Outputs[nodeID]
+	r.mu.Unlock()
+	if hasCache && cached != nil {
+		v, ok := cached[portID]
+		return v, ok
 	}
 
 	n, ok := Lookup(node.TypeID)

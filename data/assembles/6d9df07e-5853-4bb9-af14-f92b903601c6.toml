@@ -1,0 +1,171 @@
+id = "6d9df07e-5853-4bb9-af14-f92b903601c6"
+name = "配置yum仓库"
+description = ""
+returns = []
+variables = []
+
+[[params]]
+  name = "ssh"
+  var_type = "LinuxSshConnection"
+
+[[nodes]]
+  id = "3712b9ef-b31d-4cca-81fa-2f1c919d5230"
+  type = "assemble_start"
+  [nodes.config]
+  [nodes.position]
+    x = 80.0
+    y = 200.0
+
+[[nodes]]
+  id = "7365d9df-2a8f-4cff-962c-b65412fb238e"
+  type = "assemble_end"
+  [nodes.config]
+  [nodes.position]
+    x = 1118.6130318085318
+    y = 200.23552354167438
+
+[[nodes]]
+  id = "443ea36d-e36d-4fe8-ad22-ac42fbe247c9"
+  type = "linux_exec_command"
+  [nodes.config]
+    command = "yum clean all\nyum makecache"
+    timeout_seconds = 60.0
+  [nodes.position]
+    x = 715.6796724238583
+    y = 201.25451493754264
+
+[[nodes]]
+  id = "4177dad1-5a77-49e2-8880-1d2a95c716c1"
+  type = "linux_download_file"
+  [nodes.config]
+    dest_path = "/etc/yum.repos.d/CentOS-Base.repo"
+    ensure_parent_dir = true
+    follow_redirects = true
+    insecure = false
+    timeout_seconds = 60.0
+    url = "https://mirrors.aliyun.com/repo/Centos-7.repo"
+  [nodes.position]
+    x = 289.475394641524
+    y = 195.41991923365538
+
+[[nodes]]
+  id = "fbaf76e5-6a9a-4814-99bd-ff63f20de91c"
+  type = "branch"
+  [nodes.config]
+  [nodes.position]
+    x = 488.5650208236361
+    y = 196.36143095096566
+
+[[nodes]]
+  id = "a7d594ee-8fcb-432f-bdd6-d57221d15c6b"
+  type = "assemble_param"
+  [nodes.config]
+    param_name = "ssh"
+    var_type = "LinuxSshConnection"
+  [nodes.position]
+    x = 721.7513353745235
+    y = 376.4538893563038
+
+[[nodes]]
+  id = "9a952d6a-c78a-4188-b433-160c7558fbc1"
+  type = "branch"
+  [nodes.config]
+  [nodes.position]
+    x = 923.2866612234535
+    y = 202.46216819462438
+
+[[nodes]]
+  id = "27479c79-b75f-40f8-aa30-85c1fa0c3305"
+  type = "print"
+  [nodes.config]
+  [nodes.position]
+    x = 1152.1588100502029
+    y = 271.3818987018058
+
+[[edges]]
+  [edges.from]
+    node = "3712b9ef-b31d-4cca-81fa-2f1c919d5230"
+    port = "param_ssh"
+  [edges.to]
+    node = "4177dad1-5a77-49e2-8880-1d2a95c716c1"
+    port = "client"
+
+[[edges]]
+  [edges.from]
+    node = "3712b9ef-b31d-4cca-81fa-2f1c919d5230"
+    port = "exec_out"
+  [edges.to]
+    node = "4177dad1-5a77-49e2-8880-1d2a95c716c1"
+    port = "exec_in"
+
+[[edges]]
+  [edges.from]
+    node = "4177dad1-5a77-49e2-8880-1d2a95c716c1"
+    port = "success"
+  [edges.to]
+    node = "fbaf76e5-6a9a-4814-99bd-ff63f20de91c"
+    port = "condition"
+
+[[edges]]
+  [edges.from]
+    node = "4177dad1-5a77-49e2-8880-1d2a95c716c1"
+    port = "exec_out"
+  [edges.to]
+    node = "fbaf76e5-6a9a-4814-99bd-ff63f20de91c"
+    port = "exec_in"
+
+[[edges]]
+  [edges.from]
+    node = "fbaf76e5-6a9a-4814-99bd-ff63f20de91c"
+    port = "exec_out_true"
+  [edges.to]
+    node = "443ea36d-e36d-4fe8-ad22-ac42fbe247c9"
+    port = "exec_in"
+
+[[edges]]
+  [edges.from]
+    node = "a7d594ee-8fcb-432f-bdd6-d57221d15c6b"
+    port = "value"
+  [edges.to]
+    node = "443ea36d-e36d-4fe8-ad22-ac42fbe247c9"
+    port = "client"
+
+[[edges]]
+  [edges.from]
+    node = "443ea36d-e36d-4fe8-ad22-ac42fbe247c9"
+    port = "success"
+  [edges.to]
+    node = "9a952d6a-c78a-4188-b433-160c7558fbc1"
+    port = "condition"
+
+[[edges]]
+  [edges.from]
+    node = "9a952d6a-c78a-4188-b433-160c7558fbc1"
+    port = "exec_out_true"
+  [edges.to]
+    node = "7365d9df-2a8f-4cff-962c-b65412fb238e"
+    port = "exec_in"
+
+[[edges]]
+  [edges.from]
+    node = "443ea36d-e36d-4fe8-ad22-ac42fbe247c9"
+    port = "exec_out"
+  [edges.to]
+    node = "9a952d6a-c78a-4188-b433-160c7558fbc1"
+    port = "exec_in"
+
+[[edges]]
+  [edges.from]
+    node = "9a952d6a-c78a-4188-b433-160c7558fbc1"
+    port = "exec_out_false"
+  [edges.to]
+    node = "27479c79-b75f-40f8-aa30-85c1fa0c3305"
+    port = "exec_in"
+
+[[edges]]
+  [edges.from]
+    node = "443ea36d-e36d-4fe8-ad22-ac42fbe247c9"
+    port = "combined_output"
+  [edges.to]
+    node = "27479c79-b75f-40f8-aa30-85c1fa0c3305"
+    port = "message"

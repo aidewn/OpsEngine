@@ -202,7 +202,7 @@ func (e *Engine) Get(executionID string) (*Runtime, bool) {
 // 按开始时间倒序，内存版本优先（运行中 / 刚结束未保存的）
 func (e *Engine) ListSummaries() []core.ExecutionSummary {
 	seen := map[string]bool{}
-	var list []core.ExecutionSummary
+	list := make([]core.ExecutionSummary, 0)
 
 	e.mu.RLock()
 	for _, rt := range e.runs {

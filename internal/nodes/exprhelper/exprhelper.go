@@ -4,7 +4,13 @@
 
 package exprhelper
 
-import "strconv"
+import (
+	"encoding/json"
+	"fmt"
+	"strconv"
+
+	"OpsEngine/internal/clients"
+)
 
 // ToInt64 容错转 int64
 // 支持：int / int32 / int64 / float32 / float64 / bool / 数字字符串
@@ -113,4 +119,27 @@ func ToString(v any) (string, bool) {
 		return "", true
 	}
 	return "", false
+}
+
+// FormatValue 把任意运行时值格式化为可读字符串
+// 供 print / to_string 等节点共用；句柄类型走 JSON 安全视图，避免泄露连接对象
+func FormatValue(v any) string {
+	if v == nil {
+		return "<nil>"
+	}
+	if s, ok := ToString(v); ok {
+		return s
+	}
+	switch x := v.(type) {
+	case *clients.LinuxSshClient, *clients.LinuxFileHandle:
+		if b, err := json.Marshal(x); err == nil {
+			return string(b)
+		}
+	}
+	if m, ok := v.(json.Marshaler); ok {
+		if b, err := json.Marshal(m); err == nil {
+			return string(b)
+		}
+	}
+	return fmt.Sprintf("%v", v)
 }
