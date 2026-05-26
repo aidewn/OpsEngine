@@ -25,6 +25,7 @@ const (
 	PortTypeDockerContainer PortType = "DockerContainerHandle"
 	PortTypeK8sContext      PortType = "K8sContext"
 	PortTypeJenkinsContext  PortType = "JenkinsContext"
+	PortTypeLocalShell      PortType = "LocalShellConnection"
 	PortTypeNginxInstance   PortType = "NginxInstance"
 )
 

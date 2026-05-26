@@ -24,12 +24,13 @@ interface Props {
   editItem: EnvConfigItem | null;
 }
 
-// 四种 kind 全部可选；MVP 仅 SSH 表单可填，其它 kind 落库但表单显示占位
+// 五种 kind：远端 4 类 + 本机 localhost（无任何字段，直接挂载）
 const KIND_OPTIONS: { value: EnvConfigKind; label: string }[] = [
   { value: 'ssh', label: 'SSH' },
   { value: 'docker', label: 'Docker' },
   { value: 'k8s', label: 'K8s' },
   { value: 'jenkins', label: 'Jenkins' },
+  { value: 'localhost', label: 'Localhost' },
 ];
 
 export function EnvConfigDialog({

@@ -1,8 +1,8 @@
 // 环境配置相关类型，与后端 core.EnvironmentDef 对齐
 // 字段命名遵循后端 JSON tag（snake_case）
 
-// 配置类型枚举：Phase 1 仅 SSH 真正可用，其它 kind 留壳位
-export type EnvConfigKind = 'ssh' | 'docker' | 'k8s' | 'jenkins';
+// 配置类型枚举：localhost = 直连本机（无需任何 fields）；其它 kind 对应远端目标
+export type EnvConfigKind = 'ssh' | 'docker' | 'k8s' | 'jenkins' | 'localhost';
 
 // 环境内单条配置项；fields 内容随 kind 不同而不同
 export interface EnvConfigItem {

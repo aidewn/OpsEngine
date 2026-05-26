@@ -99,6 +99,10 @@ const JENKINS_SCHEMA: FieldSchema[] = [
   { type: 'password', id: 'api_token', label: 'API Token', required: true },
 ];
 
+// Localhost schema：无任何字段。fields 落库为空对象，节点直接挂载即可
+// 表单展示由 EnvConfigForm 主体内的提示文案承担，避免用户看到空白以为坏掉
+const LOCALHOST_SCHEMA: FieldSchema[] = [];
+
 // Docker 通用 schema（mode + socket_path）；ssh_config_id 由专用控件维护，不放进 ConfigForm
 const DOCKER_SCHEMA: FieldSchema[] = [
   {
@@ -123,6 +127,7 @@ const SCHEMA_BY_KIND: Partial<Record<EnvConfigKind, FieldSchema[]>> = {
   docker: DOCKER_SCHEMA,
   k8s: K8S_SCHEMA,
   jenkins: JENKINS_SCHEMA,
+  localhost: LOCALHOST_SCHEMA,
 };
 
 // 收集 schema 默认值，构造新增配置时的初始 fields
@@ -146,7 +151,7 @@ export function EnvConfigForm({
   environment,
   editingItemID,
 }: Props) {
-  // 4 种 kind 全部就位（ssh/docker/k8s/jenkins）；若联合类型扩展，schema 缺失时给出明确提示
+  // 5 种 kind 全部就位（ssh/docker/k8s/jenkins/localhost）；若联合类型扩展，schema 缺失时给出明确提示
   const schema = SCHEMA_BY_KIND[kind];
   if (!schema) {
     return (
@@ -157,6 +162,11 @@ export function EnvConfigForm({
   }
   return (
     <div className="space-y-3">
+      {kind === 'localhost' && (
+        <div className="rounded border border-slate-200 bg-white px-3 py-2 text-xs text-slate-600">
+          本机配置无需填写任何字段，保存后即可在工作流中通过「环境 · 本机连接」节点直接挂载使用。
+        </div>
+      )}
       <ConfigForm schema={schema} value={value} onChange={onChange} />
       {kind === 'docker' && (
         <SiblingConfigSelect

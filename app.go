@@ -327,6 +327,8 @@ func (a *App) TestEnvConfig(envID, configID string) error {
 		return testK8sConfig(item.Fields)
 	case core.EnvConfigKindJenkins:
 		return testJenkinsConfig(item.Fields)
+	case core.EnvConfigKindLocalhost:
+		return testLocalhostConfig()
 	default:
 		return fmt.Errorf("kind %s 暂未支持测试连接", item.Kind)
 	}
@@ -362,6 +364,15 @@ func testSSHConfig(fields map[string]any) error {
 		return err
 	}
 	defer client.Close()
+	return nil
+}
+
+// testLocalhostConfig localhost 配置无任何字段；做一次 os.Getwd 作为 sanity check
+// 极端情况（沙箱内进程没有可读 cwd）能在此暴露，避免运行节点时才报错
+func testLocalhostConfig() error {
+	if _, err := os.Getwd(); err != nil {
+		return fmt.Errorf("无法获取当前工作目录: %w", err)
+	}
 	return nil
 }
 
@@ -532,7 +543,8 @@ func isValidEnvConfigKind(k core.EnvConfigKind) bool {
 	case core.EnvConfigKindSSH,
 		core.EnvConfigKindDocker,
 		core.EnvConfigKindK8s,
-		core.EnvConfigKindJenkins:
+		core.EnvConfigKindJenkins,
+		core.EnvConfigKindLocalhost:
 		return true
 	}
 	return false

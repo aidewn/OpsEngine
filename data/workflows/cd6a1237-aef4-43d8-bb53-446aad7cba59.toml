@@ -110,6 +110,18 @@ description = "配置yum仓库，并安装nginx，启动nginx"
     x = 1393.7998398728253
     y = 63.60262646141754
 
+[[nodes]]
+  id = "2cfc8bb9-0a69-4349-9025-3a282e03b339"
+  type = "env_probe_docker_containers"
+  [nodes.config]
+    all = false
+    config_id = ""
+    environment_id = "59b2b65c-8ba0-4131-a39e-b86c1c7ea7fb"
+    resolve_mode = "static"
+  [nodes.position]
+    x = 483.3957586613619
+    y = 420.7589124518813
+
 [[edges]]
   [edges.from]
     node = "de27339a-bc16-46d3-951f-67a09039bf0d"

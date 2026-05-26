@@ -12,10 +12,11 @@ type EnvironmentDef struct {
 type EnvConfigKind string
 
 const (
-	EnvConfigKindSSH     EnvConfigKind = "ssh"
-	EnvConfigKindDocker  EnvConfigKind = "docker"
-	EnvConfigKindK8s     EnvConfigKind = "k8s"
-	EnvConfigKindJenkins EnvConfigKind = "jenkins"
+	EnvConfigKindSSH       EnvConfigKind = "ssh"
+	EnvConfigKindDocker    EnvConfigKind = "docker"
+	EnvConfigKindK8s       EnvConfigKind = "k8s"
+	EnvConfigKindJenkins   EnvConfigKind = "jenkins"
+	EnvConfigKindLocalhost EnvConfigKind = "localhost"
 )
 
 // EnvConfigItem 环境内单条配置（fields 按 kind 解析）

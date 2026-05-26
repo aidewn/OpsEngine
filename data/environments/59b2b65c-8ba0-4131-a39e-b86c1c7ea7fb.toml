@@ -1,0 +1,10 @@
+id = "59b2b65c-8ba0-4131-a39e-b86c1c7ea7fb"
+name = "测试环境"
+description = "用于测试"
+
+[[configs]]
+  id = "8fe6439a-ea0b-4d43-95ac-347a3b400367"
+  name = "本机"
+  kind = "localhost"
+  description = ""
+  [configs.fields]

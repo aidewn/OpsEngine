@@ -17,6 +17,7 @@ export type PortType =
   | 'DockerContext'
   | 'K8sContext'
   | 'JenkinsContext'
+  | 'LocalShellConnection'
   | 'NginxInstance';
 
 // ── 节点分类 ──────────────────────────────────────────────
@@ -148,6 +149,7 @@ const PORT_COLORS: Record<string, string> = {
   DockerContainerHandle: '#7c3aed', // 深紫（容器引用，与 DockerContext 同色系）
   K8sContext: '#06b6d4',        // 青色
   JenkinsContext: '#d33833',    // 红 (Jenkins brand)
+  LocalShellConnection: '#16a34a', // 绿（本机 shell，与远端蓝/红/橙区分）
   NginxInstance: '#f97316',     // 橙色
 };
 

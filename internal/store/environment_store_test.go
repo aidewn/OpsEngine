@@ -44,6 +44,13 @@ func sampleEnv() core.EnvironmentDef {
 					"ssh_config_id": "ssh-app",
 				},
 			},
+			{
+				ID:          "local-here",
+				Name:        "本机",
+				Kind:        core.EnvConfigKindLocalhost,
+				Description: "直连当前进程所在主机，无任何字段",
+				Fields:      map[string]any{},
+			},
 		},
 	}
 }
@@ -64,11 +71,15 @@ func TestEnvironmentStore_SaveGetRoundTrip(t *testing.T) {
 	if got.ID != env.ID || got.Name != env.Name || got.Description != env.Description {
 		t.Fatalf("基本字段不一致: %+v", got)
 	}
-	if len(got.Configs) != 2 {
+	if len(got.Configs) != 3 {
 		t.Fatalf("Configs 数量错误: got %d", len(got.Configs))
 	}
-	if got.Configs[0].ID != "ssh-app" || got.Configs[1].ID != "docker-app" {
+	if got.Configs[0].ID != "ssh-app" || got.Configs[1].ID != "docker-app" || got.Configs[2].ID != "local-here" {
 		t.Fatalf("Configs 顺序错误: %+v", got.Configs)
+	}
+	// localhost kind 必须能往返：fields 为空对象，kind 字段必须保留
+	if got.Configs[2].Kind != core.EnvConfigKindLocalhost {
+		t.Fatalf("localhost kind 不一致: %s", got.Configs[2].Kind)
 	}
 	ssh := got.Configs[0]
 	if ssh.Kind != core.EnvConfigKindSSH {
