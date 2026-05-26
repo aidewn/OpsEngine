@@ -15,7 +15,8 @@
       "Bash(npx tsc *)",
       "Bash(awk 'NR<235 || NR>404' \"C:/Users/m1832/GolandProjects/OpsEngine/app.go\")",
       "Bash(go run *)",
-      "Bash(go test *)"
+      "Bash(go test *)",
+      "Bash(grep -E \"\\\\.go$\")"
     ]
   }
 }

@@ -4,10 +4,12 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"strings"
 
+	"OpsEngine/internal/clients"
 	"OpsEngine/internal/core"
 	"OpsEngine/internal/engine"
 	_ "OpsEngine/internal/nodes" // 触发所有内置节点的 init() 注册
@@ -22,11 +24,12 @@ const assembleTypePrefix = "assemble:"
 
 // App 桌面应用实例，public 方法通过 Wails 绑定暴露给前端调用
 type App struct {
-	ctx            context.Context
-	workflowStore  *store.WorkflowStore
-	assembleStore  *store.AssembleStore
-	executionStore *store.ExecutionStore
-	engine         *engine.Engine
+	ctx              context.Context
+	workflowStore    *store.WorkflowStore
+	assembleStore    *store.AssembleStore
+	executionStore   *store.ExecutionStore
+	environmentStore *store.EnvironmentStore
+	engine           *engine.Engine
 }
 
 // NewApp 创建应用实例
@@ -43,7 +46,7 @@ func (a *App) startup(ctx context.Context) {
 	zap.ReplaceGlobals(logger)
 
 	// 确保数据目录存在
-	for _, dir := range []string{"data/workflows", "data/assembles", "data/executions", "data/logs"} {
+	for _, dir := range []string{"data/workflows", "data/assembles", "data/executions", "data/environments", "data/logs"} {
 		if err := os.MkdirAll(dir, 0755); err != nil {
 			zap.L().Fatal("创建目录失败", zap.Error(err))
 		}
@@ -52,6 +55,7 @@ func (a *App) startup(ctx context.Context) {
 	a.workflowStore = store.NewWorkflowStore("data/workflows")
 	a.assembleStore = store.NewAssembleStore("data/assembles")
 	a.executionStore = store.NewExecutionStore("data/executions")
+	a.environmentStore = store.NewEnvironmentStore("data/environments")
 	a.engine = engine.New(
 		a.workflowStore,
 		a.assembleStore,
@@ -248,6 +252,192 @@ func (a *App) GetNodeTypes() []core.NodeTypeDef {
 		}
 	}
 	return types
+}
+
+// ── 环境（Environment）CRUD ──────────────────────────────────
+
+// ListEnvironments 获取所有环境
+func (a *App) ListEnvironments() ([]core.EnvironmentDef, error) {
+	return a.environmentStore.List()
+}
+
+// GetEnvironment 按 ID 获取环境详情
+func (a *App) GetEnvironment(id string) (core.EnvironmentDef, error) {
+	return a.environmentStore.Get(id)
+}
+
+// CreateEnvironment 创建新环境，返回生成的 ID
+// Configs 初始化为空切片，便于前端零状态展示与后续追加
+func (a *App) CreateEnvironment(name, description string) (string, error) {
+	env := core.EnvironmentDef{
+		ID:          uuid.New().String(),
+		Name:        strings.TrimSpace(name),
+		Description: description,
+		Configs:     []core.EnvConfigItem{},
+	}
+	if err := validateEnvironment(env); err != nil {
+		return "", err
+	}
+	if err := a.environmentStore.Save(env); err != nil {
+		return "", err
+	}
+	return env.ID, nil
+}
+
+// UpdateEnvironment 整体覆盖更新环境定义
+func (a *App) UpdateEnvironment(env core.EnvironmentDef) error {
+	if err := validateEnvironment(env); err != nil {
+		return err
+	}
+	return a.environmentStore.Save(env)
+}
+
+// DeleteEnvironment 删除环境
+func (a *App) DeleteEnvironment(id string) error {
+	return a.environmentStore.Delete(id)
+}
+
+// TestEnvConfig 测试环境内某条配置的连通性
+// MVP 阶段仅 SSH 实现真实拨号；其它 kind 返回明确「暂未支持」错误
+func (a *App) TestEnvConfig(envID, configID string) error {
+	env, err := a.environmentStore.Get(envID)
+	if err != nil {
+		return err
+	}
+	var item *core.EnvConfigItem
+	for i := range env.Configs {
+		if env.Configs[i].ID == configID {
+			item = &env.Configs[i]
+			break
+		}
+	}
+	if item == nil {
+		return fmt.Errorf("配置未找到: %s", configID)
+	}
+
+	switch item.Kind {
+	case core.EnvConfigKindSSH:
+		return testSSHConfig(item.Fields)
+	default:
+		return fmt.Errorf("kind %s 暂未支持测试连接", item.Kind)
+	}
+}
+
+// testSSHConfig 用 fields 中的账号密码做一次完整 SSH 握手，握手后立即关闭
+// 字段缺失或不合法时给出与节点 Execute 一致的提示
+func testSSHConfig(fields map[string]any) error {
+	host := strings.TrimSpace(envFieldString(fields, "host"))
+	user := strings.TrimSpace(envFieldString(fields, "user"))
+	password := envFieldString(fields, "password")
+	port := envFieldInt(fields, "port")
+	timeoutSeconds := envFieldInt(fields, "timeout_seconds")
+
+	if host == "" {
+		return fmt.Errorf("SSH 配置缺少 host")
+	}
+	if user == "" {
+		return fmt.Errorf("SSH 配置缺少 user")
+	}
+	if password == "" {
+		return fmt.Errorf("SSH 配置缺少 password")
+	}
+	if port <= 0 {
+		port = 22
+	}
+	if timeoutSeconds <= 0 {
+		timeoutSeconds = 10
+	}
+
+	client, err := clients.DialLinuxSsh(host, port, user, password, timeoutSeconds)
+	if err != nil {
+		return err
+	}
+	defer client.Close()
+	return nil
+}
+
+// validateEnvironment 校验环境定义结构合法性
+// 非空 Name、config ID 唯一、Kind 必须在四个枚举内
+func validateEnvironment(env core.EnvironmentDef) error {
+	if strings.TrimSpace(env.Name) == "" {
+		return fmt.Errorf("环境名称不能为空")
+	}
+	seen := map[string]bool{}
+	for _, item := range env.Configs {
+		if item.ID == "" {
+			return fmt.Errorf("配置缺少 ID")
+		}
+		if seen[item.ID] {
+			return fmt.Errorf("配置 ID 重复: %s", item.ID)
+		}
+		seen[item.ID] = true
+		if !isValidEnvConfigKind(item.Kind) {
+			return fmt.Errorf("配置 %s 的 kind %q 非法", item.ID, item.Kind)
+		}
+	}
+	return nil
+}
+
+// isValidEnvConfigKind 是否为受支持的配置 kind
+func isValidEnvConfigKind(k core.EnvConfigKind) bool {
+	switch k {
+	case core.EnvConfigKindSSH,
+		core.EnvConfigKindDocker,
+		core.EnvConfigKindK8s,
+		core.EnvConfigKindJenkins:
+		return true
+	}
+	return false
+}
+
+// envFieldString 从 fields map 中读字符串字段，缺失或类型不符回退空串
+func envFieldString(fields map[string]any, key string) string {
+	if fields == nil {
+		return ""
+	}
+	if v, ok := fields[key]; ok {
+		if s, ok := v.(string); ok {
+			return s
+		}
+	}
+	return ""
+}
+
+// envFieldInt 抹平 Wails JSON 反序列化导致的数值类型差异
+// 实际可能出现：float64（JSON 默认）、int64（TOML 解码）、int、json.Number、字符串数字
+func envFieldInt(fields map[string]any, key string) int {
+	if fields == nil {
+		return 0
+	}
+	v, ok := fields[key]
+	if !ok {
+		return 0
+	}
+	switch n := v.(type) {
+	case float64:
+		return int(n)
+	case float32:
+		return int(n)
+	case int:
+		return n
+	case int32:
+		return int(n)
+	case int64:
+		return int(n)
+	case json.Number:
+		i, err := n.Int64()
+		if err == nil {
+			return int(i)
+		}
+	case string:
+		// 兼容 JSON 中以字符串承载数字的极端情况
+		var i int
+		_, err := fmt.Sscanf(n, "%d", &i)
+		if err == nil {
+			return i
+		}
+	}
+	return 0
 }
 
 // assembleToNodeType 把集合定义转换为可调用的节点类型

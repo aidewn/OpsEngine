@@ -7,13 +7,10 @@ import (
 	"net"
 	"strconv"
 	"strings"
-	"time"
 
 	"OpsEngine/internal/clients"
 	"OpsEngine/internal/core"
 	"OpsEngine/internal/engine"
-
-	"golang.org/x/crypto/ssh"
 )
 
 const (
@@ -84,22 +81,13 @@ func (Node) Execute(ctx engine.ExecContext) (engine.Outputs, error) {
 	addr := net.JoinHostPort(host, strconv.Itoa(port))
 	ctx.Info("正在连接 SSH %s@%s", user, addr)
 
-	config := &ssh.ClientConfig{
-		User: user,
-		Auth: []ssh.AuthMethod{
-			ssh.Password(password),
-		},
-		// MVP 阶段先跳过 host key 校验，后续可扩展 known_hosts / 指纹配置。
-		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
-		Timeout:         time.Duration(timeoutSeconds) * time.Second,
-	}
-	client, err := ssh.Dial("tcp", addr, config)
+	client, err := clients.DialLinuxSsh(host, port, user, password, int(timeoutSeconds))
 	if err != nil {
-		return nil, fmt.Errorf("SSH 连接失败: %w", err)
+		return nil, err
 	}
 
 	ctx.Info("SSH 连接成功: %s@%s", user, addr)
 	return engine.Outputs{
-		"client": clients.NewLinuxSshClient(client, host, port, user),
+		"client": client,
 	}, nil
 }

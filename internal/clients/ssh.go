@@ -7,12 +7,35 @@ package clients
 import (
 	"encoding/json"
 	"fmt"
+	"net"
+	"strconv"
 	"sync"
 	"time"
 
 	"github.com/pkg/sftp"
 	"golang.org/x/crypto/ssh"
 )
+
+// DialLinuxSsh 用账号密码拨号 SSH，成功后包装为 LinuxSshClient 句柄
+// 调用方负责传入校验过的参数（host/user/password 非空、port/timeoutSeconds > 0）
+// 错误统一以 "SSH 连接失败: %w" 包装，便于上层一致呈现
+func DialLinuxSsh(host string, port int, user, password string, timeoutSeconds int) (*LinuxSshClient, error) {
+	addr := net.JoinHostPort(host, strconv.Itoa(port))
+	config := &ssh.ClientConfig{
+		User: user,
+		Auth: []ssh.AuthMethod{
+			ssh.Password(password),
+		},
+		// MVP 阶段先跳过 host key 校验，后续可扩展 known_hosts / 指纹配置
+		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
+		Timeout:         time.Duration(timeoutSeconds) * time.Second,
+	}
+	client, err := ssh.Dial("tcp", addr, config)
+	if err != nil {
+		return nil, fmt.Errorf("SSH 连接失败: %w", err)
+	}
+	return NewLinuxSshClient(client, host, port, user), nil
+}
 
 // LinuxSshClient Linux SSH 连接句柄
 // client / sftpClient 是真实连接对象，不参与 JSON 序列化，避免泄露内部状态或导致执行记录无法持久化

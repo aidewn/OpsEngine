@@ -5,6 +5,7 @@ import { HomePage } from '@/pages/HomePage';
 import { WorkflowCanvasPage } from '@/pages/WorkflowCanvasPage';
 import { AssembleCanvasPage } from '@/pages/AssembleCanvasPage';
 import { ExecutionDetailPage } from '@/pages/ExecutionDetailPage';
+import { EnvironmentDetailPage } from '@/pages/EnvironmentDetailPage';
 
 export function App() {
   return (
@@ -13,6 +14,7 @@ export function App() {
       <Route path="/workflows/:id" element={<WorkflowCanvasPage />} />
       <Route path="/assembles/:id" element={<AssembleCanvasPage />} />
       <Route path="/executions/:id" element={<ExecutionDetailPage />} />
+      <Route path="/environments/:id" element={<EnvironmentDetailPage />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
