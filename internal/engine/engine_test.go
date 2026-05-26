@@ -82,7 +82,7 @@ func TestEngine_HelloWorld(t *testing.T) {
 
 	// 跑
 	collector := &collectorEmitter{}
-	e := engine.New(ws, as, nil, collector)
+	e := engine.New(ws, as, nil, nil, collector)
 	execID, err := e.Run(wf.ID)
 	if err != nil {
 		t.Fatalf("Run 失败: %v", err)
@@ -206,7 +206,7 @@ func TestEngine_VarSetGet(t *testing.T) {
 	}
 
 	collector := &collectorEmitter{}
-	e := engine.New(ws, as, nil, collector)
+	e := engine.New(ws, as, nil, nil, collector)
 	execID, err := e.Run(wf.ID)
 	if err != nil {
 		t.Fatal(err)

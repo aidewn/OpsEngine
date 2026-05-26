@@ -18,10 +18,11 @@ import (
 // Engine 引擎实例
 // 进程内单例，由 app 在 startup 中创建
 type Engine struct {
-	workflowStore  *store.WorkflowStore
-	assembleStore  *store.AssembleStore
-	executionStore *store.ExecutionStore // 持久化终态执行记录（可为 nil）
-	emitter        Emitter
+	workflowStore    *store.WorkflowStore
+	assembleStore    *store.AssembleStore
+	executionStore   *store.ExecutionStore // 持久化终态执行记录（可为 nil）
+	environmentStore *store.EnvironmentStore
+	emitter          Emitter
 
 	runs map[string]*Runtime // key = execution ID（内存中的运行/已结束未删的）
 	mu   sync.RWMutex
@@ -29,18 +30,21 @@ type Engine struct {
 
 // New 创建引擎实例
 // executionStore 传 nil 时不持久化（仅内存）
+// environmentStore 由环境相关节点按需访问；不使用时可传 nil
 func New(
 	ws *store.WorkflowStore,
 	as *store.AssembleStore,
 	es *store.ExecutionStore,
+	envStore *store.EnvironmentStore,
 	emitter Emitter,
 ) *Engine {
 	return &Engine{
-		workflowStore:  ws,
-		assembleStore:  as,
-		executionStore: es,
-		emitter:        emitter,
-		runs:           map[string]*Runtime{},
+		workflowStore:    ws,
+		assembleStore:    as,
+		executionStore:   es,
+		environmentStore: envStore,
+		emitter:          emitter,
+		runs:             map[string]*Runtime{},
 	}
 }
 
@@ -57,7 +61,7 @@ func (e *Engine) Run(workflowID string) (string, error) {
 		return "", err
 	}
 
-	rt := newRuntime(wf, snapshot, e.emitter)
+	rt := newRuntime(wf, snapshot, e.emitter, e.environmentStore)
 
 	e.mu.Lock()
 	e.runs[rt.ID] = rt

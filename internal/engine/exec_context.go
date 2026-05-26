@@ -8,6 +8,7 @@ import (
 	"fmt"
 
 	"OpsEngine/internal/core"
+	"OpsEngine/internal/store"
 )
 
 // execContextImpl 节点执行上下文，绑定到具体节点、当前图、当前 frame、当前 ctx
@@ -99,4 +100,10 @@ func (c *execContextImpl) Warn(format string, args ...any) {
 
 func (c *execContextImpl) Error(format string, args ...any) {
 	c.runtime.appendLog(c.frame, c.node.InstanceID, "error", fmt.Sprintf(format, args...))
+}
+
+// EnvironmentStore 透出运行时持有的环境配置 store
+// 节点拿到后按 ConfigString("environment_id") 解析当前要用的环境
+func (c *execContextImpl) EnvironmentStore() *store.EnvironmentStore {
+	return c.runtime.environmentStore
 }

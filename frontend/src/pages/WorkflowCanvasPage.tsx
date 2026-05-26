@@ -252,6 +252,7 @@ function WorkflowCanvasInner({ workflowId: id }: { workflowId: string | undefine
           graph={workflow}
           selectedNodeId={selectedNodeId}
           onConfigChange={handleConfigChange}
+          onVariablesChange={handleVariablesChange}
           onMetaChange={handleMetaChange}
         />
       </div>

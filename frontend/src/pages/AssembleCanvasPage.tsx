@@ -260,6 +260,7 @@ function AssembleCanvasInner({ assembleId: id }: { assembleId: string | undefine
             onConfigChange={handleConfigChange}
             onParamsChange={handleParamsChange}
             onReturnsChange={handleReturnsChange}
+            onVariablesChange={handleVariablesChange}
             onMetaChange={handleMetaChange}
           />
         </div>

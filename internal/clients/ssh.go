@@ -5,16 +5,82 @@
 package clients
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net"
+	"path"
+	"regexp"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/pkg/sftp"
 	"golang.org/x/crypto/ssh"
 )
+
+// WalkSFTPMatch 通过 SFTP Walk 在 startDir 下按正则匹配 basename，遵守最大深度
+// 与 linux_find_file 节点 / env_probe_ssh_find_files 探测共用同一份算法
+// onWarn 用于把遍历过程中的非致命错误传给调用方（节点日志 / 前端探测忽略）
+// ctx 用于响应取消（用户停止）；ctx 可为 nil 时表示不可取消
+func WalkSFTPMatch(
+	ctx context.Context,
+	client *LinuxSshClient,
+	startDir string,
+	re *regexp.Regexp,
+	maxDepth int,
+	onWarn func(format string, args ...any),
+) ([]string, error) {
+	if client == nil {
+		return nil, fmt.Errorf("LinuxSshConnection 未连接")
+	}
+	if re == nil {
+		return nil, fmt.Errorf("正则不能为空")
+	}
+	if maxDepth <= 0 {
+		maxDepth = 5
+	}
+	sc, err := client.Sftp()
+	if err != nil {
+		return nil, err
+	}
+
+	cleanedStart := path.Clean(startDir)
+	if cleanedStart == "" {
+		cleanedStart = "/"
+	}
+	startDepth := strings.Count(cleanedStart, "/")
+	var matches []string
+	walker := sc.Walk(cleanedStart)
+	for walker.Step() {
+		if walker.Err() != nil {
+			if onWarn != nil {
+				onWarn("遍历跳过: %v", walker.Err())
+			}
+			continue
+		}
+		if ctx != nil {
+			if err := ctx.Err(); err != nil {
+				return nil, err
+			}
+		}
+		current := walker.Path()
+		depth := strings.Count(path.Clean(current), "/") - startDepth
+		if depth > maxDepth {
+			walker.SkipDir()
+			continue
+		}
+		info := walker.Stat()
+		if info == nil || info.IsDir() {
+			continue
+		}
+		if re.MatchString(info.Name()) {
+			matches = append(matches, current)
+		}
+	}
+	return matches, nil
+}
 
 // DialLinuxSsh 用账号密码拨号 SSH，成功后包装为 LinuxSshClient 句柄
 // 调用方负责传入校验过的参数（host/user/password 非空、port/timeoutSeconds > 0）

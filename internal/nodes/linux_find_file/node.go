@@ -5,7 +5,6 @@ package linux_find_file
 
 import (
 	"fmt"
-	"path"
 	"regexp"
 	"strings"
 
@@ -85,38 +84,10 @@ func (Node) Execute(ctx engine.ExecContext) (engine.Outputs, error) {
 		maxDepth = defaultDepth
 	}
 
-	sc, err := client.Sftp()
+	ctx.Info("搜索 %s 下匹配 %s 的文件（最大深度 %d）", startDir, pattern, maxDepth)
+	matches, err := clients.WalkSFTPMatch(ctx.Context(), client, startDir, re, maxDepth, ctx.Warn)
 	if err != nil {
 		return nil, err
-	}
-
-	ctx.Info("搜索 %s 下匹配 %s 的文件（最大深度 %d）", startDir, pattern, maxDepth)
-
-	cleanedStart := path.Clean(startDir)
-	startDepth := strings.Count(cleanedStart, "/")
-	var matches []string
-	walker := sc.Walk(cleanedStart)
-	for walker.Step() {
-		if walker.Err() != nil {
-			ctx.Warn("遍历跳过: %v", walker.Err())
-			continue
-		}
-		if err := ctx.Context().Err(); err != nil {
-			return nil, err
-		}
-		current := walker.Path()
-		depth := strings.Count(path.Clean(current), "/") - startDepth
-		if depth > maxDepth {
-			walker.SkipDir()
-			continue
-		}
-		info := walker.Stat()
-		if info == nil || info.IsDir() {
-			continue
-		}
-		if re.MatchString(info.Name()) {
-			matches = append(matches, current)
-		}
 	}
 
 	first := ""

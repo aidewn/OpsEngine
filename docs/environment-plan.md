@@ -3,6 +3,8 @@
 > 主页「配置环境」+ 按业务/项目集中管理 SSH/Docker/K8s/Jenkins 凭证；  
 > 独立探测节点在编辑态「探测一次」点选结果，运行态经**数据端口连线**传给下游（主路径）；  
 > 写入 workflow 变量为可选。与 [architecture.md](./architecture.md)、[node-development.md](./node-development.md) 配合阅读。
+>
+> **当前状态**：Phase 1–6 全部已完成；4 个连接节点 + 5 个探测节点已落地，覆盖 SSH/Docker/K8s/Jenkins。
 
 ---
 
@@ -10,12 +12,12 @@
 
 | 阶段 | 主题 | 状态 |
 |------|------|------|
-| Phase 1 | Environment CRUD + 主页 Tab + 配置表单 + TestEnvConfig | 待做 |
-| Phase 2 | `env_connect_ssh` + `env_probe_ssh_list_dir` + Probe API + Picker UI | 待做 |
-| Phase 3 | `env_probe_ssh_find_files` + Docker connect/probe | 待做 |
-| Phase 4 | K8s connect + `env_probe_k8s_pods` | 待做 |
-| Phase 5 | Jenkins 配置 + connect + probe | 待做 |
-| Phase 6 | static/dynamic 完善、assemble 引用环境（可选） | 待做 |
+| Phase 1 | Environment CRUD + 主页 Tab + 配置表单 + TestEnvConfig | ✅ 已完成 |
+| Phase 2 | `env_connect_ssh` + `env_probe_ssh_list_dir` + Probe API + Picker UI | ✅ 已完成 |
+| Phase 3 | `env_probe_ssh_find_files` + Docker connect/probe | ✅ 已完成 |
+| Phase 4 | K8s connect + `env_probe_k8s_pods` | ✅ 已完成 |
+| Phase 5 | Jenkins 配置 + connect + probe | ✅ 已完成 |
+| Phase 6 | static/dynamic 完善、assemble 引用环境 | ✅ 已完成 |
 
 **已定设计决策（不再讨论）：**
 
@@ -368,24 +370,32 @@ foreach binding in variable_bindings:
 
 ### Phase 1
 
-- [ ] 主页「配置环境」Tab 可见
-- [ ] 创建环境、添加 SSH 配置、保存 TOML
-- [ ] TestEnvConfig 对 SSH 成功/失败有明确提示
-- [ ] `go test ./internal/store/...` 含 environment_store 测试
+- [x] 主页「配置环境」Tab 可见
+- [x] 创建环境、添加 SSH 配置、保存 TOML
+- [x] TestEnvConfig 对 SSH 成功/失败有明确提示
+- [x] `go test ./internal/store/...` 含 environment_store 测试
 
 ### Phase 2
 
-- [ ] `env_connect_ssh` 运行时可输出 LinuxSshConnection
-- [ ] `env_probe_ssh_list_dir` 无 exec 端口，画布显示为 Pure
-- [ ] Config 面板「探测一次」→ 列表 → 「应用」→ 写入 `probe_snapshot`
-- [ ] 画布：`selected_path` 数据边连到下游 input；static 运行后下游拿到快照路径
-- [ ] dynamic 模式：有边引用时重新 list，下游拿到最新路径
-- [ ] （可选）勾选 variables 同步后，`var_get` 能读到 default
+- [x] `env_connect_ssh` 运行时可输出 LinuxSshConnection
+- [x] `env_probe_ssh_list_dir` 无 exec 端口，画布显示为 Pure
+- [x] Config 面板「探测一次」→ 列表 → 「应用」→ 写入 `probe_snapshot`
+- [x] 画布：`selected_path` 数据边连到下游 input；static 运行后下游拿到快照路径
+- [x] dynamic 模式：有边引用时重新 list，下游拿到最新路径
+- [x] 勾选 variables 同步后，`var_get` 能读到 default
 
 ### Phase 3–5
 
-- [ ] 各 connect/probe 节点与 clients 对齐
-- [ ] Docker over_ssh 引用同环境 ssh config_id
+- [x] 各 connect/probe 节点与 clients 对齐
+- [x] Docker over_ssh 引用同环境 ssh config_id
+- [x] K8s 从 kubeconfig YAML 解析；probe 支持 label_selector
+- [x] Jenkins 使用 net/http + Basic Auth；probe 支持嵌套 folder
+- [x] TestEnvConfig 覆盖 4 种 kind
+
+### Phase 6
+
+- [x] AssembleCanvasPage 透传 onVariablesChange，集合内 EnvProbePanel 可同步 variables
+- [x] EnvProbePanel：static 模式无快照红色警告；快照超过 7 天黄色提示
 
 ---
 

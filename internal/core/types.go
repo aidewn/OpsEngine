@@ -24,6 +24,7 @@ const (
 	PortTypeDockerContext   PortType = "DockerContext"
 	PortTypeDockerContainer PortType = "DockerContainerHandle"
 	PortTypeK8sContext      PortType = "K8sContext"
+	PortTypeJenkinsContext  PortType = "JenkinsContext"
 	PortTypeNginxInstance   PortType = "NginxInstance"
 )
 

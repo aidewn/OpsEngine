@@ -35,7 +35,7 @@ func runForWorkflow(t *testing.T, wf core.WorkflowDef) core.ExecutionRecord {
 		t.Fatal(err)
 	}
 
-	e := engine.New(ws, as, nil, &collectorEmitter{})
+	e := engine.New(ws, as, nil, nil, &collectorEmitter{})
 	execID, err := e.Run(wf.ID)
 	if err != nil {
 		t.Fatal(err)

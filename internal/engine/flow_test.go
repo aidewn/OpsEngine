@@ -63,7 +63,7 @@ func TestParallel_AllBranchesRun(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	e := engine.New(ws, as, nil, &collectorEmitter{})
+	e := engine.New(ws, as, nil, nil, &collectorEmitter{})
 	execID, err := e.Run(wf.ID)
 	if err != nil {
 		t.Fatal(err)
@@ -137,7 +137,7 @@ func TestParallel_ConcurrentWrites(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	e := engine.New(ws, as, nil, &collectorEmitter{})
+	e := engine.New(ws, as, nil, nil, &collectorEmitter{})
 	execID, err := e.Run(wf.ID)
 	if err != nil {
 		t.Fatal(err)
@@ -195,7 +195,7 @@ func TestThread_MainNotBlocked(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	e := engine.New(ws, as, nil, &collectorEmitter{})
+	e := engine.New(ws, as, nil, nil, &collectorEmitter{})
 	execID, err := e.Run(wf.ID)
 	if err != nil {
 		t.Fatal(err)

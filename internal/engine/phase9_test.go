@@ -39,7 +39,7 @@ func TestSystemUpdate_AutoNoConnection(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	e := engine.New(ws, as, nil, &collectorEmitter{})
+	e := engine.New(ws, as, nil, nil, &collectorEmitter{})
 	execID, err := e.Run(wf.ID)
 	if err != nil {
 		t.Fatal(err)
@@ -92,7 +92,7 @@ func TestSystemUpdate_Off(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	e := engine.New(ws, as, nil, &collectorEmitter{})
+	e := engine.New(ws, as, nil, nil, &collectorEmitter{})
 	execID, err := e.Run(wf.ID)
 	if err != nil {
 		t.Fatal(err)
@@ -157,7 +157,7 @@ func TestBreak_TerminatesWorkflow(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	e := engine.New(ws, as, nil, &collectorEmitter{})
+	e := engine.New(ws, as, nil, nil, &collectorEmitter{})
 	execID, err := e.Run(wf.ID)
 	if err != nil {
 		t.Fatal(err)

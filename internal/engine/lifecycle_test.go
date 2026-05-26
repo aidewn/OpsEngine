@@ -48,7 +48,7 @@ func TestSystemUpdate_Interval(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	e := engine.New(ws, as, nil, &collectorEmitter{})
+	e := engine.New(ws, as, nil, nil, &collectorEmitter{})
 	execID, err := e.Run(wf.ID)
 	if err != nil {
 		t.Fatal(err)
@@ -123,7 +123,7 @@ func TestSystemOver_Triggered(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	e := engine.New(ws, as, nil, &collectorEmitter{})
+	e := engine.New(ws, as, nil, nil, &collectorEmitter{})
 	execID, err := e.Run(wf.ID)
 	if err != nil {
 		t.Fatal(err)
@@ -195,7 +195,7 @@ func TestSystemOver_NaturalEnd(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	e := engine.New(ws, as, nil, &collectorEmitter{})
+	e := engine.New(ws, as, nil, nil, &collectorEmitter{})
 	execID, err := e.Run(wf.ID)
 	if err != nil {
 		t.Fatal(err)

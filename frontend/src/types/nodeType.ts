@@ -16,6 +16,7 @@ export type PortType =
   | 'LinuxFileHandle'
   | 'DockerContext'
   | 'K8sContext'
+  | 'JenkinsContext'
   | 'NginxInstance';
 
 // ── 节点分类 ──────────────────────────────────────────────
@@ -27,6 +28,7 @@ export type ExecutionMode = 'remote_cmd' | 'agent' | 'flow';
 // 字段类型，对应后端 FieldSchema.Type
 // variable_select：从当前图 variables 挑选，同步 var_type
 // param_select / return_select：集合内从 params / returns 挑选，同步 var_type
+// env_select：所有环境下拉；env_config_select：依赖同表单 environment_id + kind filter
 export type FieldType =
   | 'text'
   | 'password'
@@ -36,7 +38,9 @@ export type FieldType =
   | 'textarea'
   | 'variable_select'
   | 'param_select'
-  | 'return_select';
+  | 'return_select'
+  | 'env_select'
+  | 'env_config_select';
 
 export interface PortDef {
   id: string;
@@ -55,6 +59,8 @@ export interface FieldSchema {
   max?: number;
   default?: unknown;
   options?: string[];
+  // env_config_select 用：限定环境内可选 config 的 kind
+  config_kind_filter?: string;
 }
 
 export interface NodeTypeDef {
@@ -141,6 +147,7 @@ const PORT_COLORS: Record<string, string> = {
   DockerContext: '#8b5cf6',     // 紫蓝
   DockerContainerHandle: '#7c3aed', // 深紫（容器引用，与 DockerContext 同色系）
   K8sContext: '#06b6d4',        // 青色
+  JenkinsContext: '#d33833',    // 红 (Jenkins brand)
   NginxInstance: '#f97316',     // 橙色
 };
 

@@ -184,7 +184,13 @@ export function EnvConfigDialog({
         </div>
 
         <div className="rounded border border-slate-200 bg-slate-50 p-3">
-          <EnvConfigForm kind={kind} value={fields} onChange={setFields} />
+          <EnvConfigForm
+            kind={kind}
+            value={fields}
+            onChange={setFields}
+            environment={environment}
+            editingItemID={editItem?.id}
+          />
         </div>
 
         {error && (

@@ -7,6 +7,7 @@ import (
 
 	"OpsEngine/internal/core"
 	"OpsEngine/internal/engine"
+	"OpsEngine/internal/store"
 )
 
 func TestTypeDef(t *testing.T) {
@@ -78,5 +79,6 @@ func (c fakeContext) SetReturn(string, any)          {}
 func (c fakeContext) Info(string, ...any)            {}
 func (c fakeContext) Warn(string, ...any)            {}
 func (c fakeContext) Error(string, ...any)           {}
+func (c fakeContext) EnvironmentStore() *store.EnvironmentStore { return nil }
 
 var _ engine.ExecContext = fakeContext{}

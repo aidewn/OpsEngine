@@ -23,8 +23,12 @@ type PortDef struct {
 }
 
 // FieldSchema 配置字段 Schema（驱动前端表单渲染）
+// Type 取值：text | password | number | select | toggle | textarea
+//            variable_select | param_select | return_select
+//            env_select       —— 下拉所有环境
+//            env_config_select —— 依赖同表单 environment_id 字段 + ConfigKindFilter 过滤
 type FieldSchema struct {
-	Type        string   `json:"type"` // text|password|number|select|toggle
+	Type        string   `json:"type"`
 	ID          string   `json:"id"`
 	Label       string   `json:"label"`
 	Placeholder string   `json:"placeholder,omitempty"`
@@ -33,6 +37,8 @@ type FieldSchema struct {
 	Max         *int64   `json:"max,omitempty"`
 	Default     any      `json:"default,omitempty"`
 	Options     []string `json:"options,omitempty"`
+	// ConfigKindFilter 仅 env_config_select 使用：限定下拉项的 EnvConfigKind
+	ConfigKindFilter string `json:"config_kind_filter,omitempty"`
 }
 
 // NodeInstance 节点实例（工作流配置中的具体节点）

@@ -17,6 +17,7 @@ import {
 import { frameAt, useExecution } from '@/features/execution/ExecutionStore';
 import { NodeStatusIcon } from '@/features/execution/ExecutionStatus';
 import { ConfigForm } from './ConfigForm';
+import { EnvProbePanel } from './EnvProbePanel';
 import { VariablePanel } from './VariablePanel';
 import { Input } from '@/components/ui/Input';
 import { Label } from '@/components/ui/Label';
@@ -48,6 +49,8 @@ interface NodeDetailPanelProps {
   // 集合编辑：选中 Start/End 时在 Config 中维护 params / returns
   onParamsChange?: (items: ParamDef[]) => void;
   onReturnsChange?: (items: ParamDef[]) => void;
+  // 探测节点应用快照时可选同步到工作流变量；不传则隐藏「同步到变量」开关
+  onVariablesChange?: (items: VariableDef[]) => void;
   // 未选中节点时编辑名称/描述（执行详情页不传 = 只读）
   onMetaChange?: (patch: GraphMetaPatch) => void;
 }
@@ -60,6 +63,7 @@ export function NodeDetailPanel({
   onConfigChange,
   onParamsChange,
   onReturnsChange,
+  onVariablesChange,
   onMetaChange,
 }: NodeDetailPanelProps) {
   const node = selectedNodeId
@@ -85,6 +89,7 @@ export function NodeDetailPanel({
             returns={graph.returns}
             onParamsChange={onParamsChange}
             onReturnsChange={onReturnsChange}
+            onVariablesChange={onVariablesChange}
           />
         ) : (
           <div className="px-4 py-3">
@@ -114,6 +119,7 @@ function NodeTabs({
   returns,
   onParamsChange,
   onReturnsChange,
+  onVariablesChange,
 }: {
   node: NodeInstance;
   executionID?: string;
@@ -124,6 +130,7 @@ function NodeTabs({
   returns?: ParamDef[];
   onParamsChange?: (items: ParamDef[]) => void;
   onReturnsChange?: (items: ParamDef[]) => void;
+  onVariablesChange?: (items: VariableDef[]) => void;
 }) {
   const [tab, setTab] = useState<Tab>(executionID ? 'logs' : 'config');
   const exec = useExecution(executionID);
@@ -170,6 +177,7 @@ function NodeTabs({
             returns={returns}
             onParamsChange={onParamsChange}
             onReturnsChange={onReturnsChange}
+            onVariablesChange={onVariablesChange}
           />
         )}
         {tab === 'logs' && (
@@ -221,6 +229,7 @@ function ConfigTab({
   returns,
   onParamsChange,
   onReturnsChange,
+  onVariablesChange,
 }: {
   node: NodeInstance;
   nodeType: NodeTypeDef | undefined;
@@ -230,6 +239,7 @@ function ConfigTab({
   returns?: ParamDef[];
   onParamsChange?: (items: ParamDef[]) => void;
   onReturnsChange?: (items: ParamDef[]) => void;
+  onVariablesChange?: (items: VariableDef[]) => void;
 }) {
   // Start / End：在节点详情里直接编辑 params / returns（与左侧栏同步，并反映到节点端口）
   if (node.type_id === ASSEMBLE_START && onParamsChange) {
@@ -281,15 +291,30 @@ function ConfigTab({
       </pre>
     );
   }
+  // 探测节点：在 ConfigForm 下方挂载 EnvProbePanel（仅编辑态出现）
+  const isProbeNode =
+    !!nodeType && node.type_id.startsWith('env_probe_');
+
   return (
-    <ConfigForm
-      schema={schema}
-      value={node.config}
-      onChange={(next) => onConfigChange(node.instance_id, next)}
-      variables={variables}
-      params={params}
-      returns={returns}
-    />
+    <div className="space-y-3">
+      <ConfigForm
+        schema={schema}
+        value={node.config}
+        onChange={(next) => onConfigChange(node.instance_id, next)}
+        variables={variables}
+        params={params}
+        returns={returns}
+      />
+      {isProbeNode && nodeType && (
+        <EnvProbePanel
+          node={node}
+          nodeType={nodeType}
+          variables={variables ?? []}
+          onConfigChange={(next) => onConfigChange(node.instance_id, next)}
+          onVariablesChange={onVariablesChange}
+        />
+      )}
+    </div>
   );
 }
 

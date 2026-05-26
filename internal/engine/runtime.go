@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"OpsEngine/internal/core"
+	"OpsEngine/internal/store"
 
 	"github.com/google/uuid"
 )
@@ -59,21 +60,25 @@ type Runtime struct {
 	cancel  context.CancelFunc
 	emitter Emitter
 
+	// 环境配置 store，按需暴露给 env_connect_* / env_probe_* 节点；其余节点不使用
+	environmentStore *store.EnvironmentStore
+
 	mu sync.Mutex
 }
 
 // newRuntime 创建运行时实例
-func newRuntime(wf core.WorkflowDef, snapshot core.ExecutionSnapshot, emitter Emitter) *Runtime {
+func newRuntime(wf core.WorkflowDef, snapshot core.ExecutionSnapshot, emitter Emitter, envStore *store.EnvironmentStore) *Runtime {
 	ctx, cancel := context.WithCancel(context.Background())
 	rt := &Runtime{
-		ID:         uuid.New().String(),
-		WorkflowID: wf.ID,
-		Snapshot:   snapshot,
-		StartedAt:  time.Now(),
-		status:     core.WorkflowStatusRunning,
-		ctx:        ctx,
-		cancel:     cancel,
-		emitter:    emitter,
+		ID:               uuid.New().String(),
+		WorkflowID:       wf.ID,
+		Snapshot:         snapshot,
+		StartedAt:        time.Now(),
+		status:           core.WorkflowStatusRunning,
+		ctx:              ctx,
+		cancel:           cancel,
+		emitter:          emitter,
+		environmentStore: envStore,
 	}
 	rt.rootFrame = newFrame("", initVariables(wf.Variables), nil, nil)
 	return rt

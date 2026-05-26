@@ -50,7 +50,7 @@ func TestPersistence_SaveAndLoad(t *testing.T) {
 	}
 
 	// 第一个 Engine 跑一次
-	e1 := engine.New(ws, as, es, &collectorEmitter{})
+	e1 := engine.New(ws, as, es, nil, &collectorEmitter{})
 	execID, err := e1.Run(wf.ID)
 	if err != nil {
 		t.Fatal(err)
@@ -73,7 +73,7 @@ func TestPersistence_SaveAndLoad(t *testing.T) {
 	}
 
 	// 第二个 Engine（模拟重启），不调用 Run，直接 ListSummaries
-	e2 := engine.New(ws, as, es, &collectorEmitter{})
+	e2 := engine.New(ws, as, es, nil, &collectorEmitter{})
 	summaries := e2.ListSummaries()
 	found := false
 	for _, s := range summaries {
@@ -123,7 +123,7 @@ func TestPersistence_DeleteRemovesFile(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	e := engine.New(ws, as, es, &collectorEmitter{})
+	e := engine.New(ws, as, es, nil, &collectorEmitter{})
 	execID, err := e.Run(wf.ID)
 	if err != nil {
 		t.Fatal(err)

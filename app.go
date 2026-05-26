@@ -8,11 +8,13 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	"OpsEngine/internal/clients"
 	"OpsEngine/internal/core"
 	"OpsEngine/internal/engine"
-	_ "OpsEngine/internal/nodes" // 触发所有内置节点的 init() 注册
+	_ "OpsEngine/internal/nodes" // 触发所有内置节点的 init() 注册（同时携带 probe 注册）
+	"OpsEngine/internal/probe"
 	"OpsEngine/internal/store"
 
 	"github.com/google/uuid"
@@ -60,6 +62,7 @@ func (a *App) startup(ctx context.Context) {
 		a.workflowStore,
 		a.assembleStore,
 		a.executionStore,
+		a.environmentStore,
 		engine.NewWailsEmitter(ctx),
 	)
 	zap.L().Info("OpsEngine 桌面应用启动完成")
@@ -318,6 +321,12 @@ func (a *App) TestEnvConfig(envID, configID string) error {
 	switch item.Kind {
 	case core.EnvConfigKindSSH:
 		return testSSHConfig(item.Fields)
+	case core.EnvConfigKindDocker:
+		return testDockerConfig(env, item.Fields)
+	case core.EnvConfigKindK8s:
+		return testK8sConfig(item.Fields)
+	case core.EnvConfigKindJenkins:
+		return testJenkinsConfig(item.Fields)
 	default:
 		return fmt.Errorf("kind %s 暂未支持测试连接", item.Kind)
 	}
@@ -354,6 +363,145 @@ func testSSHConfig(fields map[string]any) error {
 	}
 	defer client.Close()
 	return nil
+}
+
+// ── 编辑态探测（ProbeEnvNode） ──────────────────────────
+
+// ProbeEnvNodeRequest 探测请求
+// TypeID = 探测节点类型 ID（如 env_probe_ssh_list_dir）
+// NodeConfig = 该节点 config 的浅拷贝（含 path / pattern 等节点特有字段）
+type ProbeEnvNodeRequest struct {
+	TypeID     string         `json:"type_id"`
+	EnvID      string         `json:"env_id"`
+	ConfigID   string         `json:"config_id"`
+	NodeConfig map[string]any `json:"node_config"`
+}
+
+// ProbeEnvNodeResult 探测结果（与 probe.ProbeResult 同形态，Wails 绑定层暴露用）
+type ProbeEnvNodeResult struct {
+	Items []probe.ProbeItem `json:"items"`
+}
+
+// ProbeEnvNode 编辑态「探测一次」入口
+// 流程：取环境 → 按 TypeID 在 probe registry 查函数 → 执行 → 返回 items
+// 不写 execution 记录；失败错误直接抛给前端 toast
+func (a *App) ProbeEnvNode(req ProbeEnvNodeRequest) (ProbeEnvNodeResult, error) {
+	if req.TypeID == "" {
+		return ProbeEnvNodeResult{}, fmt.Errorf("type_id 未提供")
+	}
+	if req.EnvID == "" {
+		return ProbeEnvNodeResult{}, fmt.Errorf("env_id 未提供")
+	}
+	env, err := a.environmentStore.Get(req.EnvID)
+	if err != nil {
+		return ProbeEnvNodeResult{}, err
+	}
+	res, err := probe.Run(req.TypeID, env, req.ConfigID, req.NodeConfig)
+	if err != nil {
+		return ProbeEnvNodeResult{}, err
+	}
+	return ProbeEnvNodeResult{Items: res.Items}, nil
+}
+
+// testDockerConfig 通过 over_ssh 模式拨号 + Ping，验证 Docker daemon 可达
+// 仅 mode=over_ssh 受支持；其它 mode 返回明确错误
+func testDockerConfig(env core.EnvironmentDef, fields map[string]any) error {
+	mode := strings.TrimSpace(envFieldString(fields, "mode"))
+	if mode == "" {
+		mode = "over_ssh"
+	}
+	if mode != "over_ssh" {
+		return fmt.Errorf("暂不支持 Docker mode=%s（Phase 3 仅 over_ssh）", mode)
+	}
+	sshConfigID := strings.TrimSpace(envFieldString(fields, "ssh_config_id"))
+	if sshConfigID == "" {
+		return fmt.Errorf("Docker 配置缺少 ssh_config_id")
+	}
+	var sshFields map[string]any
+	for i := range env.Configs {
+		c := &env.Configs[i]
+		if c.ID == sshConfigID {
+			if c.Kind != core.EnvConfigKindSSH {
+				return fmt.Errorf("ssh_config_id %s 类型 %s 不是 ssh", sshConfigID, c.Kind)
+			}
+			sshFields = c.Fields
+			break
+		}
+	}
+	if sshFields == nil {
+		return fmt.Errorf("ssh_config_id 未找到: %s", sshConfigID)
+	}
+	host := strings.TrimSpace(envFieldString(sshFields, "host"))
+	user := strings.TrimSpace(envFieldString(sshFields, "user"))
+	password := envFieldString(sshFields, "password")
+	port := envFieldInt(sshFields, "port")
+	timeout := envFieldInt(sshFields, "timeout_seconds")
+	if host == "" || user == "" || password == "" {
+		return fmt.Errorf("引用的 SSH 配置缺少 host/user/password")
+	}
+	if port <= 0 {
+		port = 22
+	}
+	if timeout <= 0 {
+		timeout = 10
+	}
+	socketPath := strings.TrimSpace(envFieldString(fields, "socket_path"))
+	if socketPath == "" {
+		socketPath = "/var/run/docker.sock"
+	}
+
+	linuxClient, err := clients.DialLinuxSsh(host, port, user, password, timeout)
+	if err != nil {
+		return err
+	}
+	dockerClient, err := clients.NewDockerClientOverSSH(linuxClient.Client(), host, port, user, socketPath)
+	if err != nil {
+		_ = linuxClient.Close()
+		return fmt.Errorf("构造 Docker 客户端失败: %w", err)
+	}
+	defer dockerClient.Close()
+
+	pingCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if err := dockerClient.Ping(pingCtx); err != nil {
+		return fmt.Errorf("Docker daemon 不可达: %w", err)
+	}
+	return nil
+}
+
+// testJenkinsConfig 用 base_url + user + api_token Ping Jenkins
+func testJenkinsConfig(fields map[string]any) error {
+	baseURL := strings.TrimSpace(envFieldString(fields, "base_url"))
+	user := strings.TrimSpace(envFieldString(fields, "user"))
+	token := envFieldString(fields, "api_token")
+	timeout := envFieldInt(fields, "timeout_seconds")
+	if timeout <= 0 {
+		timeout = 10
+	}
+	client, err := clients.NewJenkinsClient(baseURL, user, token, timeout)
+	if err != nil {
+		return err
+	}
+	pingCtx, cancel := context.WithTimeout(context.Background(), time.Duration(timeout)*time.Second)
+	defer cancel()
+	return client.Ping(pingCtx)
+}
+
+// testK8sConfig 解析 kubeconfig + Ping，验证 API Server 可达
+func testK8sConfig(fields map[string]any) error {
+	kubeconfig := envFieldString(fields, "kubeconfig_yaml")
+	if strings.TrimSpace(kubeconfig) == "" {
+		return fmt.Errorf("K8s 配置缺少 kubeconfig_yaml")
+	}
+	contextName := strings.TrimSpace(envFieldString(fields, "context"))
+	namespace := strings.TrimSpace(envFieldString(fields, "namespace"))
+	k8sClient, err := clients.NewK8sClientFromKubeconfig(kubeconfig, namespace, contextName)
+	if err != nil {
+		return err
+	}
+	pingCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	return k8sClient.Ping(pingCtx)
 }
 
 // validateEnvironment 校验环境定义结构合法性

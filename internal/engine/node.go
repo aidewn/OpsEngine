@@ -7,6 +7,7 @@ import (
 	"context"
 
 	"OpsEngine/internal/core"
+	"OpsEngine/internal/store"
 )
 
 // Outputs 节点输出端口的值
@@ -66,4 +67,8 @@ type ExecContext interface {
 	Info(format string, args ...any)
 	Warn(format string, args ...any)
 	Error(format string, args ...any)
+
+	// EnvironmentStore 返回环境配置存储，供 env_connect_* / env_probe_* 等节点
+	// 在运行时按 environment_id + config_id 解析凭证；不依赖该 store 的节点可忽略
+	EnvironmentStore() *store.EnvironmentStore
 }

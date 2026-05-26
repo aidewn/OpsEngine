@@ -102,7 +102,7 @@ func TestAssembleCall_ParamReturn(t *testing.T) {
 
 	// 跑
 	collector := &collectorEmitter{}
-	e := engine.New(ws, as, nil, collector)
+	e := engine.New(ws, as, nil, nil, collector)
 	execID, err := e.Run(wf.ID)
 	if err != nil {
 		t.Fatal(err)
@@ -226,7 +226,7 @@ func TestAssembleCall_VariableIsolation(t *testing.T) {
 	}
 
 	collector := &collectorEmitter{}
-	e := engine.New(ws, as, nil, collector)
+	e := engine.New(ws, as, nil, nil, collector)
 	execID, err := e.Run(wf.ID)
 	if err != nil {
 		t.Fatal(err)
@@ -333,7 +333,7 @@ func TestAssembleCall_StartParamPort(t *testing.T) {
 	}
 
 	collector := &collectorEmitter{}
-	e := engine.New(ws, as, nil, collector)
+	e := engine.New(ws, as, nil, nil, collector)
 	execID, err := e.Run(wf.ID)
 	if err != nil {
 		t.Fatal(err)

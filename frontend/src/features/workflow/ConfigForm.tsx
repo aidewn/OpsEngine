@@ -15,6 +15,8 @@ import { cn } from '@/lib/cn';
 import type { FieldSchema } from '@/types/nodeType';
 import type { ParamDef } from '@/types/assemble';
 import type { VariableDef } from '@/types/workflow';
+import { useEnvironments } from '@/api/environments';
+import type { EnvConfigItem, EnvConfigKind } from '@/types/environment';
 
 interface Props {
   schema: FieldSchema[];
@@ -94,6 +96,7 @@ export function ConfigForm({
           key={field.id}
           field={field}
           value={local[field.id]}
+          formValue={local}
           onChange={(v) => setOne(field.id, v)}
           onPatch={setPatch}
           variables={variables}
@@ -109,6 +112,7 @@ export function ConfigForm({
 function FieldRow({
   field,
   value,
+  formValue,
   onChange,
   onPatch,
   variables,
@@ -117,6 +121,7 @@ function FieldRow({
 }: {
   field: FieldSchema;
   value: unknown;
+  formValue: Record<string, unknown>;
   onChange: (v: unknown) => void;
   onPatch: (patch: Record<string, unknown>) => void;
   variables?: VariableDef[];
@@ -160,6 +165,7 @@ function FieldRow({
       <FieldControl
         field={field}
         value={value}
+        formValue={formValue}
         onChange={onChange}
         onPatch={onPatch}
         variables={variables}
@@ -174,6 +180,7 @@ function FieldRow({
 function FieldControl({
   field,
   value,
+  formValue,
   onChange,
   onPatch,
   variables,
@@ -182,6 +189,7 @@ function FieldControl({
 }: {
   field: FieldSchema;
   value: unknown;
+  formValue: Record<string, unknown>;
   onChange: (v: unknown) => void;
   onPatch: (patch: Record<string, unknown>) => void;
   variables?: VariableDef[];
@@ -284,6 +292,27 @@ function FieldControl({
               var_type: r?.var_type ?? '',
             })
           }
+        />
+      );
+    case 'env_select':
+      return (
+        <EnvSelect
+          id={field.id}
+          value={(value as string) ?? ''}
+          onPick={(envID) =>
+            // 切换环境时清空 config_id，避免残留 stale 引用
+            onPatch({ [field.id]: envID, config_id: '' })
+          }
+        />
+      );
+    case 'env_config_select':
+      return (
+        <EnvConfigSelect
+          id={field.id}
+          value={(value as string) ?? ''}
+          envID={(formValue['environment_id'] as string) ?? ''}
+          kindFilter={field.config_kind_filter as EnvConfigKind | undefined}
+          onChange={onChange}
         />
       );
     case 'text':
@@ -459,6 +488,146 @@ function ReturnSelect({
       {isOrphan && (
         <div className="text-[11px] text-red-600">
           引用的返回值已不存在，保存前请重新选择
+        </div>
+      )}
+    </div>
+  );
+}
+
+// env_select 控件：列出所有环境；选中后 onPick(envID) 同时清空配套 config_id
+function EnvSelect({
+  id,
+  value,
+  onPick,
+}: {
+  id: string;
+  value: string;
+  onPick: (envID: string) => void;
+}) {
+  const { data, isLoading, error } = useEnvironments();
+  if (isLoading) {
+    return <div className="text-xs text-slate-400">加载环境列表...</div>;
+  }
+  if (error) {
+    return (
+      <div className="rounded border border-red-200 bg-red-50 px-2 py-1.5 text-xs text-red-700">
+        加载环境失败：{error.message}
+      </div>
+    );
+  }
+  const envs = data ?? [];
+  const exists = envs.some((e) => e.id === value);
+  const isOrphan = value !== '' && !exists;
+
+  if (envs.length === 0) {
+    return (
+      <div className="rounded border border-amber-300 bg-amber-50 px-2 py-1.5 text-xs text-amber-700">
+        尚未创建任何环境，请先在首页「配置环境」Tab 添加
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-1">
+      <select
+        id={id}
+        value={value}
+        onChange={(e) => onPick(e.target.value)}
+        className={cn(
+          'w-full rounded border bg-white px-2 py-1.5 text-xs',
+          isOrphan ? 'border-red-400' : 'border-slate-300',
+        )}
+      >
+        <option value="">（请选择环境）</option>
+        {isOrphan && <option value={value}>未定义：{value}</option>}
+        {envs.map((e) => (
+          <option key={e.id} value={e.id}>
+            {e.name}
+          </option>
+        ))}
+      </select>
+      {isOrphan && (
+        <div className="text-[11px] text-red-600">
+          引用的环境已不存在，保存前请重新选择
+        </div>
+      )}
+    </div>
+  );
+}
+
+// env_config_select 控件：依赖同表单 environment_id；按 kindFilter 过滤
+function EnvConfigSelect({
+  id,
+  value,
+  envID,
+  kindFilter,
+  onChange,
+}: {
+  id: string;
+  value: string;
+  envID: string;
+  kindFilter?: EnvConfigKind;
+  onChange: (v: unknown) => void;
+}) {
+  const { data: envs, isLoading } = useEnvironments();
+
+  if (!envID) {
+    return (
+      <div className="rounded border border-slate-200 bg-slate-50 px-2 py-1.5 text-xs text-slate-500">
+        请先选择上方的「环境」
+      </div>
+    );
+  }
+  if (isLoading) {
+    return <div className="text-xs text-slate-400">加载配置列表...</div>;
+  }
+
+  const env = envs?.find((e) => e.id === envID);
+  if (!env) {
+    return (
+      <div className="rounded border border-red-200 bg-red-50 px-2 py-1.5 text-xs text-red-700">
+        所选环境已不存在
+      </div>
+    );
+  }
+
+  const configs: EnvConfigItem[] = kindFilter
+    ? env.configs.filter((c) => c.kind === kindFilter)
+    : env.configs;
+
+  const exists = configs.some((c) => c.id === value);
+  const isOrphan = value !== '' && !exists;
+
+  if (configs.length === 0) {
+    return (
+      <div className="rounded border border-amber-300 bg-amber-50 px-2 py-1.5 text-xs text-amber-700">
+        该环境下没有 {kindFilter ?? ''} 类型配置，请到环境详情添加
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-1">
+      <select
+        id={id}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className={cn(
+          'w-full rounded border bg-white px-2 py-1.5 text-xs',
+          isOrphan ? 'border-red-400' : 'border-slate-300',
+        )}
+      >
+        <option value="">（请选择配置）</option>
+        {isOrphan && <option value={value}>未定义：{value}</option>}
+        {configs.map((c) => (
+          <option key={c.id} value={c.id}>
+            {c.name}
+          </option>
+        ))}
+      </select>
+      {isOrphan && (
+        <div className="text-[11px] text-red-600">
+          引用的配置已不存在，保存前请重新选择
         </div>
       )}
     </div>
