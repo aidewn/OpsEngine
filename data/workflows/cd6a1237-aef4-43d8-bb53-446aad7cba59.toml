@@ -111,16 +111,64 @@ description = "配置yum仓库，并安装nginx，启动nginx"
     y = 63.60262646141754
 
 [[nodes]]
-  id = "2cfc8bb9-0a69-4349-9025-3a282e03b339"
-  type = "env_probe_docker_containers"
+  id = "a0f2c5a8-938b-4242-9995-5f76d046c782"
+  type = "image_push_tar"
   [nodes.config]
-    all = false
     config_id = ""
     environment_id = "59b2b65c-8ba0-4131-a39e-b86c1c7ea7fb"
+    registry_config_id = "168a8ed1-4095-41c5-a508-fdeebaa43b9a"
+  [nodes.position]
+    x = 651.201620133322
+    y = 322.53639071128765
+
+[[nodes]]
+  id = "4bd3511c-9087-4b3e-9598-e26bde218c5f"
+  type = "k8s_set_workload_image"
+  [nodes.config]
+    timeout_seconds = 300.0
+    wait_for_rollout = true
+  [nodes.position]
+    x = 923.0585815587995
+    y = 316.12411241144264
+
+[[nodes]]
+  id = "7d8e0edb-906f-4b9d-9cfc-e3dcc4ed8d99"
+  type = "env_probe_k8s_workloads"
+  [nodes.config]
+    config_id = ""
+    environment_id = ""
+    include_daemonsets = true
+    include_deployments = true
+    include_statefulsets = true
     resolve_mode = "static"
   [nodes.position]
-    x = 483.3957586613619
-    y = 420.7589124518813
+    x = 698.7822220963794
+    y = 473.7392593012069
+
+[[nodes]]
+  id = "6cdb86e7-0925-465c-9c20-5b4f1a2e3318"
+  type = "env_probe_docker_containers"
+  [nodes.config]
+    all = true
+    config_id = "f404a7f6-0b71-4e53-b3da-02389b0dc7d3"
+    environment_id = "59b2b65c-8ba0-4131-a39e-b86c1c7ea7fb"
+    resolve_mode = "static"
+    variable_bindings = []
+    [nodes.config.probe_snapshot]
+      captured_at = "2026-05-27T04:58:30.789Z"
+      picked_key = "5c4cde6c1e98daf6367ad6748b7069c4f49a83071713127e6f2ee18fda532d0c"
+      picked_label = "operator-dev-control-plane"
+
+      [[nodes.config.probe_snapshot.items]]
+        key = "5c4cde6c1e98daf6367ad6748b7069c4f49a83071713127e6f2ee18fda532d0c"
+        label = "operator-dev-control-plane"
+        [nodes.config.probe_snapshot.items.meta]
+          image = "kindest/node:v1.35.0"
+          state = "running"
+          status = "Up 14 hours"
+  [nodes.position]
+    x = 388.0
+    y = 478.0
 
 [[edges]]
   [edges.from]
@@ -185,3 +233,19 @@ description = "配置yum仓库，并安装nginx，启动nginx"
   [edges.to]
     node = "4ac55088-054f-43ff-9f04-ae2c992b348d"
     port = "exec_in"
+
+[[edges]]
+  [edges.from]
+    node = "a0f2c5a8-938b-4242-9995-5f76d046c782"
+    port = "image"
+  [edges.to]
+    node = "4bd3511c-9087-4b3e-9598-e26bde218c5f"
+    port = "image"
+
+[[edges]]
+  [edges.from]
+    node = "7d8e0edb-906f-4b9d-9cfc-e3dcc4ed8d99"
+    port = "selected_workload"
+  [edges.to]
+    node = "4bd3511c-9087-4b3e-9598-e26bde218c5f"
+    port = "workload_ref"

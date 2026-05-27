@@ -24,13 +24,14 @@ interface Props {
   editItem: EnvConfigItem | null;
 }
 
-// 五种 kind：远端 4 类 + 本机 localhost（无任何字段，直接挂载）
+// 六种 kind：远端 4 类 + 本机 localhost + 镜像仓库 registry
 const KIND_OPTIONS: { value: EnvConfigKind; label: string }[] = [
   { value: 'ssh', label: 'SSH' },
   { value: 'docker', label: 'Docker' },
   { value: 'k8s', label: 'K8s' },
   { value: 'jenkins', label: 'Jenkins' },
   { value: 'localhost', label: 'Localhost' },
+  { value: 'registry', label: 'Registry' },
 ];
 
 export function EnvConfigDialog({

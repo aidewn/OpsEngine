@@ -103,14 +103,37 @@ const JENKINS_SCHEMA: FieldSchema[] = [
 // 表单展示由 EnvConfigForm 主体内的提示文案承担，避免用户看到空白以为坏掉
 const LOCALHOST_SCHEMA: FieldSchema[] = [];
 
+// Registry schema：镜像仓库（image_push_tar 节点的目标）
+// user / password 同填或同空；同空表示匿名仓库
+const REGISTRY_SCHEMA: FieldSchema[] = [
+  {
+    type: 'text',
+    id: 'url',
+    label: 'Registry URL',
+    placeholder: 'https://reg.example.com:5000',
+    required: true,
+  },
+  { type: 'text', id: 'user', label: '用户名（匿名仓库可空）' },
+  { type: 'password', id: 'password', label: '密码 / Token（匿名仓库可空）' },
+  {
+    type: 'number',
+    id: 'timeout_seconds',
+    label: '超时（秒）',
+    min: 1,
+    max: 300,
+    default: 10,
+  },
+];
+
 // Docker 通用 schema（mode + socket_path）；ssh_config_id 由专用控件维护，不放进 ConfigForm
+// mode=local 直连本机 unix socket；mode=over_ssh 通过同环境 SSH 隧道转发
 const DOCKER_SCHEMA: FieldSchema[] = [
   {
     type: 'select',
     id: 'mode',
     label: '连接模式',
-    options: ['over_ssh'],
-    default: 'over_ssh',
+    options: ['local', 'over_ssh'],
+    default: 'local',
     required: true,
   },
   {
@@ -128,6 +151,7 @@ const SCHEMA_BY_KIND: Partial<Record<EnvConfigKind, FieldSchema[]>> = {
   k8s: K8S_SCHEMA,
   jenkins: JENKINS_SCHEMA,
   localhost: LOCALHOST_SCHEMA,
+  registry: REGISTRY_SCHEMA,
 };
 
 // 收集 schema 默认值，构造新增配置时的初始 fields
@@ -151,7 +175,7 @@ export function EnvConfigForm({
   environment,
   editingItemID,
 }: Props) {
-  // 5 种 kind 全部就位（ssh/docker/k8s/jenkins/localhost）；若联合类型扩展，schema 缺失时给出明确提示
+  // 6 种 kind 全部就位（ssh/docker/k8s/jenkins/localhost/registry）；若联合类型扩展，schema 缺失时给出明确提示
   const schema = SCHEMA_BY_KIND[kind];
   if (!schema) {
     return (
@@ -168,7 +192,8 @@ export function EnvConfigForm({
         </div>
       )}
       <ConfigForm schema={schema} value={value} onChange={onChange} />
-      {kind === 'docker' && (
+      {/* Docker over_ssh 模式才需要绑定同环境的 SSH 配置；local 模式直连本机 socket */}
+      {kind === 'docker' && (value['mode'] ?? 'local') === 'over_ssh' && (
         <SiblingConfigSelect
           label="SSH 引用"
           environment={environment}
@@ -177,6 +202,14 @@ export function EnvConfigForm({
           value={(value['ssh_config_id'] as string) ?? ''}
           onChange={(v) => onChange({ ...value, ssh_config_id: v })}
         />
+      )}
+      {kind === 'docker' && (value['mode'] ?? 'local') === 'local' && (
+        <div className="rounded border border-slate-200 bg-white px-3 py-2 text-xs text-slate-600">
+          local 模式直连本机 docker.sock；
+          macOS Docker Desktop 默认 <code>/var/run/docker.sock</code> 是软链，
+          Colima 用 <code>~/.colima/default/docker.sock</code>，
+          可按机器实际路径填写。
+        </div>
       )}
     </div>
   );

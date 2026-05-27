@@ -18,6 +18,7 @@ import (
 	"OpsEngine/internal/store"
 
 	"github.com/google/uuid"
+	wailsruntime "github.com/wailsapp/wails/v2/pkg/runtime"
 	"go.uber.org/zap"
 )
 
@@ -65,7 +66,28 @@ func (a *App) startup(ctx context.Context) {
 		a.environmentStore,
 		engine.NewWailsEmitter(ctx),
 	)
+
+	// Wails 拖拽文件回调：转发为前端事件 file:dropped，paths = []string
+	// 前端 file_path 字段在自身被打上 CSS 标记后，可监听该事件填值
+	wailsruntime.OnFileDrop(ctx, func(x, y int, paths []string) {
+		wailsruntime.EventsEmit(ctx, "file:dropped", paths)
+	})
+
 	zap.L().Info("OpsEngine 桌面应用启动完成")
+}
+
+// SelectFile 弹出原生文件选择对话框，返回用户选中的绝对路径
+// title 为对话框标题；extPattern 为 *.tar 等通配符过滤（空字符串 = 不过滤）
+// 取消选择时返回空串 + nil error（与 Wails 行为一致）
+func (a *App) SelectFile(title, extPattern string) (string, error) {
+	opts := wailsruntime.OpenDialogOptions{Title: title}
+	if extPattern != "" {
+		opts.Filters = []wailsruntime.FileFilter{{
+			DisplayName: extPattern,
+			Pattern:     extPattern,
+		}}
+	}
+	return wailsruntime.OpenFileDialog(a.ctx, opts)
 }
 
 // ── 工作流 CRUD ──────────────────────────────────────────────
@@ -329,6 +351,8 @@ func (a *App) TestEnvConfig(envID, configID string) error {
 		return testJenkinsConfig(item.Fields)
 	case core.EnvConfigKindLocalhost:
 		return testLocalhostConfig()
+	case core.EnvConfigKindRegistry:
+		return testRegistryConfig(item.Fields)
 	default:
 		return fmt.Errorf("kind %s 暂未支持测试连接", item.Kind)
 	}
@@ -416,13 +440,38 @@ func (a *App) ProbeEnvNode(req ProbeEnvNodeRequest) (ProbeEnvNodeResult, error) 
 
 // testDockerConfig 通过 over_ssh 模式拨号 + Ping，验证 Docker daemon 可达
 // 仅 mode=over_ssh 受支持；其它 mode 返回明确错误
+// testDockerConfigLocal 直连本机 unix socket → Ping
+// 不需要 ssh_config_id；socket_path 默认 /var/run/docker.sock
+func testDockerConfigLocal(fields map[string]any) error {
+	socketPath := strings.TrimSpace(envFieldString(fields, "socket_path"))
+	if socketPath == "" {
+		socketPath = "/var/run/docker.sock"
+	}
+	dockerClient, err := clients.NewDockerClientLocal(socketPath)
+	if err != nil {
+		return err
+	}
+	defer dockerClient.Close()
+	pingCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if err := dockerClient.Ping(pingCtx); err != nil {
+		return fmt.Errorf("Docker daemon 不可达（socket=%s）: %w", socketPath, err)
+	}
+	return nil
+}
+
 func testDockerConfig(env core.EnvironmentDef, fields map[string]any) error {
 	mode := strings.TrimSpace(envFieldString(fields, "mode"))
 	if mode == "" {
 		mode = "over_ssh"
 	}
-	if mode != "over_ssh" {
-		return fmt.Errorf("暂不支持 Docker mode=%s（Phase 3 仅 over_ssh）", mode)
+	switch mode {
+	case "local":
+		return testDockerConfigLocal(fields)
+	case "over_ssh":
+		// 走下方既有逻辑
+	default:
+		return fmt.Errorf("不支持的 Docker mode=%s（仅支持 local / over_ssh）", mode)
 	}
 	sshConfigID := strings.TrimSpace(envFieldString(fields, "ssh_config_id"))
 	if sshConfigID == "" {
@@ -498,6 +547,25 @@ func testJenkinsConfig(fields map[string]any) error {
 	return client.Ping(pingCtx)
 }
 
+// testRegistryConfig 用 GET <url>/v2/ 探活：200 视为可达；401 视为「需要凭据」
+// 字段：url（必填）/ user / password（user+password 为空 = 匿名仓库，仅做匿名探活）
+func testRegistryConfig(fields map[string]any) error {
+	rawURL := strings.TrimSpace(envFieldString(fields, "url"))
+	if rawURL == "" {
+		return fmt.Errorf("registry 配置缺少 url")
+	}
+	user := strings.TrimSpace(envFieldString(fields, "user"))
+	password := envFieldString(fields, "password")
+	if (user == "") != (password == "") {
+		return fmt.Errorf("user 与 password 必须同时填写或同时留空")
+	}
+	timeoutSec := envFieldInt(fields, "timeout_seconds")
+	if timeoutSec <= 0 {
+		timeoutSec = 10
+	}
+	return clients.PingRegistry(rawURL, user, password, time.Duration(timeoutSec)*time.Second)
+}
+
 // testK8sConfig 解析 kubeconfig + Ping，验证 API Server 可达
 func testK8sConfig(fields map[string]any) error {
 	kubeconfig := envFieldString(fields, "kubeconfig_yaml")
@@ -544,7 +612,8 @@ func isValidEnvConfigKind(k core.EnvConfigKind) bool {
 		core.EnvConfigKindDocker,
 		core.EnvConfigKindK8s,
 		core.EnvConfigKindJenkins,
-		core.EnvConfigKindLocalhost:
+		core.EnvConfigKindLocalhost,
+		core.EnvConfigKindRegistry:
 		return true
 	}
 	return false

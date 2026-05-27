@@ -1,5 +1,7 @@
 // env_connect_docker 节点：从环境配置读取 docker 配置并建立 Docker 客户端
-// Phase 3 仅支持 mode=over_ssh：从同环境内引用的 ssh 配置拨号 → SSH 隧道 → Docker daemon
+// 支持两种 mode：
+//   - local    —— 直连本机 unix socket（不开 SSH 隧道，要求桌面本机就装了 Docker）
+//   - over_ssh —— 引用同环境的 ssh 配置，通过 SSH 隧道拨号到远端 docker.sock
 // docker_connect 节点保留，作为「凭证内联」的临时方案
 
 package env_connect_docker
@@ -76,8 +78,31 @@ func (Node) Execute(ctx engine.ExecContext) (engine.Outputs, error) {
 	if mode == "" {
 		mode = "over_ssh"
 	}
+
+	socketPath := strings.TrimSpace(stringField(dockerCfg.Fields, "socket_path"))
+	if socketPath == "" {
+		socketPath = defaultSocketPath
+	}
+
+	// local 模式：直连本机 docker.sock，不走 SSH
+	if mode == "local" {
+		ctx.Info("直连本机 Docker socket %s", socketPath)
+		dockerClient, err := clients.NewDockerClientLocal(socketPath)
+		if err != nil {
+			return nil, err
+		}
+		if err := dockerClient.Ping(ctx.Context()); err != nil {
+			_ = dockerClient.Close()
+			return nil, fmt.Errorf("本机 Docker daemon 不可达（socket=%s）: %w", socketPath, err)
+		}
+		ctx.Info("本机 Docker 连接成功 (socket=%s)", socketPath)
+		return engine.Outputs{
+			"client": dockerClient,
+		}, nil
+	}
+
 	if mode != "over_ssh" {
-		return nil, fmt.Errorf("暂不支持 Docker mode=%s（Phase 3 仅 over_ssh）", mode)
+		return nil, fmt.Errorf("不支持的 Docker mode=%s（仅支持 local / over_ssh）", mode)
 	}
 
 	sshConfigID := strings.TrimSpace(stringField(dockerCfg.Fields, "ssh_config_id"))
@@ -87,11 +112,6 @@ func (Node) Execute(ctx engine.ExecContext) (engine.Outputs, error) {
 	sshCfg, err := findSSHConfig(env, sshConfigID)
 	if err != nil {
 		return nil, err
-	}
-
-	socketPath := strings.TrimSpace(stringField(dockerCfg.Fields, "socket_path"))
-	if socketPath == "" {
-		socketPath = defaultSocketPath
 	}
 
 	host := strings.TrimSpace(stringField(sshCfg.Fields, "host"))

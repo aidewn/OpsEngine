@@ -3,8 +3,30 @@ name = "测试环境"
 description = "用于测试"
 
 [[configs]]
-  id = "8fe6439a-ea0b-4d43-95ac-347a3b400367"
-  name = "本机"
-  kind = "localhost"
+  id = "f404a7f6-0b71-4e53-b3da-02389b0dc7d3"
+  name = "test"
+  kind = "docker"
   description = ""
   [configs.fields]
+    mode = "local"
+    socket_path = "/Users/liqian/.colima/default/docker.sock"
+
+[[configs]]
+  id = "168a8ed1-4095-41c5-a508-fdeebaa43b9a"
+  name = "test rigst"
+  kind = "registry"
+  description = ""
+  [configs.fields]
+    timeout_seconds = 10.0
+
+[[configs]]
+  id = "203940af-9cb4-4d36-8f2f-74a0297cd527"
+  name = "Benji"
+  kind = "ssh"
+  description = ""
+  [configs.fields]
+    host = "127.0.0.1"
+    password = "liqian5201314"
+    port = 22.0
+    timeout_seconds = 10.0
+    user = "liqian"

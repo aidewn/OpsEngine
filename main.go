@@ -28,6 +28,13 @@ func main() {
 		AssetServer: &assetserver.Options{
 			Assets: assets,
 		},
+		// 启用拖拽文件功能：image_push_tar 等节点的 file_path 字段需要拿到本机绝对路径
+		// 前端把可接收拖拽的元素打上 CSS 属性 --wails-drop-target: drop；
+		// 用户拖到该元素上松手时，runtime.OnFileDrop 回调收到绝对路径
+		DragAndDrop: &options.DragAndDrop{
+			EnableFileDrop:     true,
+			DisableWebViewDrop: true,
+		},
 		OnStartup: app.startup,
 		Bind: []interface{}{
 			app,

@@ -17,6 +17,7 @@ const (
 	EnvConfigKindK8s       EnvConfigKind = "k8s"
 	EnvConfigKindJenkins   EnvConfigKind = "jenkins"
 	EnvConfigKindLocalhost EnvConfigKind = "localhost"
+	EnvConfigKindRegistry  EnvConfigKind = "registry"
 )
 
 // EnvConfigItem 环境内单条配置（fields 按 kind 解析）

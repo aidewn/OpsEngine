@@ -33,6 +33,33 @@ type DockerClient struct {
 	closed  bool
 }
 
+// NewDockerClientLocal 直连本机 Docker daemon 的 unix socket，不开 SSH 隧道
+// 适用于「桌面运行 OpsEngine + 本机已装 Docker」的场景
+// socketPath 必填（典型值：/var/run/docker.sock；Docker Desktop macOS 可填 ~/.docker/run/docker.sock）
+//   - Host / User 字段填本机标识，仅用于 MarshalJSON 元数据，不参与拨号
+//   - 返回的 DockerClient.Close 是幂等的；本地模式下 sshClient 为 nil，Close 只关 API
+func NewDockerClientLocal(socketPath string) (*DockerClient, error) {
+	if socketPath == "" {
+		return nil, fmt.Errorf("socket_path 不能为空")
+	}
+	api, err := dockerclient.NewClientWithOpts(
+		dockerclient.WithHost("unix://"+socketPath),
+		dockerclient.WithAPIVersionNegotiation(),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("构造本地 Docker 客户端失败: %w", err)
+	}
+	return &DockerClient{
+		api:         api,
+		sshClient:   nil,
+		Host:        "localhost",
+		Port:        0,
+		User:        "local",
+		SocketPath:  socketPath,
+		ConnectedAt: time.Now(),
+	}, nil
+}
+
 // NewDockerClientOverSSH 基于已建立的 SSH 连接构造 Docker 客户端
 // socketPath 默认 /var/run/docker.sock，可由配置覆盖（部分发行版用 /run/docker.sock）
 func NewDockerClientOverSSH(sshClient *ssh.Client, host string, port int, user, socketPath string) (*DockerClient, error) {

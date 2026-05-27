@@ -11,12 +11,15 @@ import { useEffect, useRef, useState } from 'react';
 import { Input } from '@/components/ui/Input';
 import { Textarea } from '@/components/ui/Textarea';
 import { Label } from '@/components/ui/Label';
+import { Button } from '@/components/ui/Button';
 import { cn } from '@/lib/cn';
 import type { FieldSchema } from '@/types/nodeType';
 import type { ParamDef } from '@/types/assemble';
 import type { VariableDef } from '@/types/workflow';
 import { useEnvironments } from '@/api/environments';
 import type { EnvConfigItem, EnvConfigKind } from '@/types/environment';
+import { EventsOn } from '@wails/runtime/runtime';
+import { SelectFile } from '@wails/go/main/App';
 
 interface Props {
   schema: FieldSchema[];
@@ -312,6 +315,15 @@ function FieldControl({
           value={(value as string) ?? ''}
           envID={(formValue['environment_id'] as string) ?? ''}
           kindFilter={field.config_kind_filter as EnvConfigKind | undefined}
+          onChange={onChange}
+        />
+      );
+    case 'file_path':
+      return (
+        <FilePathField
+          id={field.id}
+          value={(value as string) ?? ''}
+          placeholder={field.placeholder}
           onChange={onChange}
         />
       );
@@ -630,6 +642,112 @@ function EnvConfigSelect({
           引用的配置已不存在，保存前请重新选择
         </div>
       )}
+    </div>
+  );
+}
+
+// file_path 字段：拖拽区 + 选择文件按钮 + 当前路径文本框
+// 拖拽实现说明：
+//   - main.go 开启 Wails DragAndDrop.EnableFileDrop；OnFileDrop 把绝对路径 emit 为 file:dropped
+//   - 元素打上 CSS 属性 --wails-drop-target: drop，告诉 Wails 哪些区域允许接收
+//   - hover 时高亮，drop 后只有 active（最近聚焦/hover 的）字段把第一个路径写入 value
+// 多个 file_path 字段同时存在时按「hover 中 → 上次 hover 中」的优先级竞争 drop 事件
+function FilePathField({
+  id,
+  value,
+  placeholder,
+  onChange,
+}: {
+  id: string;
+  value: string;
+  placeholder?: string;
+  onChange: (v: unknown) => void;
+}) {
+  const [hovering, setHovering] = useState(false);
+  const dropRef = useRef<HTMLDivElement | null>(null);
+  // 每次 hover 进入时记录时间戳，全局只有最大 hoveredAt 的字段消费 drop 事件
+  const hoveredAtRef = useRef(0);
+
+  // 在元素上挂 Wails 识别的 CSS 标记
+  useEffect(() => {
+    const el = dropRef.current;
+    if (!el) return;
+    el.style.setProperty('--wails-drop-target', 'drop');
+    return () => {
+      el.style.removeProperty('--wails-drop-target');
+    };
+  }, []);
+
+  // 监听全局 file:dropped 事件，只在自己是「当前 hover 字段」时消费
+  useEffect(() => {
+    const off = EventsOn('file:dropped', (paths: string[]) => {
+      if (!Array.isArray(paths) || paths.length === 0) return;
+      // 比较此字段记录的 hoveredAt 与全局最近 hover 字段；
+      // 简化：只要当前字段 hoveredAt 在过去 500ms 内即视为目标
+      const now = Date.now();
+      if (now - hoveredAtRef.current > 500) return;
+      onChange(paths[0]);
+      setHovering(false);
+    });
+    return () => off();
+  }, [onChange]);
+
+  async function pickViaDialog() {
+    try {
+      const picked = await SelectFile('选择文件', '');
+      if (picked) onChange(picked);
+    } catch (err) {
+      console.error('SelectFile 失败', err);
+    }
+  }
+
+  return (
+    <div className="space-y-1.5">
+      <div
+        ref={dropRef}
+        onDragEnter={(e) => {
+          e.preventDefault();
+          setHovering(true);
+          hoveredAtRef.current = Date.now();
+        }}
+        onDragOver={(e) => {
+          e.preventDefault();
+          hoveredAtRef.current = Date.now();
+        }}
+        onDragLeave={() => setHovering(false)}
+        onDrop={(e) => {
+          // WebView 的 drop 事件主要用于视觉反馈；真正的路径走 Wails 全局事件
+          e.preventDefault();
+          setHovering(false);
+        }}
+        className={cn(
+          'flex items-center justify-between gap-2 rounded border-2 border-dashed px-3 py-3 text-xs transition-colors',
+          hovering
+            ? 'border-blue-400 bg-blue-50 text-blue-700'
+            : 'border-slate-300 bg-slate-50 text-slate-500',
+        )}
+      >
+        <span className="truncate">
+          {value
+            ? value
+            : '把文件拖到此处，或点击「选择文件」'}
+        </span>
+        <Button
+          type="button"
+          size="sm"
+          variant="secondary"
+          onClick={pickViaDialog}
+        >
+          选择文件
+        </Button>
+      </div>
+      <Input
+        id={id}
+        type="text"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder ?? '或手动粘贴绝对路径'}
+      />
     </div>
   );
 }

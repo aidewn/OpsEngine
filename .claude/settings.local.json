@@ -48,7 +48,21 @@
       "Bash(docker --version)",
       "Read(//Users/liqian/.colima/**)",
       "Bash(colima start *)",
-      "Bash(kubectl delete *)"
+      "Bash(kubectl delete *)",
+      "Bash(grep -rn \"DragAndDrop\\\\|OnFileDrop\\\\|OpenFileDialog\" /Users/liqian/goland/pkg/mod/github.com/wailsapp/wails/v2@v2.12.0/pkg/options/ 2>/dev/null | head -20)",
+      "Bash(grep -rn \"OnFileDrop\\\\|OpenFileDialog\" /Users/liqian/goland/pkg/mod/github.com/wailsapp/wails/v2@v2.12.0/pkg/runtime/ 2>/dev/null | head -20)",
+      "Bash(grep -rn \"AuthConfig\" /Users/liqian/goland/pkg/mod/github.com/docker/docker@v28.5.2+incompatible/api/types/registry/ 2>/dev/null | head -5)",
+      "Bash(grep -rn \"ImageLoad\\\\|ImageTag\\\\|ImagePush\" /Users/liqian/goland/pkg/mod/github.com/docker/docker@v28.5.2+incompatible/client/*.go 2>/dev/null | head -10)",
+      "Read(//Users/liqian/goland/pkg/mod/github.com/docker/docker@v28.5.2+incompatible/api/types/image/**)",
+      "Read(//var/run/**)",
+      "Read(//Users/liqian/.docker/run/**)",
+      "Bash(docker info *)",
+      "Bash(nc -zU /var/run/docker.sock)",
+      "Bash(nc -zU ~/.docker/run/docker.sock)",
+      "Bash(docker context *)",
+      "Bash(cat ~/.docker/config.json 2>&1)",
+      "Bash(docker pull *)",
+      "Bash(docker run *)"
     ]
   }
 }

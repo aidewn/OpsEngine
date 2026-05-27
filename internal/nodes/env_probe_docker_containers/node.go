@@ -9,8 +9,6 @@ package env_probe_docker_containers
 import (
 	"context"
 	"fmt"
-	"net"
-	"strconv"
 	"strings"
 
 	"OpsEngine/internal/clients"
@@ -180,6 +178,7 @@ func snapshotItems(raw any) []probe.ProbeItem {
 
 // Probe Docker 容器列表探测
 // 自行拨号 → ContainerList → 关闭，避免持有长连接
+// 支持 mode = local（直连本机 unix socket）与 over_ssh（通过 SSH 隧道）
 func Probe(env core.EnvironmentDef, configID string, nodeConfig map[string]any) (probe.ProbeResult, error) {
 	dockerCfg, err := findDockerConfig(env, configID)
 	if err != nil {
@@ -189,41 +188,15 @@ func Probe(env core.EnvironmentDef, configID string, nodeConfig map[string]any) 
 	if mode == "" {
 		mode = "over_ssh"
 	}
-	if mode != "over_ssh" {
-		return probe.ProbeResult{}, fmt.Errorf("暂不支持 Docker mode=%s（Phase 3 仅 over_ssh）", mode)
-	}
-
-	sshConfigID := strings.TrimSpace(stringField(dockerCfg.Fields, "ssh_config_id"))
-	if sshConfigID == "" {
-		return probe.ProbeResult{}, fmt.Errorf("Docker 配置缺少 ssh_config_id")
-	}
-	sshCfg, err := findSSHConfig(env, sshConfigID)
-	if err != nil {
-		return probe.ProbeResult{}, err
-	}
-
 	socketPath := strings.TrimSpace(stringField(dockerCfg.Fields, "socket_path"))
 	if socketPath == "" {
 		socketPath = defaultSocketPath
 	}
-	host := stringField(sshCfg.Fields, "host")
-	user := stringField(sshCfg.Fields, "user")
-	password := stringField(sshCfg.Fields, "password")
-	port := intField(sshCfg.Fields, "port", 22)
-	timeout := intField(sshCfg.Fields, "timeout_seconds", 10)
-	if host == "" || user == "" || password == "" {
-		return probe.ProbeResult{}, fmt.Errorf("引用的 SSH 配置缺少 host/user/password")
-	}
 
-	linuxClient, err := clients.DialLinuxSsh(host, port, user, password, timeout)
+	// 拨号：local / over_ssh 两条路径共同产出一个可用的 *DockerClient
+	dockerClient, err := dialDocker(mode, dockerCfg, env, socketPath)
 	if err != nil {
 		return probe.ProbeResult{}, err
-	}
-	// 后续 DockerClient 接管 ssh.Client；若构造失败需自己关 ssh
-	dockerClient, err := clients.NewDockerClientOverSSH(linuxClient.Client(), host, port, user, socketPath)
-	if err != nil {
-		_ = linuxClient.Close()
-		return probe.ProbeResult{}, fmt.Errorf("构造 Docker 客户端失败: %w", err)
 	}
 	defer dockerClient.Close()
 
@@ -246,9 +219,6 @@ func Probe(env core.EnvironmentDef, configID string, nodeConfig map[string]any) 
 		return probe.ProbeResult{}, fmt.Errorf("ContainerList 失败: %w", err)
 	}
 
-	addr := net.JoinHostPort(host, strconv.Itoa(port))
-	_ = addr // 仅用于潜在的日志，留作占位避免误删
-
 	items := make([]probe.ProbeItem, 0, len(summaries))
 	for _, s := range summaries {
 		name := ""
@@ -266,6 +236,45 @@ func Probe(env core.EnvironmentDef, configID string, nodeConfig map[string]any) 
 		})
 	}
 	return probe.ProbeResult{Items: items}, nil
+}
+
+// dialDocker 按 mode 选择拨号路径，返回已就绪的 DockerClient
+//   - local    —— 直连本机 unix socket，不依赖 ssh 配置
+//   - over_ssh —— 解析 ssh_config_id → DialLinuxSsh → NewDockerClientOverSSH
+// 不支持的 mode 直接报错
+func dialDocker(mode string, dockerCfg *core.EnvConfigItem, env core.EnvironmentDef, socketPath string) (*clients.DockerClient, error) {
+	switch mode {
+	case "local":
+		return clients.NewDockerClientLocal(socketPath)
+	case "over_ssh":
+		sshConfigID := strings.TrimSpace(stringField(dockerCfg.Fields, "ssh_config_id"))
+		if sshConfigID == "" {
+			return nil, fmt.Errorf("Docker 配置缺少 ssh_config_id")
+		}
+		sshCfg, err := findSSHConfig(env, sshConfigID)
+		if err != nil {
+			return nil, err
+		}
+		host := stringField(sshCfg.Fields, "host")
+		user := stringField(sshCfg.Fields, "user")
+		password := stringField(sshCfg.Fields, "password")
+		port := intField(sshCfg.Fields, "port", 22)
+		timeout := intField(sshCfg.Fields, "timeout_seconds", 10)
+		if host == "" || user == "" || password == "" {
+			return nil, fmt.Errorf("引用的 SSH 配置缺少 host/user/password")
+		}
+		linuxClient, err := clients.DialLinuxSsh(host, port, user, password, timeout)
+		if err != nil {
+			return nil, err
+		}
+		dockerClient, err := clients.NewDockerClientOverSSH(linuxClient.Client(), host, port, user, socketPath)
+		if err != nil {
+			_ = linuxClient.Close()
+			return nil, fmt.Errorf("构造 Docker 客户端失败: %w", err)
+		}
+		return dockerClient, nil
+	}
+	return nil, fmt.Errorf("不支持的 Docker mode=%s（仅支持 local / over_ssh）", mode)
 }
 
 // findDockerConfig 在环境中按 configID 定位 docker 配置
