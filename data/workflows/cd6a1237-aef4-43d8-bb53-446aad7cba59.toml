@@ -68,8 +68,8 @@ description = "配置yum仓库，并安装nginx，启动nginx"
     var_name = "SSH"
     var_type = "LinuxSshConnection"
   [nodes.position]
-    x = 944.041527528124
-    y = 173.77774052636758
+    x = 946.5684834750462
+    y = 161.98527944073086
 
 [[nodes]]
   id = "bf5075e9-0446-4659-affe-322875ae56da"
@@ -88,8 +88,8 @@ description = "配置yum仓库，并安装nginx，启动nginx"
     var_name = "SSH"
     var_type = "LinuxSshConnection"
   [nodes.position]
-    x = 743.8850244762425
-    y = 173.62194803558936
+    x = 754.8351669129052
+    y = 172.7796293866153
 
 [[nodes]]
   id = "5409707c-8910-419d-b26f-3932805b9094"
@@ -99,8 +99,8 @@ description = "配置yum仓库，并安装nginx，启动nginx"
     socket_path = "/var/run/docker.sock"
     timeout_seconds = 10.0
   [nodes.position]
-    x = 1174.0
-    y = 66.0
+    x = 1174.842318648974
+    y = 76.1078237876886
 
 [[nodes]]
   id = "4ac55088-054f-43ff-9f04-ae2c992b348d"
@@ -118,8 +118,8 @@ description = "配置yum仓库，并安装nginx，启动nginx"
     environment_id = "59b2b65c-8ba0-4131-a39e-b86c1c7ea7fb"
     registry_config_id = "168a8ed1-4095-41c5-a508-fdeebaa43b9a"
   [nodes.position]
-    x = 651.201620133322
-    y = 322.53639071128765
+    x = 670.5749490597252
+    y = 353.70218072332756
 
 [[nodes]]
   id = "4bd3511c-9087-4b3e-9598-e26bde218c5f"
@@ -142,8 +142,8 @@ description = "配置yum仓库，并安装nginx，启动nginx"
     include_statefulsets = true
     resolve_mode = "static"
   [nodes.position]
-    x = 698.7822220963794
-    y = 473.7392593012069
+    x = 664.2471574884433
+    y = 510.80127985606515
 
 [[nodes]]
   id = "6cdb86e7-0925-465c-9c20-5b4f1a2e3318"
@@ -167,8 +167,8 @@ description = "配置yum仓库，并安装nginx，启动nginx"
           state = "running"
           status = "Up 14 hours"
   [nodes.position]
-    x = 388.0
-    y = 478.0
+    x = 411.58492217127343
+    y = 485.58086784076636
 
 [[nodes]]
   id = "d9c02652-e025-4bdf-9115-3d86862d8fd7"
@@ -275,14 +275,6 @@ description = "配置yum仓库，并安装nginx，启动nginx"
   [edges.to]
     node = "4bd3511c-9087-4b3e-9598-e26bde218c5f"
     port = "workload_ref"
-
-[[edges]]
-  [edges.from]
-    node = "193b2778-e946-473f-a388-2d19eb4afb62"
-    port = "exec_out"
-  [edges.to]
-    node = "d9c02652-e025-4bdf-9115-3d86862d8fd7"
-    port = "exec_in"
 
 [[edges]]
   [edges.from]

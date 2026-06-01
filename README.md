@@ -3,13 +3,20 @@
 面向运维场景的可视化工作流桌面应用。通过节点图画出执行流与数据流，在本地运行并实时查看状态与日志；支持将子流程封装为可复用的**集合**（Assemble），在工作流或其它集合中调用。
 
 ## 功能概览
-
+- **多环境管理**：基于文件配置，为单个环境指定多个连接配置
+![alt text](image-6.png)
 - **工作流编辑**：基于 React Flow 的画布，拖拽节点、连线，自动保存位置
+![alt text](image-1.png)
 - **集合（子流程）**：参数 / 返回值端口，保存时检测循环引用
+![alt text](image.png)
 - **三阶段生命周期**：`system_ready`（启动）→ `system_update`（周期/手动增量，可选）→ `system_over`（收尾）
+![alt text](image-2.png)
 - **流程控制**：并行（`parallel`）、后台线程（`thread`）、中断（`break`）、停止执行
+![alt text](image-3.png)
 - **本地执行引擎**：Exec / Data 双流调度，集合调用栈以 Frame 树记录状态与日志
+![alt text](image-4.png)
 - **实时反馈**：通过 Wails 事件推送节点状态、日志、变量变更
+![alt text](image-5.png)
 - **持久化**：工作流、集合、终态执行记录以 TOML 保存在 `data/` 目录
 
 > 业务向节点（SSH、Docker、K8s 等）端口类型已在模型中预留；当前内置节点以流程与示例（如 `print`）为主，便于扩展。
