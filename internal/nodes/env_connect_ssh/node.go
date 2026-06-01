@@ -74,29 +74,19 @@ func (Node) Execute(ctx engine.ExecContext) (engine.Outputs, error) {
 		return nil, err
 	}
 
-	host := strings.TrimSpace(stringField(item.Fields, "host"))
-	user := strings.TrimSpace(stringField(item.Fields, "user"))
-	password := stringField(item.Fields, "password")
-	port := intField(item.Fields, "port", defaultPort)
-	timeout := intField(item.Fields, "timeout_seconds", defaultTimeoutSeconds)
-	if host == "" {
-		return nil, fmt.Errorf("SSH 配置缺少 host")
-	}
-	if user == "" {
-		return nil, fmt.Errorf("SSH 配置缺少 user")
-	}
-	if password == "" {
-		return nil, fmt.Errorf("SSH 配置缺少 password")
-	}
-
-	addr := net.JoinHostPort(host, strconv.Itoa(port))
-	ctx.Info("正在连接环境 %s 内 SSH %s@%s", env.Name, user, addr)
-
-	client, err := clients.DialLinuxSsh(host, port, user, password, timeout)
+	sshDial, err := clients.ParseLinuxSshDialConfig(item.Fields)
 	if err != nil {
 		return nil, err
 	}
-	ctx.Info("SSH 连接成功: %s@%s", user, addr)
+
+	addr := net.JoinHostPort(sshDial.Host, strconv.Itoa(sshDial.Port))
+	ctx.Info("正在连接环境 %s 内 SSH %s@%s", env.Name, sshDial.User, addr)
+
+	client, err := sshDial.Dial()
+	if err != nil {
+		return nil, err
+	}
+	ctx.Info("SSH 连接成功: %s@%s", sshDial.User, addr)
 	return engine.Outputs{
 		"client": client,
 	}, nil

@@ -114,26 +114,22 @@ func (Node) Execute(ctx engine.ExecContext) (engine.Outputs, error) {
 		return nil, err
 	}
 
-	host := strings.TrimSpace(stringField(sshCfg.Fields, "host"))
-	user := strings.TrimSpace(stringField(sshCfg.Fields, "user"))
-	password := stringField(sshCfg.Fields, "password")
-	port := intField(sshCfg.Fields, "port", 22)
-	timeout := intField(sshCfg.Fields, "timeout_seconds", 10)
-	if host == "" || user == "" || password == "" {
-		return nil, fmt.Errorf("引用的 SSH 配置缺少 host/user/password")
+	sshDial, err := clients.ParseLinuxSshDialConfig(sshCfg.Fields)
+	if err != nil {
+		return nil, fmt.Errorf("引用的 SSH 配置无效: %w", err)
 	}
 
-	addr := net.JoinHostPort(host, strconv.Itoa(port))
-	ctx.Info("正在通过 SSH %s@%s 拨号到 Docker socket %s", user, addr, socketPath)
+	addr := net.JoinHostPort(sshDial.Host, strconv.Itoa(sshDial.Port))
+	ctx.Info("正在通过 SSH %s@%s 拨号到 Docker socket %s", sshDial.User, addr, socketPath)
 
-	linuxClient, err := clients.DialLinuxSsh(host, port, user, password, timeout)
+	linuxClient, err := sshDial.Dial()
 	if err != nil {
 		return nil, err
 	}
 
 	// DockerClient 取得底层 ssh.Client 的所有权（Close 会一起关）
 	// 因此不再调用 linuxClient.Close，避免双重关闭
-	dockerClient, err := clients.NewDockerClientOverSSH(linuxClient.Client(), host, port, user, socketPath)
+	dockerClient, err := clients.NewDockerClientOverSSH(linuxClient.Client(), sshDial.Host, sshDial.Port, sshDial.User, socketPath)
 	if err != nil {
 		// 包装失败时手动关闭 SSH，避免泄漏
 		_ = linuxClient.Close()
@@ -145,7 +141,7 @@ func (Node) Execute(ctx engine.ExecContext) (engine.Outputs, error) {
 		return nil, fmt.Errorf("Docker daemon 不可达: %w", err)
 	}
 
-	ctx.Info("Docker 连接成功: %s@%s (socket=%s)", user, addr, socketPath)
+	ctx.Info("Docker 连接成功: %s@%s (socket=%s)", sshDial.User, addr, socketPath)
 	return engine.Outputs{
 		"client": dockerClient,
 	}, nil

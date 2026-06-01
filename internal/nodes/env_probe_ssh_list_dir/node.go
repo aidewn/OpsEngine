@@ -192,16 +192,11 @@ func Probe(env core.EnvironmentDef, configID string, nodeConfig map[string]any) 
 	includeFiles := boolField(nodeConfig, "include_files", true)
 	includeDirs := boolField(nodeConfig, "include_dirs", false)
 
-	host := stringField(item.Fields, "host")
-	user := stringField(item.Fields, "user")
-	password := stringField(item.Fields, "password")
-	port := intField(item.Fields, "port", 22)
-	timeout := intField(item.Fields, "timeout_seconds", 10)
-	if host == "" || user == "" || password == "" {
-		return probe.ProbeResult{}, fmt.Errorf("SSH 配置缺少 host/user/password")
+	sshDial, err := clients.ParseLinuxSshDialConfig(item.Fields)
+	if err != nil {
+		return probe.ProbeResult{}, err
 	}
-
-	client, err := clients.DialLinuxSsh(host, port, user, password, timeout)
+	client, err := sshDial.Dial()
 	if err != nil {
 		return probe.ProbeResult{}, err
 	}

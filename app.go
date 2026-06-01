@@ -361,29 +361,11 @@ func (a *App) TestEnvConfig(envID, configID string) error {
 // testSSHConfig 用 fields 中的账号密码做一次完整 SSH 握手，握手后立即关闭
 // 字段缺失或不合法时给出与节点 Execute 一致的提示
 func testSSHConfig(fields map[string]any) error {
-	host := strings.TrimSpace(envFieldString(fields, "host"))
-	user := strings.TrimSpace(envFieldString(fields, "user"))
-	password := envFieldString(fields, "password")
-	port := envFieldInt(fields, "port")
-	timeoutSeconds := envFieldInt(fields, "timeout_seconds")
-
-	if host == "" {
-		return fmt.Errorf("SSH 配置缺少 host")
+	cfg, err := clients.ParseLinuxSshDialConfig(fields)
+	if err != nil {
+		return err
 	}
-	if user == "" {
-		return fmt.Errorf("SSH 配置缺少 user")
-	}
-	if password == "" {
-		return fmt.Errorf("SSH 配置缺少 password")
-	}
-	if port <= 0 {
-		port = 22
-	}
-	if timeoutSeconds <= 0 {
-		timeoutSeconds = 10
-	}
-
-	client, err := clients.DialLinuxSsh(host, port, user, password, timeoutSeconds)
+	client, err := cfg.Dial()
 	if err != nil {
 		return err
 	}
@@ -491,30 +473,20 @@ func testDockerConfig(env core.EnvironmentDef, fields map[string]any) error {
 	if sshFields == nil {
 		return fmt.Errorf("ssh_config_id 未找到: %s", sshConfigID)
 	}
-	host := strings.TrimSpace(envFieldString(sshFields, "host"))
-	user := strings.TrimSpace(envFieldString(sshFields, "user"))
-	password := envFieldString(sshFields, "password")
-	port := envFieldInt(sshFields, "port")
-	timeout := envFieldInt(sshFields, "timeout_seconds")
-	if host == "" || user == "" || password == "" {
-		return fmt.Errorf("引用的 SSH 配置缺少 host/user/password")
-	}
-	if port <= 0 {
-		port = 22
-	}
-	if timeout <= 0 {
-		timeout = 10
+	sshDial, err := clients.ParseLinuxSshDialConfig(sshFields)
+	if err != nil {
+		return fmt.Errorf("引用的 SSH 配置无效: %w", err)
 	}
 	socketPath := strings.TrimSpace(envFieldString(fields, "socket_path"))
 	if socketPath == "" {
 		socketPath = "/var/run/docker.sock"
 	}
 
-	linuxClient, err := clients.DialLinuxSsh(host, port, user, password, timeout)
+	linuxClient, err := sshDial.Dial()
 	if err != nil {
 		return err
 	}
-	dockerClient, err := clients.NewDockerClientOverSSH(linuxClient.Client(), host, port, user, socketPath)
+	dockerClient, err := clients.NewDockerClientOverSSH(linuxClient.Client(), sshDial.Host, sshDial.Port, sshDial.User, socketPath)
 	if err != nil {
 		_ = linuxClient.Close()
 		return fmt.Errorf("构造 Docker 客户端失败: %w", err)
@@ -704,4 +676,3 @@ func assembleToNodeType(asm core.AssembleDef) core.NodeTypeDef {
 		ExecutionMode: core.ExecutionModeFlow,
 	}
 }
-

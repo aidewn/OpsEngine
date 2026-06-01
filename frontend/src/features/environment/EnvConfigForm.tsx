@@ -48,10 +48,28 @@ const SSH_SCHEMA: FieldSchema[] = [
     required: true,
   },
   {
+    type: 'select',
+    id: 'auth_type',
+    label: '认证方式',
+    options: ['password', 'private_key'],
+    default: 'password',
+    required: true,
+  },
+  {
     type: 'password',
     id: 'password',
     label: '密码',
-    required: true,
+  },
+  {
+    type: 'file_path',
+    id: 'private_key_path',
+    label: '私钥文件',
+    placeholder: 'C:\\Users\\me\\.ssh\\id_rsa',
+  },
+  {
+    type: 'password',
+    id: 'private_key_passphrase',
+    label: '私钥口令',
   },
   {
     type: 'number',
