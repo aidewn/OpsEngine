@@ -12,6 +12,7 @@ interface DialogProps {
   description?: string;
   children: ReactNode;
   footer?: ReactNode;
+  contentClassName?: string;
 }
 
 export function Dialog({
@@ -21,6 +22,7 @@ export function Dialog({
   description,
   children,
   footer,
+  contentClassName,
 }: DialogProps) {
   return (
     <RadixDialog.Root open={open} onOpenChange={onOpenChange}>
@@ -36,6 +38,7 @@ export function Dialog({
             'fixed left-1/2 top-1/2 z-50 w-full max-w-md -translate-x-1/2 -translate-y-1/2',
             'rounded-lg bg-white p-6 shadow-xl',
             'focus:outline-none',
+            contentClassName,
           )}
         >
           <RadixDialog.Title className="text-lg font-semibold text-slate-900">

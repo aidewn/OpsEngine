@@ -18,7 +18,10 @@
 - **实时反馈**：通过 Wails 事件推送节点状态、日志、变量变更
 ![alt text](image-5.png)
 - **持久化**：工作流、集合、终态执行记录以 TOML 保存在 `data/` 目录
-
+- **ai对话**：根据指定环境进行对话分析
+![alt text](image-7.png)
+- **ai对话-自动生成工作流**：根据指定环境进行工作流生成
+![alt text](image-8.png) ![alt text](image-9.png)
 > 业务向节点（SSH、Docker、K8s 等）端口类型已在模型中预留；当前内置节点以流程与示例（如 `print`）为主，便于扩展。
 
 ## 技术栈

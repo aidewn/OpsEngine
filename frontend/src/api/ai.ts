@@ -1,0 +1,141 @@
+// AI 相关 API hooks，封装 Wails 后端方法。
+
+import {
+  useMutation,
+  useQuery,
+  useQueryClient,
+  type UseMutationResult,
+  type UseQueryResult,
+} from '@tanstack/react-query';
+import {
+  CreateAISession,
+  DeleteAISession,
+  GetAISession,
+  GetAISettings,
+  ListAISessions,
+  StartAIAssistant,
+  TestAISettings,
+  UpdateAISessionTitle,
+  UpdateAISettings,
+} from '@wails/go/main/App';
+import type {
+  AIAssistantRequest,
+  AISession,
+  AISettings,
+} from '@/types/ai';
+
+// KEY 统一管理 AI 缓存键。
+const KEY = {
+  settings: ['ai', 'settings'] as const,
+  sessions: ['ai', 'sessions'] as const,
+  session: (id: string) => ['ai', 'session', id] as const,
+};
+
+// useAISettings 读取 AI 设置。
+export function useAISettings(): UseQueryResult<AISettings> {
+  return useQuery({
+    queryKey: KEY.settings,
+    queryFn: () => GetAISettings() as Promise<AISettings>,
+  });
+}
+
+// useUpdateAISettings 保存 AI 设置。
+export function useUpdateAISettings(): UseMutationResult<
+  void,
+  Error,
+  AISettings
+> {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (settings) => UpdateAISettings(settings as never),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: KEY.settings });
+    },
+  });
+}
+
+// useTestAISettings 验证当前保存的 AI 设置。
+export function useTestAISettings(): UseMutationResult<string, Error, void> {
+  return useMutation({
+    mutationFn: () => TestAISettings(),
+  });
+}
+
+// useAISessions 列出所有 AI 会话。
+export function useAISessions(): UseQueryResult<AISession[]> {
+  return useQuery({
+    queryKey: KEY.sessions,
+    queryFn: () => ListAISessions() as Promise<AISession[]>,
+  });
+}
+
+// useAISession 加载单个会话。null/undefined id 时禁用查询。
+export function useAISession(
+  id: string | null | undefined,
+): UseQueryResult<AISession> {
+  return useQuery({
+    queryKey: KEY.session(id ?? ''),
+    queryFn: () => GetAISession(id as string) as Promise<AISession>,
+    enabled: !!id,
+  });
+}
+
+// useCreateAISession 创建新会话。
+export function useCreateAISession(): UseMutationResult<
+  AISession,
+  Error,
+  { environment_id: string; config_id: string; title?: string }
+> {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ environment_id, config_id, title }) =>
+      CreateAISession(environment_id, config_id, title ?? '') as Promise<AISession>,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: KEY.sessions });
+    },
+  });
+}
+
+// useUpdateAISessionTitle 重命名会话。
+export function useUpdateAISessionTitle(): UseMutationResult<
+  void,
+  Error,
+  { id: string; title: string }
+> {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, title }) => UpdateAISessionTitle(id, title),
+    onSuccess: (_data, vars) => {
+      qc.invalidateQueries({ queryKey: KEY.sessions });
+      qc.invalidateQueries({ queryKey: KEY.session(vars.id) });
+    },
+  });
+}
+
+// useDeleteAISession 删除会话。
+export function useDeleteAISession(): UseMutationResult<void, Error, string> {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id) => DeleteAISession(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: KEY.sessions });
+    },
+  });
+}
+
+// useStartAIAssistant 发起一次 AI 对话或工作流生成；结果通过 ai:assistant 事件流式返回。
+export function useStartAIAssistant(): UseMutationResult<
+  void,
+  Error,
+  AIAssistantRequest
+> {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (request) => StartAIAssistant(request as never),
+    onSuccess: (_data, vars) => {
+      qc.invalidateQueries({ queryKey: ['workflows'] });
+      qc.invalidateQueries({ queryKey: KEY.sessions });
+      qc.invalidateQueries({ queryKey: KEY.session(vars.session_id) });
+    },
+  });
+}

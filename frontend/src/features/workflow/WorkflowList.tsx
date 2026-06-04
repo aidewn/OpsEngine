@@ -7,9 +7,11 @@ import { Dialog } from '@/components/ui/Dialog';
 import { useWorkflows, useDeleteWorkflow } from '@/api/workflows';
 import { CreateWorkflowDialog } from './CreateWorkflowDialog';
 import { useTabs } from '@/features/tabs/TabsContext';
+import { AIAssistantDialog } from '@/features/ai/AIAssistantDialog';
 
 export function WorkflowList() {
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [aiAssistantOpen, setAIAssistantOpen] = useState(false);
   const [deleteDialog, setDeleteDialog] = useState<{
     open: boolean;
     id: string;
@@ -26,7 +28,12 @@ export function WorkflowList() {
           <h1 className="text-2xl font-semibold text-slate-900">工作流</h1>
           <p className="mt-1 text-sm text-slate-500">管理你的运维工作流</p>
         </div>
-        <Button onClick={() => setDialogOpen(true)}>+ 新建工作流</Button>
+        <div className="flex items-center gap-2">
+          <Button variant="secondary" onClick={() => setAIAssistantOpen(true)}>
+            AI 助手
+          </Button>
+          <Button onClick={() => setDialogOpen(true)}>+ 新建工作流</Button>
+        </div>
       </header>
 
       <main className="flex-1">
@@ -82,6 +89,10 @@ export function WorkflowList() {
       </main>
 
       <CreateWorkflowDialog open={dialogOpen} onOpenChange={setDialogOpen} />
+      <AIAssistantDialog
+        open={aiAssistantOpen}
+        onOpenChange={setAIAssistantOpen}
+      />
 
       {deleteDialog && (
         <Dialog

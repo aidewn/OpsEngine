@@ -7,8 +7,9 @@ import { WorkflowList } from '@/features/workflow/WorkflowList';
 import { AssembleList } from '@/features/assemble/AssembleList';
 import { ExecutionList } from '@/features/execution/ExecutionList';
 import { EnvironmentList } from '@/features/environment/EnvironmentList';
+import { SettingsPage } from '@/features/settings/SettingsPage';
 
-type Tab = 'workflow' | 'assemble' | 'execution' | 'environment';
+type Tab = 'workflow' | 'assemble' | 'execution' | 'environment' | 'settings';
 
 export function HomePage() {
   const [tab, setTab] = useState<Tab>('workflow');
@@ -41,6 +42,12 @@ export function HomePage() {
         >
           配置环境
         </TabButton>
+        <TabButton
+          active={tab === 'settings'}
+          onClick={() => setTab('settings')}
+        >
+          设置
+        </TabButton>
       </div>
 
       {/* 列表内容；包 ErrorBoundary 避免单个 tab 渲染异常打挂整页 */}
@@ -49,6 +56,7 @@ export function HomePage() {
         {tab === 'assemble' && <AssembleList />}
         {tab === 'execution' && <ExecutionList />}
         {tab === 'environment' && <EnvironmentList />}
+        {tab === 'settings' && <SettingsPage />}
       </ErrorBoundary>
     </div>
   );

@@ -32,6 +32,7 @@ type App struct {
 	assembleStore    *store.AssembleStore
 	executionStore   *store.ExecutionStore
 	environmentStore *store.EnvironmentStore
+	aiSessionStore   *store.AISessionStore
 	engine           *engine.Engine
 }
 
@@ -49,7 +50,7 @@ func (a *App) startup(ctx context.Context) {
 	zap.ReplaceGlobals(logger)
 
 	// 确保数据目录存在
-	for _, dir := range []string{"data/workflows", "data/assembles", "data/executions", "data/environments", "data/logs"} {
+	for _, dir := range []string{"data/workflows", "data/assembles", "data/executions", "data/environments", "data/settings", "data/logs", "data/ai-sessions"} {
 		if err := os.MkdirAll(dir, 0755); err != nil {
 			zap.L().Fatal("创建目录失败", zap.Error(err))
 		}
@@ -59,6 +60,7 @@ func (a *App) startup(ctx context.Context) {
 	a.assembleStore = store.NewAssembleStore("data/assembles")
 	a.executionStore = store.NewExecutionStore("data/executions")
 	a.environmentStore = store.NewEnvironmentStore("data/environments")
+	a.aiSessionStore = store.NewAISessionStore("data/ai-sessions")
 	a.engine = engine.New(
 		a.workflowStore,
 		a.assembleStore,

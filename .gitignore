@@ -5,6 +5,7 @@
 # 运行时数据
 /data/executions/
 /data/logs/
+/data/settings/
 
 # IDE
 .idea/
