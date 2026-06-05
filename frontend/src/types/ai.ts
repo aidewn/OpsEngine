@@ -29,11 +29,19 @@ export interface AISessionMessage {
   created_at: string;
 }
 
+// AISessionScope 标识会话工作范围：
+//  - 'environment'：环境级，Agent 可看到环境下所有配置（默认）
+//  - 'config'：单配置范围，强绑 ConfigID（旧行为）
+export type AISessionScope = 'environment' | 'config';
+
 // AISession 是一次完整的 AI 对话上下文。
 export interface AISession {
   id: string;
   title: string;
   environment_id: string;
+  /** 工作范围；旧会话由后端在加载时按 config_id 推断。 */
+  scope: AISessionScope;
+  /** 仅 scope='config' 时必填；环境级会话可以为空。 */
   config_id: string;
   context_prefetched: boolean;
   messages: AISessionMessage[];
@@ -51,14 +59,23 @@ export interface AIAssistantRequest {
   operation?: 'auto';
   /** 用户输入内容。 */
   message: string;
+  /** target_select 后用户选定的本轮目标配置。 */
+  target_config_id?: string;
+}
+
+// AITargetOption 是后端要求用户选择目标配置时返回的候选项。
+export interface AITargetOption {
+  id: string;
+  name: string;
 }
 
 // AIAssistantEvent 是后端推送的 AI 助手事件。
 export interface AIAssistantEvent {
   request_id: string;
   session_id?: string;
-  type: 'delta' | 'progress' | 'workflow' | 'done' | 'error';
+  type: 'delta' | 'progress' | 'workflow' | 'target_select' | 'done' | 'error';
   text?: string;
   workflow_id?: string;
   workflow_name?: string;
+  target_options?: AITargetOption[];
 }

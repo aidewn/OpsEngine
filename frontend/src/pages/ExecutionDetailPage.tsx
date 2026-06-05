@@ -21,6 +21,7 @@ import {
 } from '@/features/execution/ExecutionStore';
 import { WorkflowStatusIcon } from '@/features/execution/ExecutionStatus';
 import { ExecutionCallStack } from '@/features/execution/ExecutionCallStack';
+import { InspectionReportDialog } from '@/features/execution/InspectionReportDialog';
 import { WorkflowCanvas } from '@/features/workflow/WorkflowCanvas';
 import { NodeDetailPanel } from '@/features/workflow/NodeDetailPanel';
 import { Button } from '@/components/ui/Button';
@@ -59,6 +60,7 @@ export function ExecutionDetailPage() {
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   // 当前查看的 frame 路径（[] = 主流；["callA"] = 主流中调用 callA 后的子帧）
   const [framePath, setFramePath] = useState<string[]>([]);
+  const [reportOpen, setReportOpen] = useState(false);
 
   // 切换 framePath 时清掉选中节点（不同 frame 的节点 id 可能相同）
   useEffect(() => {
@@ -183,13 +185,23 @@ export function ExecutionDetailPage() {
                   ■ 停止
                 </Button>
               ) : (
-                <Button
-                  size="sm"
-                  onClick={handleRerun}
-                  disabled={runMutation.isPending}
-                >
-                  ↻ 重新运行
-                </Button>
+                <>
+                  <Button
+                    size="sm"
+                    onClick={handleRerun}
+                    disabled={runMutation.isPending}
+                  >
+                    ↻ 重新运行
+                  </Button>
+                  {/* 巡检报告：基于执行结果生成，工作流非巡检形态时报告内容会自动退化为通用执行摘要 */}
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => setReportOpen(true)}
+                  >
+                    📄 生成报告
+                  </Button>
+                </>
               )}
             </div>
           </header>
@@ -245,6 +257,11 @@ export function ExecutionDetailPage() {
               />
             </div>
           </ErrorBoundary>
+          <InspectionReportDialog
+            open={reportOpen}
+            executionID={id}
+            onOpenChange={setReportOpen}
+          />
         </div>
       </FramePathContext.Provider>
     </ReactFlowProvider>

@@ -100,5 +100,13 @@ func (s *AISessionStore) loadLocked(id string) (core.AISession, error) {
 	if _, err := toml.Decode(string(content), &session); err != nil {
 		return core.AISession{}, fmt.Errorf("解析 AI 会话失败: %w", err)
 	}
+	// 兼容老会话：Scope 字段加入前的持久化数据不带 Scope，按 ConfigID 是否填充推断。
+	if session.Scope == "" {
+		if strings.TrimSpace(session.ConfigID) != "" {
+			session.Scope = core.AISessionScopeConfig
+		} else {
+			session.Scope = core.AISessionScopeEnvironment
+		}
+	}
 	return session, nil
 }

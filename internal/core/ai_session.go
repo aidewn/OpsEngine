@@ -4,6 +4,20 @@ package core
 
 import "time"
 
+// AISessionScope 标识会话的工作范围。
+//
+//   - AISessionScopeEnvironment：环境级会话，Agent 可看到环境下所有配置，适合架构分析、多机巡检。
+//   - AISessionScopeConfig：单配置会话（旧行为），强绑某个 SSH/Docker/K8s 配置。
+//
+// 新建会话默认环境级；显式指定 ConfigID 时才会落到 config 范围。
+// 旧会话文件没有 Scope 字段，store 加载时按 ConfigID 是否为空自动补值（参见 AISessionStore.loadLocked）。
+type AISessionScope string
+
+const (
+	AISessionScopeEnvironment AISessionScope = "environment"
+	AISessionScopeConfig      AISessionScope = "config"
+)
+
 // AISessionMessageRole 是会话消息的角色枚举。
 type AISessionMessageRole string
 
@@ -33,9 +47,12 @@ type AISessionMessage struct {
 type AISession struct {
 	ID    string `json:"id"    toml:"id"`
 	Title string `json:"title" toml:"title"`
-	// EnvironmentID / ConfigID 在创建时绑定，会话期间不可变。
+	// EnvironmentID 在创建时绑定，必填，会话期间不可变。
 	EnvironmentID string `json:"environment_id" toml:"environment_id"`
-	ConfigID      string `json:"config_id"      toml:"config_id"`
+	// Scope 决定 Agent 看到的资产范围。空字符串视为 config 范围（仅旧会话）。
+	Scope AISessionScope `json:"scope" toml:"scope"`
+	// ConfigID 仅当 Scope=config 时有意义；环境级会话也可设置为"用户偏好的默认目标"。
+	ConfigID string `json:"config_id" toml:"config_id"`
 	// ContextPrefetched 标记是否已经预取过 SSH 服务器信息，避免每条消息重复采集。
 	ContextPrefetched bool               `json:"context_prefetched" toml:"context_prefetched"`
 	Messages          []AISessionMessage `json:"messages"           toml:"messages"`

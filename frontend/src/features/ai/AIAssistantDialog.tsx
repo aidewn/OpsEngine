@@ -1,6 +1,6 @@
 // AI 助手对话框：左侧多会话列表，右侧消息流。
 // 会话持久化在后端，刷新/重启后仍能继续。
-// 创建新会话时需选 SSH 环境，首条用户消息触发服务器信息预取。
+// 创建新会话时只需选择环境；SSH 配置是可选范围，环境级会话可用于整体分析。
 
 import {
   FormEvent,
@@ -28,6 +28,7 @@ import { useEnvironments } from '@/api/environments';
 import { cn } from '@/lib/cn';
 import type {
   AIAssistantEvent,
+  AITargetOption,
   AISession,
   AISessionMessage,
 } from '@/types/ai';
@@ -46,6 +47,9 @@ interface PendingTurn {
   assistantProgress: string[];
   workflowID?: string;
   workflowName?: string;
+  targetOptions?: AITargetOption[];
+  targetText?: string;
+  selectingTargetID?: string;
   errorText?: string;
 }
 
@@ -120,6 +124,17 @@ export function AIAssistantDialog({
               }
             : prev,
         );
+      } else if (event.type === 'target_select') {
+        setPending((prev) =>
+          prev
+            ? {
+                ...prev,
+                assistantContent: event.text ?? '请选择要使用的 SSH 配置。',
+                targetText: event.text,
+                targetOptions: event.target_options ?? [],
+              }
+            : prev,
+        );
       } else if (event.type === 'done') {
         // 服务端已经把这一轮持久化到 session，清掉本地 pending。
         setPending(null);
@@ -183,12 +198,12 @@ export function AIAssistantDialog({
 
     let sessionID = selectedID;
     if (!sessionID) {
-      if (!draftEnvID || !draftConfigID) {
+      if (!draftEnvID) {
         setPending({
           sessionID: '',
           requestID: newID(),
           userContent: message,
-          assistantContent: '请先选择目标环境与 SSH 配置。',
+          assistantContent: '请先选择目标环境。',
           assistantProgress: [],
           errorText: '缺少环境',
         });
@@ -241,6 +256,39 @@ export function AIAssistantDialog({
     navigate(`/workflows/${workflowID}`);
   }
 
+  async function handleSelectTarget(configID: string) {
+    const current = pendingRef.current;
+    if (!current || !current.sessionID || current.selectingTargetID) return;
+    setPending((prev) =>
+      prev
+        ? {
+            ...prev,
+            selectingTargetID: configID,
+            assistantProgress: [...prev.assistantProgress, '已选择目标 SSH，继续生成巡检工作流'],
+          }
+        : prev,
+    );
+    try {
+      await startAssistant.mutateAsync({
+        request_id: current.requestID,
+        session_id: current.sessionID,
+        operation: 'auto',
+        message: current.userContent,
+        target_config_id: configID,
+      });
+    } catch (err) {
+      setPending((prev) =>
+        prev
+          ? {
+              ...prev,
+              selectingTargetID: undefined,
+              errorText: err instanceof Error ? err.message : 'AI 调用失败',
+            }
+          : prev,
+      );
+    }
+  }
+
   return (
     <Dialog
       open={open}
@@ -248,7 +296,7 @@ export function AIAssistantDialog({
         if (!busy) onOpenChange(next);
       }}
       title="AI 助手"
-      description="多会话保存在本地；首次提问会自动采集所选 SSH 环境的服务器信息作为分析依据。"
+      description="多会话保存在本地；只选环境时为环境级会话，Agent 可看到环境内全部配置；选定 SSH 配置时会绑定到该机器并自动采集服务器信息。"
       contentClassName="max-w-5xl"
     >
       <div className="flex h-[560px] gap-4">
@@ -284,6 +332,7 @@ export function AIAssistantDialog({
               session={session}
               pending={pending}
               onOpenWorkflow={handleOpenWorkflow}
+              onSelectTarget={handleSelectTarget}
             />
           </div>
 
@@ -292,7 +341,7 @@ export function AIAssistantDialog({
               value={input}
               onChange={(event) => setInput(event.target.value)}
               rows={3}
-              placeholder="例：分析一下这台服务器的状态，或：生成一个 nginx 配置热加载工作流。"
+              placeholder="例：分析一下这个环境的状态，或：生成一个服务器巡检工作流。"
               disabled={busy}
               onKeyDown={(event) => {
                 if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) {
@@ -435,7 +484,7 @@ function NewSessionHeader({
         </select>
       </div>
       <div className="space-y-1">
-        <Label htmlFor="ai-ssh-config">SSH 配置</Label>
+        <Label htmlFor="ai-ssh-config">SSH 配置（可选）</Label>
         <select
           id="ai-ssh-config"
           value={configID}
@@ -443,7 +492,7 @@ function NewSessionHeader({
           disabled={!envID}
           className="h-9 w-full rounded-md border border-slate-300 bg-white px-3 text-sm outline-none focus:border-slate-500 disabled:bg-slate-50"
         >
-          <option value="">请选择 SSH 配置</option>
+          <option value="">不指定（环境级会话）</option>
           {sshConfigs.map((config) => (
             <option key={config.id} value={config.id}>
               {config.name}
@@ -464,7 +513,10 @@ function SessionHeader({
   environments: { id: string; name: string; configs: { id: string; name: string }[] }[];
 }) {
   const env = environments.find((e) => e.id === session.environment_id);
-  const config = env?.configs.find((c) => c.id === session.config_id);
+  const config = session.config_id
+    ? env?.configs.find((c) => c.id === session.config_id)
+    : undefined;
+  const scopeLabel = session.scope === 'environment' || !session.config_id ? '环境级' : 'SSH';
   return (
     <div className="flex items-center justify-between border-b border-slate-200 px-3 py-2 text-xs text-slate-500">
       <div className="truncate">
@@ -472,7 +524,7 @@ function SessionHeader({
         <span className="mx-2 text-slate-300">·</span>
         环境 {env?.name ?? session.environment_id}
         <span className="mx-1 text-slate-300">/</span>
-        SSH {config?.name ?? session.config_id}
+        {scopeLabel} {config?.name ?? session.config_id ?? '全部配置'}
       </div>
       {session.context_prefetched && (
         <span className="rounded-sm bg-emerald-50 px-1.5 py-0.5 text-[10px] text-emerald-600">
@@ -488,10 +540,12 @@ function MessageList({
   session,
   pending,
   onOpenWorkflow,
+  onSelectTarget,
 }: {
   session: AISession | undefined;
   pending: PendingTurn | null;
   onOpenWorkflow: (workflowID: string) => void;
+  onSelectTarget: (configID: string) => void;
 }) {
   const visible = useMemo(() => {
     if (!session) return [];
@@ -505,7 +559,7 @@ function MessageList({
   if (visible.length === 0 && !showPending) {
     return (
       <div className="text-sm text-slate-500">
-        选择左侧会话继续对话，或输入新需求。例如「分析一下这台服务器目前的状态」。
+        选择左侧会话继续对话，或输入新需求。例如「分析一下这个环境目前的状态」。
       </div>
     );
   }
@@ -540,9 +594,12 @@ function MessageList({
               progress: pending.assistantProgress,
               workflow_id: pending.workflowID,
               workflow_name: pending.workflowName,
+              target_options: pending.targetOptions,
               created_at: new Date().toISOString(),
             }}
             onOpenWorkflow={onOpenWorkflow}
+            onSelectTarget={onSelectTarget}
+            selectingTargetID={pending.selectingTargetID}
           />
         </>
       )}
@@ -554,9 +611,13 @@ function MessageList({
 function Bubble({
   message,
   onOpenWorkflow,
+  onSelectTarget,
+  selectingTargetID,
 }: {
-  message: AISessionMessage;
+  message: AISessionMessage & { target_options?: AITargetOption[] };
   onOpenWorkflow: (workflowID: string) => void;
+  onSelectTarget?: (configID: string) => void;
+  selectingTargetID?: string;
 }) {
   const isUser = message.role === 'user';
   return (
@@ -594,6 +655,25 @@ function Bubble({
             >
               打开工作流
             </Button>
+          </div>
+        )}
+        {!isUser && message.target_options && message.target_options.length > 0 && (
+          <div className="mt-3 space-y-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2">
+            <div className="text-xs font-medium text-amber-800">选择巡检目标 SSH</div>
+            <div className="flex flex-wrap gap-2">
+              {message.target_options.map((option) => (
+                <Button
+                  key={option.id}
+                  type="button"
+                  size="sm"
+                  variant="secondary"
+                  disabled={!onSelectTarget || !!selectingTargetID}
+                  onClick={() => onSelectTarget?.(option.id)}
+                >
+                  {selectingTargetID === option.id ? '继续中…' : option.name || option.id}
+                </Button>
+              ))}
+            </div>
           </div>
         )}
       </div>

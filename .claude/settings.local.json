@@ -62,7 +62,8 @@
       "Bash(docker context *)",
       "Bash(cat ~/.docker/config.json 2>&1)",
       "Bash(docker pull *)",
-      "Bash(docker run *)"
+      "Bash(docker run *)",
+      "Bash(npx -y tsc --noEmit)"
     ]
   }
 }

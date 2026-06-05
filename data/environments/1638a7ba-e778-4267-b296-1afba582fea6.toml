@@ -1,0 +1,14 @@
+id = "1638a7ba-e778-4267-b296-1afba582fea6"
+name = "test"
+description = ""
+
+[[configs]]
+  id = "2ccd77f9-3a5f-4bb0-9b75-3985fab4560b"
+  name = "aliyun"
+  kind = "ssh"
+  description = ""
+  [configs.fields]
+    host = "172.21.230.142"
+    password = "199932"
+    port = 22.0
+    user = "m1832"
