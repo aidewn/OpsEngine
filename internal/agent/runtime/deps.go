@@ -23,6 +23,11 @@ type WorkflowSaver interface {
 	Save(wf core.WorkflowDef) error
 }
 
+// OpsDocSaver 让 Runtime 只能写文档；列举/删除走 ai.go 的 RPC。
+type OpsDocSaver interface {
+	Save(doc core.OpsDoc) error
+}
+
 // EnvironmentLookup 按 id 取环境定义，用于 SSH 上下文预取与校验。
 type EnvironmentLookup func(environmentID string) (core.EnvironmentDef, error)
 
@@ -40,4 +45,7 @@ type NodeTypeChecker func(typeID string) error
 type LLMProvider interface {
 	Chat(messages []clients.ChatMessage) (string, error)
 	ChatStream(messages []clients.ChatMessage, onDelta func(string)) (string, error)
+	// ChatWithTools 支持 OpenAI function calling 协议；非流式。
+	// 工具未启用时（tools 为 nil 或空），等价于 Chat 但返回 ChatCompletion 结构。
+	ChatWithTools(messages []clients.ChatMessage, tools []clients.ToolSpec) (clients.ChatCompletion, error)
 }

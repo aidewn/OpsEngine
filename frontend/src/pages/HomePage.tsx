@@ -7,9 +7,10 @@ import { WorkflowList } from '@/features/workflow/WorkflowList';
 import { AssembleList } from '@/features/assemble/AssembleList';
 import { ExecutionList } from '@/features/execution/ExecutionList';
 import { EnvironmentList } from '@/features/environment/EnvironmentList';
+import { OpsDocList } from '@/features/opsDocs/OpsDocList';
 import { SettingsPage } from '@/features/settings/SettingsPage';
 
-type Tab = 'workflow' | 'assemble' | 'execution' | 'environment' | 'settings';
+type Tab = 'workflow' | 'assemble' | 'execution' | 'environment' | 'docs' | 'settings';
 
 export function HomePage() {
   const [tab, setTab] = useState<Tab>('workflow');
@@ -42,6 +43,9 @@ export function HomePage() {
         >
           配置环境
         </TabButton>
+        <TabButton active={tab === 'docs'} onClick={() => setTab('docs')}>
+          文档
+        </TabButton>
         <TabButton
           active={tab === 'settings'}
           onClick={() => setTab('settings')}
@@ -56,6 +60,7 @@ export function HomePage() {
         {tab === 'assemble' && <AssembleList />}
         {tab === 'execution' && <ExecutionList />}
         {tab === 'environment' && <EnvironmentList />}
+        {tab === 'docs' && <OpsDocList />}
         {tab === 'settings' && <SettingsPage />}
       </ErrorBoundary>
     </div>

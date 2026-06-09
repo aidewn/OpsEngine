@@ -88,6 +88,7 @@ func (r *Runtime) handleWorkflow(req Request, session core.AISession) {
 		Progress:     progress,
 		WorkflowID:   wf.ID,
 		WorkflowName: wf.Name,
+		Intent:       "generate_workflow",
 		CreatedAt:    time.Now(),
 	})
 	session.UpdatedAt = time.Now()

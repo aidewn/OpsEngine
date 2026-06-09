@@ -68,6 +68,12 @@ func (s *stubLLM) ChatStream(messages []clients.ChatMessage, onDelta func(string
 	return strings.Join(s.streamChunks, ""), nil
 }
 
+// ChatWithTools 在测试 stub 中等价于 Chat，但返回 ChatCompletion 结构。
+func (s *stubLLM) ChatWithTools(messages []clients.ChatMessage, _ []clients.ToolSpec) (clients.ChatCompletion, error) {
+	s.gotMessages = append(s.gotMessages, messages)
+	return clients.ChatCompletion{Content: s.reply}, nil
+}
+
 // bufEmitter 把事件累计到 slice，供测试断言。
 type bufEmitter struct {
 	mu     sync.Mutex

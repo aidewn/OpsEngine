@@ -37,6 +37,61 @@ func (a *App) DeleteOpsDoc(id string) error {
 	return a.opsDocStore.Delete(id)
 }
 
+// SaveAssistantMessageAsDoc 把一条 assistant 消息（含工具调用 progress + 正文）落成 OpsDoc。
+// Kind 由消息 Intent 推断（troubleshoot → troubleshooting，其他 → architecture/troubleshooting fallback）。
+//   - chat 消息默认归类为 troubleshooting（用户主动保存为报告通常是有分析结论的对话）
+//   - generate_workflow / inspect_server 消息一般已经有工作流入口，不建议保存为文档，但调用时仍允许
+func (a *App) SaveAssistantMessageAsDoc(sessionID, messageID string) (core.OpsDoc, error) {
+	if a.aiSessionStore == nil || a.opsDocStore == nil {
+		return core.OpsDoc{}, errors.New("依赖存储未初始化")
+	}
+	session, err := a.aiSessionStore.Get(sessionID)
+	if err != nil {
+		return core.OpsDoc{}, err
+	}
+	var msg core.AISessionMessage
+	found := false
+	for _, m := range session.Messages {
+		if m.ID == messageID {
+			msg = m
+			found = true
+			break
+		}
+	}
+	if !found {
+		return core.OpsDoc{}, fmt.Errorf("会话 %s 中未找到消息 %s", sessionID, messageID)
+	}
+	env := core.EnvironmentDef{ID: session.EnvironmentID}
+	if a.environmentStore != nil {
+		if loaded, err := a.environmentStore.Get(session.EnvironmentID); err == nil {
+			env = loaded
+		}
+	}
+	kind := opsDocKindForIntent(msg.Intent)
+	doc, err := report.FromSessionMessage(env, session, msg, kind)
+	if err != nil {
+		return core.OpsDoc{}, err
+	}
+	if err := a.opsDocStore.Save(doc); err != nil {
+		return core.OpsDoc{}, fmt.Errorf("保存报告失败: %w", err)
+	}
+	return doc, nil
+}
+
+// opsDocKindForIntent 把消息 Intent 字符串映射成 OpsDocKind。
+// 默认归到 troubleshooting，因为这是用户主动"保存为报告"最常见的来源；
+// 未来加 architecture intent 时在这里扩展。
+func opsDocKindForIntent(intent string) core.OpsDocKind {
+	switch intent {
+	case "troubleshoot":
+		return core.OpsDocKindTroubleshooting
+	case "inspect_server":
+		return core.OpsDocKindInspection
+	default:
+		return core.OpsDocKindTroubleshooting
+	}
+}
+
 // GenerateInspectionReport 根据执行记录生成巡检报告 OpsDoc 并落盘。
 //   - executionID 必填
 //   - 若 AI 设置中有可用 API Key 则做 LLM 风险分析；否则退化为纯事实报告

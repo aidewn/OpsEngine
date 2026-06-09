@@ -12,6 +12,7 @@ import {
   GetOpsDoc,
   DeleteOpsDoc,
   GenerateInspectionReport,
+  SaveAssistantMessageAsDoc,
 } from '@wails/go/main/App';
 import type { OpsDoc, OpsDocSummary } from '@/types/opsDoc';
 
@@ -57,6 +58,22 @@ export function useGenerateInspectionReport(): UseMutationResult<OpsDoc, Error, 
   return useMutation({
     mutationFn: (executionID) =>
       GenerateInspectionReport(executionID) as unknown as Promise<OpsDoc>,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: KEY.list });
+    },
+  });
+}
+
+// useSaveAssistantMessageAsDoc 把一条 assistant 消息保存为 OpsDoc（排障/对话类报告）。
+export function useSaveAssistantMessageAsDoc(): UseMutationResult<
+  OpsDoc,
+  Error,
+  { sessionID: string; messageID: string }
+> {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ sessionID, messageID }) =>
+      SaveAssistantMessageAsDoc(sessionID, messageID) as unknown as Promise<OpsDoc>,
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: KEY.list });
     },

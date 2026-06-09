@@ -18,6 +18,9 @@ const (
 	EventDone EventType = "done"
 	// EventWorkflow 工作流生成完成的副带数据（workflow id/name）。
 	EventWorkflow EventType = "workflow"
+	// EventDoc OpsDoc 生成完成的副带数据（doc id/title）。
+	// 当前架构分析路径在调用 OpsDocStore.Save 后用它告知前端"查看文档"按钮可用。
+	EventDoc EventType = "doc"
 	// EventTargetSelect 表示本轮需要用户选择目标配置后才能继续。
 	EventTargetSelect EventType = "target_select"
 )
@@ -36,6 +39,8 @@ type Event struct {
 	Text          string         `json:"text,omitempty"`
 	WorkflowID    string         `json:"workflow_id,omitempty"`
 	WorkflowName  string         `json:"workflow_name,omitempty"`
+	DocID         string         `json:"doc_id,omitempty"`
+	DocTitle      string         `json:"doc_title,omitempty"`
 	TargetOptions []TargetOption `json:"target_options,omitempty"`
 }
 

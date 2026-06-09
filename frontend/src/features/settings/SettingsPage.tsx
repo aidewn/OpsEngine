@@ -23,6 +23,10 @@ export function SettingsPage() {
   const testSettings = useTestAISettings();
   const [form, setForm] = useState<AISettings>(DEFAULT_SETTINGS);
   const [message, setMessage] = useState('');
+  // editingKey=true 时让用户输入 API Key；false 时显示脱敏的旧值 + 编辑按钮。
+  // 避免每次进入设置页都把 Key 明文回填到 input。
+  const [editingKey, setEditingKey] = useState(false);
+  const [revealKey, setRevealKey] = useState(false);
 
   useEffect(() => {
     if (data) {
@@ -34,6 +38,9 @@ export function SettingsPage() {
         timeout_seconds:
           data.timeout_seconds || DEFAULT_SETTINGS.timeout_seconds,
       });
+      // 已有 Key 时默认进入"已保存"态，避免明文回填；空 Key 必须进入编辑态让用户填。
+      setEditingKey(!data.deepseek_api_key);
+      setRevealKey(false);
     }
   }, [data]);
 
@@ -43,8 +50,10 @@ export function SettingsPage() {
     try {
       await updateSettings.mutateAsync(form);
       setMessage('AI 设置已保存');
+      setEditingKey(false);
+      setRevealKey(false);
     } catch (err) {
-      setMessage(err instanceof Error ? err.message : '保存失败');
+      setMessage(formatLLMError(err));
     }
   }
 
@@ -54,8 +63,10 @@ export function SettingsPage() {
       await updateSettings.mutateAsync(form);
       const result = await testSettings.mutateAsync();
       setMessage(`连接测试返回：${result}`);
+      setEditingKey(false);
+      setRevealKey(false);
     } catch (err) {
-      setMessage(err instanceof Error ? err.message : '连接测试失败');
+      setMessage(formatLLMError(err));
     }
   }
 
@@ -80,18 +91,60 @@ export function SettingsPage() {
         className="space-y-5 rounded-lg border border-slate-200 bg-white p-5"
       >
         <Field label="DeepSeek API Key">
-          <input
-            type="password"
-            value={form.deepseek_api_key}
-            onChange={(event) =>
-              setForm((prev) => ({
-                ...prev,
-                deepseek_api_key: event.target.value,
-              }))
-            }
-            placeholder="sk-..."
-            className="h-9 w-full rounded-md border border-slate-300 px-3 text-sm outline-none focus:border-slate-500"
-          />
+          {editingKey ? (
+            <div className="flex items-stretch gap-2">
+              <input
+                type={revealKey ? 'text' : 'password'}
+                value={form.deepseek_api_key}
+                onChange={(event) =>
+                  setForm((prev) => ({
+                    ...prev,
+                    deepseek_api_key: event.target.value,
+                  }))
+                }
+                placeholder="sk-..."
+                className="h-9 w-full rounded-md border border-slate-300 px-3 text-sm outline-none focus:border-slate-500 font-mono"
+                autoFocus
+              />
+              <button
+                type="button"
+                onClick={() => setRevealKey((v) => !v)}
+                className="rounded-md border border-slate-300 px-2 text-xs text-slate-600 hover:bg-slate-50"
+                title={revealKey ? '隐藏' : '显示明文'}
+              >
+                {revealKey ? '隐藏' : '显示'}
+              </button>
+              {data?.deepseek_api_key && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditingKey(false);
+                    setRevealKey(false);
+                    setForm((prev) => ({
+                      ...prev,
+                      deepseek_api_key: data.deepseek_api_key,
+                    }));
+                  }}
+                  className="rounded-md border border-slate-300 px-2 text-xs text-slate-600 hover:bg-slate-50"
+                >
+                  取消
+                </button>
+              )}
+            </div>
+          ) : (
+            <div className="flex items-center gap-2">
+              <code className="h-9 flex-1 rounded-md border border-slate-200 bg-slate-50 px-3 text-sm leading-9 text-slate-700 font-mono">
+                {maskApiKey(form.deepseek_api_key)}
+              </code>
+              <button
+                type="button"
+                onClick={() => setEditingKey(true)}
+                className="rounded-md border border-slate-300 px-3 text-xs text-slate-700 hover:bg-slate-50"
+              >
+                编辑
+              </button>
+            </div>
+          )}
         </Field>
 
         <Field label="Base URL">
@@ -180,4 +233,23 @@ function Field({
       {children}
     </label>
   );
+}
+
+// maskApiKey 把已保存的 API Key 渲染成 "sk-•••cdef"，保留首末 4 字符方便用户对照。
+// 空字符串显示占位提示。
+function maskApiKey(key: string): string {
+  const trimmed = (key ?? '').trim();
+  if (!trimmed) return '（未配置）';
+  if (trimmed.length <= 8) return '•'.repeat(trimmed.length);
+  return `${trimmed.slice(0, 4)}•••${trimmed.slice(-4)}`;
+}
+
+// formatLLMError 把后端 LLMError 字符串（形如 "[网络错误] ..."）转成更友好的提示。
+// 已经带前缀的直接展示；未带前缀的回退到原始 message。
+function formatLLMError(err: unknown): string {
+  const msg = err instanceof Error ? err.message : String(err);
+  // 后端已经把 LLMError.Kind 拼到前缀里，前端直接展示即可。
+  // 此处只做兜底：若没有前缀，附加"请求失败"提示。
+  if (/^\[(配置错误|网络错误|模型响应错误)\]/.test(msg)) return msg;
+  return msg || '请求失败';
 }

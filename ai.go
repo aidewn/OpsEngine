@@ -235,12 +235,14 @@ func (a *App) StartAIAssistant(req AIAssistantRequest) error {
 	rt := &runtime.Runtime{
 		Sessions:     a.aiSessionStore,
 		Workflows:    a.workflowStore,
+		OpsDocs:      a.opsDocStore,
 		Environments: a.lookupEnvironment,
 		EnvList:      a.listEnvironmentsForPrompt,
 		Nodes:        a.GetNodeTypes,
 		NodeChecker:  a.checkNodeTypeExists,
 		LLM:          a.newLLMAdapter(settings),
 		Emit:         runtime.EmitterFunc(a.emitRuntimeEvent),
+		Tools:        a.toolRegistry,
 	}
 	return rt.Run(runtime.Request{
 		RequestID:      requestID,
@@ -396,6 +398,13 @@ func (l *llmAdapter) ChatStream(messages []clients.ChatMessage, onDelta func(str
 	ctx, cancel := context.WithTimeout(l.parent, l.timeout)
 	defer cancel()
 	return l.client.ChatStream(ctx, messages, onDelta)
+}
+
+// ChatWithTools 实现 runtime.LLMProvider；走 OpenAI function calling 协议。
+func (l *llmAdapter) ChatWithTools(messages []clients.ChatMessage, toolSpecs []clients.ToolSpec) (clients.ChatCompletion, error) {
+	ctx, cancel := context.WithTimeout(l.parent, l.timeout)
+	defer cancel()
+	return l.client.ChatWithTools(ctx, messages, toolSpecs)
 }
 
 // ── 设置加载与默认值 ───────────────────────────────────────

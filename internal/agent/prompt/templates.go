@@ -18,10 +18,12 @@ var files embed.FS
 
 // templateFile 是相对 files/ 的模板路径。新增模板时只需在此登记。
 const (
-	templateSystemOpsAssistant = "files/system/ops_assistant.md"
-	templateWorkflowGeneration = "files/workflow/generation.md"
-	templateInspectionPlan     = "files/workflow/inspection_plan.md"
-	templateInspectionRisks    = "files/report/inspection_risks.md"
+	templateSystemOpsAssistant     = "files/system/ops_assistant.md"
+	templateSystemTroubleshoot     = "files/system/troubleshoot_assistant.md"
+	templateWorkflowGeneration     = "files/workflow/generation.md"
+	templateInspectionPlan         = "files/workflow/inspection_plan.md"
+	templateInspectionRisks        = "files/report/inspection_risks.md"
+	templateArchitectureExplain    = "files/architecture/explanation.md"
 )
 
 // renderTemplate 加载并执行指定模板，缺失变量时返回包含模板名的明确错误。

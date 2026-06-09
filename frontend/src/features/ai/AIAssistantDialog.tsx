@@ -25,6 +25,7 @@ import {
   useUpdateAISessionTitle,
 } from '@/api/ai';
 import { useEnvironments } from '@/api/environments';
+import { useSaveAssistantMessageAsDoc } from '@/api/opsDocs';
 import { cn } from '@/lib/cn';
 import type {
   AIAssistantEvent,
@@ -47,6 +48,8 @@ interface PendingTurn {
   assistantProgress: string[];
   workflowID?: string;
   workflowName?: string;
+  docID?: string;
+  docTitle?: string;
   targetOptions?: AITargetOption[];
   targetText?: string;
   selectingTargetID?: string;
@@ -121,6 +124,16 @@ export function AIAssistantDialog({
                 ...prev,
                 workflowID: event.workflow_id,
                 workflowName: event.workflow_name,
+              }
+            : prev,
+        );
+      } else if (event.type === 'doc') {
+        setPending((prev) =>
+          prev
+            ? {
+                ...prev,
+                docID: event.doc_id,
+                docTitle: event.doc_title,
               }
             : prev,
         );
@@ -570,6 +583,7 @@ function MessageList({
         <Bubble
           key={message.id}
           message={message}
+          sessionID={session?.id}
           onOpenWorkflow={onOpenWorkflow}
         />
       ))}
@@ -594,6 +608,8 @@ function MessageList({
               progress: pending.assistantProgress,
               workflow_id: pending.workflowID,
               workflow_name: pending.workflowName,
+              doc_id: pending.docID,
+              doc_title: pending.docTitle,
               target_options: pending.targetOptions,
               created_at: new Date().toISOString(),
             }}
@@ -610,16 +626,28 @@ function MessageList({
 // Bubble 渲染单条会话消息气泡。
 function Bubble({
   message,
+  sessionID,
   onOpenWorkflow,
   onSelectTarget,
   selectingTargetID,
 }: {
   message: AISessionMessage & { target_options?: AITargetOption[] };
+  sessionID?: string;
   onOpenWorkflow: (workflowID: string) => void;
   onSelectTarget?: (configID: string) => void;
   selectingTargetID?: string;
 }) {
   const isUser = message.role === 'user';
+  // 触发"保存为报告"的条件：
+  //   - 必须是已落库的 assistant 消息（pending 消息没 sessionID/messageID，不允许保存）
+  //   - 不能是工作流类（已有"打开工作流"入口）
+  //   - 必须带 intent 标签（chat / troubleshoot），避免把 system 提示等误存
+  const canSaveAsDoc =
+    !isUser &&
+    !!sessionID &&
+    !!message.id &&
+    !message.workflow_id &&
+    (message.intent === 'troubleshoot' || message.intent === 'chat');
   return (
     <div className={isUser ? 'flex justify-end' : 'flex justify-start'}>
       <div
@@ -639,7 +667,9 @@ function Bubble({
         {message.progress && message.progress.length > 0 && (
           <ol className="mt-2 space-y-1 border-t border-slate-200 pt-2 text-xs text-slate-500">
             {message.progress.map((item, index) => (
-              <li key={`${item}-${index}`}>{item}</li>
+              <li key={`${item}-${index}`} className={progressLineClass(item)}>
+                {item}
+              </li>
             ))}
           </ol>
         )}
@@ -654,6 +684,21 @@ function Bubble({
               onClick={() => onOpenWorkflow(message.workflow_id!)}
             >
               打开工作流
+            </Button>
+          </div>
+        )}
+        {message.doc_id && (
+          <div className="mt-3 flex items-center justify-between gap-3 rounded-md border border-indigo-200 bg-indigo-50 px-3 py-2">
+            <span className="truncate text-xs text-indigo-700">
+              📄 {message.doc_title || 'AI 生成文档'}
+            </span>
+            <Button
+              type="button"
+              size="sm"
+              variant="secondary"
+              onClick={() => window.alert('请到首页"文档"标签页查看；文档 ID: ' + message.doc_id)}
+            >
+              查看文档
             </Button>
           </div>
         )}
@@ -676,9 +721,64 @@ function Bubble({
             </div>
           </div>
         )}
+        {canSaveAsDoc && (
+          <SaveAsDocButton sessionID={sessionID!} messageID={message.id} intent={message.intent} />
+        )}
       </div>
     </div>
   );
+}
+
+// SaveAsDocButton 把当前 assistant 消息保存为 OpsDoc。
+// 成功后展示"已保存"短反馈 + 文档 ID（截断）；失败时弹 alert。
+// 不直接跳转文档库，避免打断用户当前对话；用户可自行切到文档 tab 查看。
+function SaveAsDocButton({
+  sessionID,
+  messageID,
+  intent,
+}: {
+  sessionID: string;
+  messageID: string;
+  intent?: string;
+}) {
+  const save = useSaveAssistantMessageAsDoc();
+  const [saved, setSaved] = useState<{ id: string } | null>(null);
+  async function handleClick() {
+    try {
+      const doc = await save.mutateAsync({ sessionID, messageID });
+      setSaved({ id: doc.id });
+    } catch (err) {
+      alert(err instanceof Error ? err.message : String(err));
+    }
+  }
+  const label = intent === 'troubleshoot' ? '保存为排障报告' : '保存为报告';
+  return (
+    <div className="mt-3 flex items-center justify-end gap-2">
+      {saved && (
+        <span className="text-[11px] text-emerald-600">
+          已保存（ID: <span className="font-mono">{saved.id.slice(0, 8)}</span>）
+        </span>
+      )}
+      <Button
+        type="button"
+        size="sm"
+        variant="ghost"
+        onClick={handleClick}
+        disabled={save.isPending || !!saved}
+      >
+        {save.isPending ? '保存中…' : saved ? '已保存' : `📄 ${label}`}
+      </Button>
+    </div>
+  );
+}
+
+// progressLineClass 根据进度文本前缀给出不同颜色，让"工具调用"在长进度列表里更醒目。
+// 后端约定：🔧 = 工具调用开始；✓ = 工具完成；✗ = 工具失败。其他保持默认灰色。
+function progressLineClass(text: string): string {
+  if (text.startsWith('🔧')) return 'text-indigo-600';
+  if (text.startsWith('✓')) return 'text-emerald-600';
+  if (text.startsWith('✗')) return 'text-rose-600';
+  return '';
 }
 
 // newID 生成前端请求和消息 ID。

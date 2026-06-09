@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"OpsEngine/internal/agent/intent"
+	"OpsEngine/internal/agent/tools"
 	"OpsEngine/internal/core"
 
 	"github.com/google/uuid"
@@ -41,17 +42,22 @@ type Request struct {
 type Runtime struct {
 	Sessions     SessionStore
 	Workflows    WorkflowSaver
+	OpsDocs      OpsDocSaver
 	Environments EnvironmentLookup
 	EnvList      EnvironmentLister
 	Nodes        NodeCatalog
 	NodeChecker  NodeTypeChecker
 	LLM          LLMProvider
 	Emit         Emitter
+	// Tools 是只读 Agent 工具注册表。可为 nil（chat 路径退化为不带工具的单轮调用）。
+	Tools *tools.Registry
 
 	// SnapshotTTL 覆盖默认 SSH 快照过期时间。<=0 时用包默认值。
 	SnapshotTTL time.Duration
 	// MaxTurns 覆盖默认长会话裁剪轮次。<=0 时用包默认值。
 	MaxTurns int
+	// MaxToolRounds 限制 chat 工具循环最多迭代多少轮，<=0 时用默认 5。
+	MaxToolRounds int
 }
 
 // Run 执行一轮 AI 助手调用。
@@ -112,6 +118,10 @@ func (r *Runtime) Run(req Request) error {
 		r.handleInspection(req, session)
 	case intent.KindGenerateWorkflow:
 		r.handleWorkflow(req, session)
+	case intent.KindTroubleshoot:
+		r.handleTroubleshoot(req, session)
+	case intent.KindAnalyzeArchitecture:
+		r.handleArchitecture(req, session)
 	default:
 		r.handleChat(req, session)
 	}

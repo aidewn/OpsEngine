@@ -54,6 +54,14 @@ type InspectionInputs struct {
 	PreferredConfigID      string
 }
 
+// BuildArchitectureExplanationPrompt 渲染架构分析的 system prompt。
+// summary 是 architecture.RenderTopologySummary 产出的拓扑摘要文本。
+func BuildArchitectureExplanationPrompt(summary string) (string, error) {
+	return renderTemplate(templateArchitectureExplain, map[string]string{
+		"TopologySummary": summary,
+	})
+}
+
 // BuildInspectionRisksPrompt 渲染巡检报告风险分析 system prompt。
 // facts 是 report.RenderFactsForLLM 产出的事实摘要（已剥离冗余日志、控制在合理长度）。
 func BuildInspectionRisksPrompt(facts string) (string, error) {
@@ -78,20 +86,39 @@ func BuildInspectionPlanPrompt(in InspectionInputs) (string, error) {
 }
 
 // ChatContext 是 BuildChatMessages 的可选注入。
-// 当前只承载 Inventory，未来 P7 工具结果汇总也会通过它注入。
 type ChatContext struct {
+	// SystemKind 选择 system 提示词；空值默认 SystemPromptChat。
+	SystemKind SystemPromptKind
 	// Inventory 是预渲染的环境资产清单文本（agentcontext.Inventory.RenderText 的产物）。
 	// 空字符串时不注入。
 	Inventory string
 }
 
+// SystemPromptKind 用来在 BuildChatMessages 中切换 system 提示词的场景。
+type SystemPromptKind string
+
+const (
+	// SystemPromptChat 是默认的运维助手 system 提示词。
+	SystemPromptChat SystemPromptKind = "chat"
+	// SystemPromptTroubleshoot 是排障专用 system 提示词，强制"事实/判断/建议"三段输出。
+	SystemPromptTroubleshoot SystemPromptKind = "troubleshoot"
+)
+
+// systemPromptTemplate 把 SystemPromptKind 映射到 embed 内的模板路径。
+func systemPromptTemplate(kind SystemPromptKind) string {
+	if kind == SystemPromptTroubleshoot {
+		return templateSystemTroubleshoot
+	}
+	return templateSystemOpsAssistant
+}
+
 // BuildChatMessages 把指定的消息序列拼成 LLM 调用的 messages 数组。
-// 顺序：固定 system 提示词 → Inventory（如有）→ 传入的所有可见消息（含 Hidden 的 system 上下文）。
+// 顺序：ctx.SystemKind 对应的 system 提示词 → Inventory（如有）→ 传入的所有可见消息。
 // 空 assistant 消息被丢弃以避免污染上下文（例如用户中断流式回复留下的占位）。
 //
 // 调用方通常先经过 context.TruncateMessages 裁剪 session.Messages，再传到这里。
 func BuildChatMessages(messages []core.AISessionMessage, ctx ChatContext) ([]clients.ChatMessage, error) {
-	systemPrompt, err := renderTemplate(templateSystemOpsAssistant, struct{}{})
+	systemPrompt, err := renderTemplate(systemPromptTemplate(ctx.SystemKind), struct{}{})
 	if err != nil {
 		return nil, err
 	}

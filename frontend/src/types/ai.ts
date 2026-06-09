@@ -24,8 +24,13 @@ export interface AISessionMessage {
   progress?: string[];
   workflow_id?: string;
   workflow_name?: string;
+  /** 指向消息产生时落地的 OpsDoc，前端用于"查看文档"跳转。 */
+  doc_id?: string;
+  doc_title?: string;
   /** 隐藏消息（预取的服务器状态等），前端不渲染。 */
   hidden?: boolean;
+  /** 产生该消息时的意图标签（'chat' / 'troubleshoot' / 'inspect_server' / ...），用于决定是否显示"保存为报告"等动作。 */
+  intent?: string;
   created_at: string;
 }
 
@@ -73,9 +78,11 @@ export interface AITargetOption {
 export interface AIAssistantEvent {
   request_id: string;
   session_id?: string;
-  type: 'delta' | 'progress' | 'workflow' | 'target_select' | 'done' | 'error';
+  type: 'delta' | 'progress' | 'workflow' | 'doc' | 'target_select' | 'done' | 'error';
   text?: string;
   workflow_id?: string;
   workflow_name?: string;
+  doc_id?: string;
+  doc_title?: string;
   target_options?: AITargetOption[];
 }

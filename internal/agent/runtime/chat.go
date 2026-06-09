@@ -1,10 +1,11 @@
-// 普通运维问答的单轮处理。
+// chat / troubleshoot 单轮处理。两者结构相同（注入 Inventory → 可选 SSH 快照 → 工具循环或流式回复），
+// 只在 system 提示词与 Intent 标签上有差别，因此共用 runConversationTurn。
 //
 // 关键流程：
 //   - 注入环境资产清单（Inventory），让 Agent 看到环境全貌而不是只盯单 SSH
 //   - 若会话有明确 SSH 目标（Scope=config 或 Inventory 内唯一 SSH），刷新过期的 SSH 快照
 //   - 长会话裁剪，控制上下文窗口
-//   - 流式回复
+//   - 工具循环（启用 Tools 时）或流式回复
 
 package runtime
 
@@ -19,8 +20,32 @@ import (
 	"github.com/google/uuid"
 )
 
+// turnOpts 把 chat / troubleshoot 之间的差异收敛到一个结构里。
+type turnOpts struct {
+	// SystemKind 决定加载哪个 system 提示词。
+	SystemKind prompt.SystemPromptKind
+	// IntentTag 写到 AISessionMessage.Intent，前端据此决定是否显示"保存为报告"。
+	IntentTag string
+}
+
 // handleChat 处理 intent.KindChat。
 func (r *Runtime) handleChat(req Request, session core.AISession) {
+	r.runConversationTurn(req, session, turnOpts{
+		SystemKind: prompt.SystemPromptChat,
+		IntentTag:  "chat",
+	})
+}
+
+// handleTroubleshoot 处理 intent.KindTroubleshoot：与 chat 同结构，但 system 提示词强制"事实/判断/建议"。
+func (r *Runtime) handleTroubleshoot(req Request, session core.AISession) {
+	r.runConversationTurn(req, session, turnOpts{
+		SystemKind: prompt.SystemPromptTroubleshoot,
+		IntentTag:  "troubleshoot",
+	})
+}
+
+// runConversationTurn 是 chat 和 troubleshoot 共享的执行体。
+func (r *Runtime) runConversationTurn(req Request, session core.AISession, opts turnOpts) {
 	progress := []string{}
 
 	// 构造 Inventory：注入到 prompt 让 LLM 知道环境内有哪些资产。
@@ -37,23 +62,42 @@ func (r *Runtime) handleChat(req Request, session core.AISession) {
 		maxTurns = agentctx.DefaultMaxTurns
 	}
 	trimmed := agentctx.TruncateMessages(session.Messages, maxTurns)
-	messages, err := prompt.BuildChatMessages(trimmed, prompt.ChatContext{Inventory: inventoryText})
+	messages, err := prompt.BuildChatMessages(trimmed, prompt.ChatContext{
+		SystemKind: opts.SystemKind,
+		Inventory:  inventoryText,
+	})
 	if err != nil {
 		r.emitError(req.RequestID, session.ID, err.Error())
 		return
 	}
 
 	assistant := strings.Builder{}
-	_, err = r.LLM.ChatStream(messages, func(delta string) {
-		assistant.WriteString(delta)
-		r.Emit.Emit(Event{
-			RequestID: req.RequestID, SessionID: session.ID,
-			Type: EventDelta, Text: delta,
+	if r.Tools != nil && !r.Tools.IsEmpty() {
+		// 启用工具时走非流式工具循环；最终回复一次性 emit 成 delta，保持前端渲染契约。
+		text, err := r.runChatToolLoop(req, session, messages, &progress)
+		if err != nil {
+			r.emitError(req.RequestID, session.ID, err.Error())
+			return
+		}
+		assistant.WriteString(text)
+		if text != "" {
+			r.Emit.Emit(Event{
+				RequestID: req.RequestID, SessionID: session.ID,
+				Type: EventDelta, Text: text,
+			})
+		}
+	} else {
+		_, err = r.LLM.ChatStream(messages, func(delta string) {
+			assistant.WriteString(delta)
+			r.Emit.Emit(Event{
+				RequestID: req.RequestID, SessionID: session.ID,
+				Type: EventDelta, Text: delta,
+			})
 		})
-	})
-	if err != nil {
-		r.emitError(req.RequestID, session.ID, err.Error())
-		return
+		if err != nil {
+			r.emitError(req.RequestID, session.ID, err.Error())
+			return
+		}
 	}
 
 	session.Messages = append(session.Messages, core.AISessionMessage{
@@ -61,6 +105,7 @@ func (r *Runtime) handleChat(req Request, session core.AISession) {
 		Role:      core.AIMessageRoleAssistant,
 		Content:   assistant.String(),
 		Progress:  progress,
+		Intent:    opts.IntentTag,
 		CreatedAt: time.Now(),
 	})
 	session.UpdatedAt = time.Now()

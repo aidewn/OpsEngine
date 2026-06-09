@@ -17,6 +17,11 @@ const (
 	// KindInspectServer 用户要求做服务器巡检：走两阶段生成（LLM 出 Plan，后端拼工作流）。
 	// 比 KindGenerateWorkflow 更具体、更稳定，所以路由时应优先命中。
 	KindInspectServer Kind = "inspect_server"
+	// KindTroubleshoot 用户描述故障现象，要求 Agent 排查：走"工具循环 + 事实/判断/建议"路径。
+	// 与 KindChat 区别在于系统提示词强制结构化输出，便于后续沉淀为排障文档。
+	KindTroubleshoot Kind = "troubleshoot"
+	// KindAnalyzeArchitecture 用户要求分析环境架构：触发 SSH 拓扑采集 + Mermaid 渲染 + LLM 说明。
+	KindAnalyzeArchitecture Kind = "analyze_architecture"
 )
 
 // Result 包含意图本身和触发原因，供前端进度展示和后续诊断使用。
@@ -31,6 +36,21 @@ var inspectionKeywords = []string{
 	"inspect", "inspection", "health check",
 }
 
+// architectureKeywords 触发 analyze_architecture。包含明确的"架构/拓扑/服务关系"信号词。
+// 优先级低于 inspection / troubleshoot（这两类是更具体的诉求）。
+var architectureKeywords = []string{
+	"架构", "拓扑", "服务关系", "组件关系", "依赖关系",
+	"architecture", "topology",
+}
+
+// troubleshootKeywords 触发 troubleshoot。包含典型故障现象词。
+// 优先于普通 chat，但低于 inspection（"排查巡检脚本"应走巡检而不是排障）。
+var troubleshootKeywords = []string{
+	"排查", "排障", "故障", "诊断", "为什么挂", "为什么慢", "为什么不通",
+	"cpu 高", "cpu高", "内存高", "内存满", "磁盘满", "磁盘 100", "服务挂", "起不来", "无响应",
+	"troubleshoot", "diagnose", "investigate", "high cpu", "out of memory", "disk full",
+}
+
 // workflowKeywords 是触发 generate_workflow 的强信号词。
 // 注意：扩展时优先添加"动作 + 对象"的组合，避免单字误命中（例如只写"流"会误判）。
 var workflowKeywords = []string{
@@ -39,10 +59,12 @@ var workflowKeywords = []string{
 }
 
 // negativeKeywords 命中其一时强制回退到 chat，覆盖"解释一下"/"不要生成"等场景。
-// 即使消息里出现"工作流"，也按用户更明确的否定意图处理。
+// 注意：这些词只用来抑制"生成"类操作（workflow / inspection）；
+// "怎么排查 / 为什么挂"这类原本被当作否定的词已经迁移到 troubleshootKeywords，
+// 因为它们实际上是排障信号而非"不要做任何事"。
 var negativeKeywords = []string{
 	"不要生成", "不用生成", "别生成", "不需要工作流",
-	"解释", "说明", "为什么", "怎么排查", "如何排查",
+	"解释", "说明",
 	"do not generate", "don't generate", "explain",
 }
 
@@ -73,6 +95,18 @@ func Resolve(operation, message string) Result {
 	for _, kw := range inspectionKeywords {
 		if strings.Contains(text, kw) {
 			return Result{Kind: KindInspectServer, Reason: "命中巡检关键词：" + kw}
+		}
+	}
+	// 排障优先于通用 workflow：用户说"排查 CPU 高"应直接进排障路径，而不是被识别为"生成排查工作流"。
+	for _, kw := range troubleshootKeywords {
+		if strings.Contains(text, kw) {
+			return Result{Kind: KindTroubleshoot, Reason: "命中排障关键词：" + kw}
+		}
+	}
+	// 架构分析在排障/巡检之后判断：避免"排查架构问题"被错路由到这里（troubleshoot 已先命中）。
+	for _, kw := range architectureKeywords {
+		if strings.Contains(text, kw) {
+			return Result{Kind: KindAnalyzeArchitecture, Reason: "命中架构关键词：" + kw}
 		}
 	}
 	for _, kw := range workflowKeywords {

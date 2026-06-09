@@ -63,7 +63,26 @@
       "Bash(cat ~/.docker/config.json 2>&1)",
       "Bash(docker pull *)",
       "Bash(docker run *)",
-      "Bash(npx -y tsc --noEmit)"
+      "Bash(npx -y tsc --noEmit)",
+      "Bash(head -187 frontend/src/features/execution/InspectionReportDialog.tsx)",
+      "Bash(mv /tmp/dialog.tsx.tmp frontend/src/features/execution/InspectionReportDialog.tsx)",
+      "Bash(cmd.exe /c \"npx --no-install tsc --noEmit 2>&1\")",
+      "Bash(\"C:/Program Files/nodejs/npx.cmd\" tsc --noEmit)",
+      "Bash(\"C:/Program Files/Go/bin/go.exe\" test ./internal/clients/)",
+      "Bash(\"C:/Program Files/Go/bin/go.exe\" test ./internal/clients/ -run \"TestValidate|Test401|Test500|TestInvalidJSON|TestUnreachable\" -v)",
+      "Bash(\"C:/Program Files/Go/bin/go.exe\" build ./...)",
+      "Bash(\"C:/Program Files/Go/bin/go.exe\" test ./...)",
+      "Bash(\"C:/Program Files/Go/bin/go.exe\" test ./internal/agent/tools/)",
+      "Bash(\"C:/Program Files/Go/bin/go.exe\" build ./internal/agent/tools/...)",
+      "Bash(\"C:/Program Files/Go/bin/go.exe\" test ./internal/agent/tools/...)",
+      "Bash(\"C:/Program Files/Go/bin/go.exe\" test ./internal/agent/runtime/ -v -run \"TestToolLoop\")",
+      "Bash(\"C:/Program Files/Go/bin/go.exe\" test ./internal/agent/intent/)",
+      "Bash(\"C:/Program Files/Go/bin/go.exe\" test ./internal/agent/intent/ -v)",
+      "Bash(\"C:/Program Files/Go/bin/go.exe\" test ./internal/agent/report/ -v -run TestFromSession)",
+      "Bash(\"C:/Program Files/Go/bin/go.exe\" test ./internal/agent/runtime/ ./internal/agent/report/ ./internal/agent/intent/ ./internal/clients/ ./internal/agent/tools/...)",
+      "Bash(findstr /R \"FAIL ^ok\")",
+      "Bash(\"C:/Program Files/Go/bin/go.exe\" test ./internal/agent/architecture/ -v)",
+      "Bash(\"C:/Program Files/Go/bin/go.exe\" test ./internal/agent/architecture/)"
     ]
   }
 }

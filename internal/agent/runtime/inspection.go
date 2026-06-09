@@ -118,6 +118,7 @@ func (r *Runtime) handleInspection(req Request, session core.AISession) {
 		Progress:     progress,
 		WorkflowID:   wf.ID,
 		WorkflowName: wf.Name,
+		Intent:       "inspect_server",
 		CreatedAt:    time.Now(),
 	})
 	session.UpdatedAt = time.Now()

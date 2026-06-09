@@ -10,6 +10,8 @@ import (
 	"strings"
 	"time"
 
+	"OpsEngine/internal/agent/tools"
+	"OpsEngine/internal/agent/tools/builtin"
 	"OpsEngine/internal/clients"
 	"OpsEngine/internal/core"
 	"OpsEngine/internal/engine"
@@ -34,6 +36,7 @@ type App struct {
 	environmentStore *store.EnvironmentStore
 	aiSessionStore   *store.AISessionStore
 	opsDocStore      *store.OpsDocStore
+	toolRegistry     *tools.Registry
 	engine           *engine.Engine
 }
 
@@ -63,6 +66,12 @@ func (a *App) startup(ctx context.Context) {
 	a.environmentStore = store.NewEnvironmentStore("data/environments")
 	a.aiSessionStore = store.NewAISessionStore("data/ai-sessions")
 	a.opsDocStore = store.NewOpsDocStore("data/docs")
+
+	// 注册内置 Agent 工具（只读 tier）。失败仅记日志，不影响其他功能。
+	a.toolRegistry = tools.NewRegistry()
+	if err := builtin.Register(a.toolRegistry); err != nil {
+		zap.L().Warn("注册内置 Agent 工具失败", zap.Error(err))
+	}
 	a.engine = engine.New(
 		a.workflowStore,
 		a.assembleStore,

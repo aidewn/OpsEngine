@@ -38,8 +38,16 @@ type AISessionMessage struct {
 	Progress     []string             `json:"progress,omitempty"      toml:"progress,omitempty"`
 	WorkflowID   string               `json:"workflow_id,omitempty"   toml:"workflow_id,omitempty"`
 	WorkflowName string               `json:"workflow_name,omitempty" toml:"workflow_name,omitempty"`
+	// DocID / DocTitle 指向消息产生时落地的 OpsDoc，前端用于"查看文档"跳转。
+	// 当前仅 architecture handler 在使用；troubleshoot 通过用户手动"保存为报告"产文档，不预填这两字段。
+	DocID    string `json:"doc_id,omitempty"    toml:"doc_id,omitempty"`
+	DocTitle string `json:"doc_title,omitempty" toml:"doc_title,omitempty"`
 	// Hidden 标记 system 角色的辅助消息（如预取的服务器信息），前端不渲染。
-	Hidden    bool      `json:"hidden,omitempty" toml:"hidden,omitempty"`
+	Hidden bool `json:"hidden,omitempty" toml:"hidden,omitempty"`
+	// Intent 是 assistant 消息产生时的意图标签（"chat" / "troubleshoot" / "inspect_server" / ...）。
+	// 前端据此决定是否显示"保存为报告"按钮，后端 SaveAssistantMessageAsDoc 据此推断 OpsDoc.Kind。
+	// 旧消息没有此字段，按空字符串处理。
+	Intent    string    `json:"intent,omitempty" toml:"intent,omitempty"`
 	CreatedAt time.Time `json:"created_at" toml:"created_at"`
 }
 

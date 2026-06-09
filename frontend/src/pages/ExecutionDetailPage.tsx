@@ -199,7 +199,7 @@ export function ExecutionDetailPage() {
                     variant="ghost"
                     onClick={() => setReportOpen(true)}
                   >
-                    📄 生成报告
+                    📄 巡检报告
                   </Button>
                 </>
               )}
