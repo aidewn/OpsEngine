@@ -11,6 +11,7 @@ package engine
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"OpsEngine/internal/core"
@@ -34,11 +35,17 @@ func (r *Runtime) execAssembleCall(
 	r.appendLog(parent, callNode.InstanceID, "info", fmt.Sprintf("调用集合 %s", asm.Name))
 
 	// 1. 调用方作用域求 params
+	// 端口未连线时回退到 caller 节点 config 里的 param_<name>_default
+	// 默认值约定：FieldSchema 用 number/toggle/text，最终值已是数字/bool/string；
+	// 若历史/手工配置存成字符串，按 VarType 解析一次，失败则用 nil（不阻断执行）
 	params := map[string]any{}
 	for _, p := range asm.Params {
 		portID := "param_" + p.Name
-		v, _ := r.evalInput(ctx, parent, callerNodes, callerEdges, callNode.InstanceID, portID)
-		params[p.Name] = v
+		if v, ok := r.evalInput(ctx, parent, callerNodes, callerEdges, callNode.InstanceID, portID); ok {
+			params[p.Name] = v
+			continue
+		}
+		params[p.Name] = resolveAssembleParamDefault(callNode.Config[portID+"_default"], p.VarType)
 	}
 
 	// 2. 创建子 frame
@@ -106,6 +113,72 @@ func (r *Runtime) runAssembleEnd(
 // isAssembleCallType 判断节点类型是否为集合调用
 func isAssembleCallType(typeID string) bool {
 	return strings.HasPrefix(typeID, "assemble:")
+}
+
+// resolveAssembleParamDefault 把 caller 节点 config 中的默认值按 VarType 规范化
+// raw 可能是 number/bool/string（取决于前端 FieldSchema 类型）；空值/解析失败统一返回 nil
+func resolveAssembleParamDefault(raw any, varType core.PortType) any {
+	if raw == nil {
+		return nil
+	}
+	switch varType {
+	case core.PortTypeInt:
+		switch v := raw.(type) {
+		case float64:
+			return int64(v)
+		case int64:
+			return v
+		case int:
+			return int64(v)
+		case string:
+			if v == "" {
+				return nil
+			}
+			if n, err := strconv.ParseInt(strings.TrimSpace(v), 10, 64); err == nil {
+				return n
+			}
+			return nil
+		}
+	case core.PortTypeFloat:
+		switch v := raw.(type) {
+		case float64:
+			return v
+		case int64:
+			return float64(v)
+		case int:
+			return float64(v)
+		case string:
+			if v == "" {
+				return nil
+			}
+			if n, err := strconv.ParseFloat(strings.TrimSpace(v), 64); err == nil {
+				return n
+			}
+			return nil
+		}
+	case core.PortTypeBool:
+		switch v := raw.(type) {
+		case bool:
+			return v
+		case string:
+			if v == "" {
+				return nil
+			}
+			if b, err := strconv.ParseBool(strings.TrimSpace(v)); err == nil {
+				return b
+			}
+			return nil
+		}
+	case core.PortTypeString, core.PortTypeDynamic, core.PortTypeAny:
+		if s, ok := raw.(string); ok {
+			if s == "" {
+				return nil
+			}
+			return s
+		}
+		return raw
+	}
+	return raw
 }
 
 // evalAssembleStartParamOutput 求 assemble_start 的 param_<name> 输出

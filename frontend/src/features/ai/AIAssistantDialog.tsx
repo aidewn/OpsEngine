@@ -66,6 +66,8 @@ interface PendingTurn {
   userContent: string;
   assistantContent: string;
   assistantProgress: string[];
+  // 瞬态心跳文本，每次替换不追加；done/delta 到来时清空
+  assistantHeartbeat?: string;
   workflowID?: string;
   workflowName?: string;
   assembleID?: string;
@@ -191,7 +193,12 @@ export function AIAssistantPanel({
       if (event.type === 'delta') {
         setPending((prev) =>
           prev
-            ? { ...prev, assistantContent: prev.assistantContent + (event.text ?? '') }
+            ? {
+                ...prev,
+                // 收到真实流式 token，清掉心跳，避免心跳与正文并存
+                assistantHeartbeat: undefined,
+                assistantContent: prev.assistantContent + (event.text ?? ''),
+              }
             : prev,
         );
       } else if (event.type === 'progress') {
@@ -202,6 +209,11 @@ export function AIAssistantPanel({
                 assistantProgress: [...prev.assistantProgress, event.text ?? ''],
               }
             : prev,
+        );
+      } else if (event.type === 'heartbeat') {
+        // 单行原地刷新，不进 progress 数组，避免持久化时堆积
+        setPending((prev) =>
+          prev ? { ...prev, assistantHeartbeat: event.text ?? '' } : prev,
         );
       } else if (event.type === 'workflow') {
         setPending((prev) =>
@@ -761,6 +773,7 @@ function MessageList({
                 ? pending.errorText
                 : pending.assistantContent,
               progress: pending.assistantProgress,
+              heartbeat: pending.assistantHeartbeat,
               workflow_id: pending.workflowID,
               workflow_name: pending.workflowName,
               assemble_id: pending.assembleID,
@@ -795,7 +808,7 @@ function Bubble({
   selectingTargetID,
   onResend,
 }: {
-  message: AISessionMessage & { target_options?: AITargetOption[] };
+  message: AISessionMessage & { target_options?: AITargetOption[]; heartbeat?: string };
   sessionID?: string;
   onOpenWorkflow: (workflowID: string) => void;
   onOpenAssemble: (assembleID: string) => void;
@@ -852,6 +865,12 @@ function Bubble({
         )}
         {message.progress && message.progress.length > 0 && (
           <ProgressTimeline items={message.progress} />
+        )}
+        {message.heartbeat && (
+          <div className="mt-1 flex items-center gap-1.5 text-[11px] italic text-ops-tertiary">
+            <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-ops-accent" />
+            {message.heartbeat}
+          </div>
         )}
         {message.workflow_id && (
           <ActionCard

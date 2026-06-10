@@ -14,11 +14,17 @@ package runtime
 import (
 	"encoding/json"
 	"fmt"
+	"sync/atomic"
+	"time"
 
 	"OpsEngine/internal/agent/tools"
 	"OpsEngine/internal/clients"
 	"OpsEngine/internal/core"
 )
+
+// llmHeartbeatInterval 是 LLM 调用期间心跳事件的间隔。
+// 选 2s：足够快让用户看到"还活着"，又不至于刷屏（前端单行原地刷新）。
+const llmHeartbeatInterval = 2 * time.Second
 
 // defaultMaxToolRounds 是默认工具循环上限。
 // 50 轮够覆盖"看清单 → 看进程 → 看日志 → 总结"这种典型链路，又能拦住模型卡死的循环调用。
@@ -52,16 +58,41 @@ func (r *Runtime) runChatToolLoop(
 			r.emitProgress(req.RequestID, session.ID, "正在基于工具结果继续推理…", progress)
 		}
 
+		// 启动心跳 goroutine：DeepSeek 在 tools 模式下经常不真正流 content，
+		// 思考阶段会有几十秒"假死"，靠这里的 ticker 推 heartbeat 让 UI 显示已用时长。
+		// 一旦收到任意 content delta 就把心跳静音（gotDelta=true），避免心跳与流式文本互相覆盖。
+		stopHeartbeat := make(chan struct{})
+		startedAt := time.Now()
+		var gotDelta atomic.Bool
+		go func() {
+			ticker := time.NewTicker(llmHeartbeatInterval)
+			defer ticker.Stop()
+			for {
+				select {
+				case <-stopHeartbeat:
+					return
+				case <-ticker.C:
+					if gotDelta.Load() {
+						continue
+					}
+					r.emitHeartbeat(req.RequestID, session.ID,
+						fmt.Sprintf("思考中（%ds）", int(time.Since(startedAt).Seconds())))
+				}
+			}
+		}()
+
 		// 走流式：content 一边出一边推送给前端，让用户看到模型实时输出
 		completion, err := r.LLM.ChatWithToolsStream(messages, specs, func(delta string) {
 			if delta == "" || r.Emit == nil {
 				return
 			}
+			gotDelta.Store(true)
 			r.Emit.Emit(Event{
 				RequestID: req.RequestID, SessionID: session.ID,
 				Type: EventDelta, Text: delta,
 			})
 		})
+		close(stopHeartbeat)
 		if err != nil {
 			return "", err
 		}

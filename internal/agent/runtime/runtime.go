@@ -160,6 +160,14 @@ func (r *Runtime) emitProgress(requestID, sessionID, text string, progress *[]st
 	r.Emit.Emit(Event{RequestID: requestID, SessionID: sessionID, Type: EventProgress, Text: text})
 }
 
+// emitHeartbeat 推送瞬态心跳。不写入 progress 切片，前端单行原地刷新。
+func (r *Runtime) emitHeartbeat(requestID, sessionID, text string) {
+	if r.Emit == nil {
+		return
+	}
+	r.Emit.Emit(Event{RequestID: requestID, SessionID: sessionID, Type: EventHeartbeat, Text: text})
+}
+
 // emitDone 推送成功终态。
 func (r *Runtime) emitDone(requestID, sessionID string) {
 	if r.Emit == nil {

@@ -25,6 +25,11 @@ const (
 	EventDoc EventType = "doc"
 	// EventTargetSelect 表示本轮需要用户选择目标配置后才能继续。
 	EventTargetSelect EventType = "target_select"
+	// EventHeartbeat 表示 Agent 仍在工作的瞬态提示（如"思考中（4s）"）。
+	// 与 EventProgress 不同：不写入 session.Messages.Progress，前端用单行原地刷新展示。
+	// 出现原因：DeepSeek 在带 tools 请求里通常不真正逐 chunk 推 content，
+	// 思考阶段会有 10-60s 的"假死"窗口，需要心跳让用户知道还活着。
+	EventHeartbeat EventType = "heartbeat"
 )
 
 // TargetOption 是需要用户选择的目标配置候选项。

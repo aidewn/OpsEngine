@@ -60,6 +60,7 @@ import (
 	_ "OpsEngine/internal/nodes/system_over"
 	_ "OpsEngine/internal/nodes/system_ready"
 	_ "OpsEngine/internal/nodes/system_update"
+	_ "OpsEngine/internal/nodes/text_template"
 	_ "OpsEngine/internal/nodes/thread"
 	_ "OpsEngine/internal/nodes/to_string"
 	_ "OpsEngine/internal/nodes/varget"

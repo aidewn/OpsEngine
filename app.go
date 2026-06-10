@@ -656,16 +656,22 @@ func envFieldInt(fields map[string]any, key string) int {
 
 // assembleToNodeType 把集合定义转换为可调用的节点类型
 // 端口 = exec_in/out + 每个 param/return 一个数据端口
+// 同时为可赋默认值的 param 生成 <portID>_default 配置字段：
+// caller 节点未连线时引擎会回退到这里的默认值，与 arith/compare 节点的约定一致
 func assembleToNodeType(asm core.AssembleDef) core.NodeTypeDef {
 	inputPorts := []core.PortDef{
 		{ID: "exec_in", Label: "▶", PortType: core.PortTypeExec, Required: true},
 	}
+	configSchema := make([]core.FieldSchema, 0, len(asm.Params))
 	for _, p := range asm.Params {
 		inputPorts = append(inputPorts, core.PortDef{
 			ID:       "param_" + p.Name,
 			Label:    p.Name,
 			PortType: p.VarType,
 		})
+		if field, ok := assembleParamDefaultField(p); ok {
+			configSchema = append(configSchema, field)
+		}
 	}
 	outputPorts := []core.PortDef{
 		{ID: "exec_out", Label: "▶", PortType: core.PortTypeExec},
@@ -686,6 +692,31 @@ func assembleToNodeType(asm core.AssembleDef) core.NodeTypeDef {
 		Description:   asm.Description,
 		InputPorts:    inputPorts,
 		OutputPorts:   outputPorts,
+		ConfigSchema:  configSchema,
 		ExecutionMode: core.ExecutionModeFlow,
 	}
+}
+
+// assembleParamDefaultField 为可填默认值的 param 生成 FieldSchema
+// 句柄类型（SSH 连接、Docker context 等）必须通过连线传入，没有"默认值"语义，跳过
+// 返回 false 表示该类型不支持默认值字段
+func assembleParamDefaultField(p core.ParamDef) (core.FieldSchema, bool) {
+	fieldType := ""
+	placeholder := "未连线时使用"
+	switch p.VarType {
+	case core.PortTypeInt, core.PortTypeFloat:
+		fieldType = "number"
+	case core.PortTypeBool:
+		fieldType = "toggle"
+	case core.PortTypeString, core.PortTypeDynamic, core.PortTypeAny:
+		fieldType = "text"
+	default:
+		return core.FieldSchema{}, false
+	}
+	return core.FieldSchema{
+		Type:        fieldType,
+		ID:          "param_" + p.Name + "_default",
+		Label:       p.Name + " 默认值",
+		Placeholder: placeholder,
+	}, true
 }

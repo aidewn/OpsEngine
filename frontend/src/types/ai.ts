@@ -86,7 +86,16 @@ export interface AITargetOption {
 export interface AIAssistantEvent {
   request_id: string;
   session_id?: string;
-  type: 'delta' | 'progress' | 'workflow' | 'assemble' | 'doc' | 'target_select' | 'done' | 'error';
+  type:
+    | 'delta'
+    | 'progress'
+    | 'heartbeat'
+    | 'workflow'
+    | 'assemble'
+    | 'doc'
+    | 'target_select'
+    | 'done'
+    | 'error';
   text?: string;
   workflow_id?: string;
   workflow_name?: string;

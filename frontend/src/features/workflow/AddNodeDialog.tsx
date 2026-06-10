@@ -121,7 +121,7 @@ export function AddNodeDialog({
 
           {[...grouped.entries()].map(([category, types]) => (
             <div key={category} className="mb-2">
-              <div className="sticky top-0 bg-white px-1 py-1 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+              <div className="sticky top-0 bg-ops-elevated px-1 py-1 text-[10px] font-semibold uppercase tracking-wider text-ops-tertiary">
                 {category}
               </div>
               {types.map((t) => (
@@ -129,20 +129,20 @@ export function AddNodeDialog({
                   key={t.type_id}
                   type="button"
                   onClick={() => handleSelect(t)}
-                  className="flex w-full items-center gap-3 rounded px-2 py-2 text-left text-sm hover:bg-slate-50"
+                  className="group flex w-full items-center gap-3 rounded px-2 py-2 text-left text-sm text-ops-primary hover:bg-ops-surface"
                 >
                   <span className="text-lg">{t.icon || '◆'}</span>
                   <div className="min-w-0 flex-1">
-                    <div className="font-medium text-slate-900">
+                    <div className="font-medium text-ops-primary">
                       {t.display_name}
                     </div>
                     {t.description && (
-                      <div className="truncate text-xs text-slate-500">
+                      <div className="truncate text-xs text-ops-secondary">
                         {t.description}
                       </div>
                     )}
                   </div>
-                  <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-500">
+                  <span className="rounded bg-ops-surface px-1.5 py-0.5 text-[10px] text-ops-secondary group-hover:bg-ops-elevated">
                     {t.node_kind}
                   </span>
                 </button>
