@@ -29,8 +29,8 @@ variables = []
     fail_on_error = false
     timeout_seconds = 30.0
   [nodes.position]
-    x = 420.0
-    y = 120.0
+    x = 440.5868341981218
+    y = 106.96167167452282
 
 [[nodes]]
   id = "5e30cef3-e440-47bd-82c8-62078dbeda06"

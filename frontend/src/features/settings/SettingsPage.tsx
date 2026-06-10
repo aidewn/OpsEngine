@@ -17,7 +17,11 @@ const DEFAULT_SETTINGS: AISettings = {
   timeout_seconds: 60,
 };
 
-export function SettingsPage() {
+interface SettingsPageProps {
+  embedded?: boolean;
+}
+
+export function SettingsPage({ embedded = false }: SettingsPageProps) {
   const { data, isLoading, error } = useAISettings();
   const updateSettings = useUpdateAISettings();
   const testSettings = useTestAISettings();
@@ -72,12 +76,14 @@ export function SettingsPage() {
 
   return (
     <section className="max-w-2xl">
-      <header className="mb-6">
-        <h1 className="text-2xl font-semibold text-slate-900">设置</h1>
-        <p className="mt-1 text-sm text-slate-500">
-          配置 DeepSeek API，用于 AI 对话和后续工作流生成。
-        </p>
-      </header>
+      {!embedded ? (
+        <header className="mb-6">
+          <h1 className="text-2xl font-semibold text-slate-900">设置</h1>
+          <p className="mt-1 text-sm text-slate-500">
+            配置 DeepSeek API，用于 AI 对话和后续工作流生成。
+          </p>
+        </header>
+      ) : null}
 
       {isLoading && <div className="text-sm text-slate-500">加载中...</div>}
       {error && (

@@ -42,9 +42,32 @@ func (m *memSessions) Save(s core.AISession) error {
 // memWorkflows 是 WorkflowSaver 的内存实现，仅记录最近一次写入。
 type memWorkflows struct{ saved *core.WorkflowDef }
 
+func (m *memWorkflows) Get(id string) (core.WorkflowDef, error) {
+	if m.saved != nil && m.saved.ID == id {
+		return *m.saved, nil
+	}
+	return core.WorkflowDef{}, errors.New("workflow 不存在")
+}
+
 func (m *memWorkflows) Save(wf core.WorkflowDef) error {
 	wf2 := wf
 	m.saved = &wf2
+	return nil
+}
+
+// memAssembles 是 AssembleSaver 的内存实现，仅记录最近一次写入。
+type memAssembles struct{ saved *core.AssembleDef }
+
+func (m *memAssembles) Get(id string) (core.AssembleDef, error) {
+	if m.saved != nil && m.saved.ID == id {
+		return *m.saved, nil
+	}
+	return core.AssembleDef{}, errors.New("assemble 不存在")
+}
+
+func (m *memAssembles) Save(asm core.AssembleDef) error {
+	asm2 := asm
+	m.saved = &asm2
 	return nil
 }
 
@@ -71,6 +94,15 @@ func (s *stubLLM) ChatStream(messages []clients.ChatMessage, onDelta func(string
 // ChatWithTools 在测试 stub 中等价于 Chat，但返回 ChatCompletion 结构。
 func (s *stubLLM) ChatWithTools(messages []clients.ChatMessage, _ []clients.ToolSpec) (clients.ChatCompletion, error) {
 	s.gotMessages = append(s.gotMessages, messages)
+	return clients.ChatCompletion{Content: s.reply}, nil
+}
+
+// ChatWithToolsStream 把 reply 整段当作单次 delta 推回，足够单测使用。
+func (s *stubLLM) ChatWithToolsStream(messages []clients.ChatMessage, _ []clients.ToolSpec, onContent func(string)) (clients.ChatCompletion, error) {
+	s.gotMessages = append(s.gotMessages, messages)
+	if s.reply != "" && onContent != nil {
+		onContent(s.reply)
+	}
 	return clients.ChatCompletion{Content: s.reply}, nil
 }
 
@@ -235,6 +267,53 @@ func TestRunInspectionTargetResumeNoDuplicateUser(t *testing.T) {
 	}
 	if userCount != 1 {
 		t.Fatalf("user 消息重复追加，count=%d messages=%#v", userCount, final.Messages)
+	}
+}
+
+// TestRunCreateAssembleGeneralSession 验证通用会话无需环境即可生成集合资产。
+func TestRunCreateAssembleGeneralSession(t *testing.T) {
+	sessions := newMemSessions()
+	sessions.data["sess-1"] = core.AISession{
+		ID: "sess-1", Title: "general", Scope: core.AISessionScopeGeneral,
+	}
+	emit := &bufEmitter{}
+	asmStore := &memAssembles{}
+	rt := &Runtime{
+		Sessions:  sessions,
+		Assembles: asmStore,
+		LLM: &stubLLM{reply: `{
+			"name":"安装 Docker",
+			"description":"安装 Docker 和 Docker Compose",
+			"params":[],
+			"returns":[],
+			"variables":[],
+			"nodes":[
+				{"id":"n1","type_id":"assemble_start","config":{},"position":{"x":80,"y":120}},
+				{"id":"n2","type_id":"assemble_end","config":{},"position":{"x":360,"y":120}}
+			],
+			"edges":[{"from":{"node":"n1","port":"exec_out"},"to":{"node":"n2","port":"exec_in"}}],
+			"notes":[]
+		}`},
+		Emit: emit,
+	}
+	if err := rt.Run(Request{RequestID: "req-1", SessionID: "sess-1", Message: "生成安装 Docker 和 Docker Compose 的集合"}); err != nil {
+		t.Fatalf("Run error: %v", err)
+	}
+	if asmStore.saved == nil || asmStore.saved.Name != "安装 Docker" {
+		t.Fatalf("集合未保存: %#v", asmStore.saved)
+	}
+	var seenAssemble bool
+	for _, event := range emit.events {
+		if event.Type == EventAssemble && event.AssembleID != "" {
+			seenAssemble = true
+		}
+	}
+	if !seenAssemble {
+		t.Fatalf("缺少 assemble 事件: %#v", emit.events)
+	}
+	final := sessions.data["sess-1"]
+	if len(final.Messages) != 2 || final.Messages[1].AssembleID == "" {
+		t.Fatalf("会话未记录集合产物: %#v", final.Messages)
 	}
 }
 

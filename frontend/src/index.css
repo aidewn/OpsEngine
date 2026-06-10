@@ -18,8 +18,230 @@ body {
     'PingFang SC',
     'Microsoft YaHei',
     sans-serif;
-  background: #f8fafc;
-  color: #0f172a;
+  background: #1a1a19;
+  color: #f5f4ed;
+}
+
+* {
+  scrollbar-color: #4a4a45 #1f1f1d;
+  scrollbar-width: thin;
+}
+
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+*::-webkit-scrollbar-track {
+  background: #1f1f1d;
+}
+
+*::-webkit-scrollbar-thumb {
+  border: 2px solid #1f1f1d;
+  border-radius: 999px;
+  background: #4a4a45;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: #6b6962;
+}
+
+/* 阶段 1 兼容层：把旧页面里的浅色 Tailwind 类映射到暗色 token。 */
+.bg-white {
+  background-color: #262624;
+}
+
+.bg-slate-50,
+.bg-slate-100 {
+  background-color: #1f1f1d;
+}
+
+.bg-slate-200 {
+  background-color: #3a3a36;
+}
+
+.hover\:bg-white:hover,
+.hover\:bg-slate-50:hover,
+.hover\:bg-slate-100:hover,
+.hover\:bg-slate-200:hover,
+.data-\[highlighted\]\:bg-slate-50[data-highlighted],
+.data-\[highlighted\]\:bg-slate-100[data-highlighted],
+.data-\[selected\]\:bg-slate-50[data-selected='true'],
+.data-\[selected\]\:bg-slate-100[data-selected='true'] {
+  background-color: #262624;
+}
+
+.bg-slate-900,
+.bg-slate-950 {
+  background-color: #d97757;
+}
+
+.bg-red-50,
+.bg-rose-50 {
+  background-color: rgba(239, 68, 68, 0.12);
+}
+
+.bg-red-100 {
+  background-color: rgba(239, 68, 68, 0.18);
+}
+
+.hover\:bg-red-50:hover,
+.hover\:bg-red-100:hover {
+  background-color: rgba(239, 68, 68, 0.18);
+}
+
+.bg-red-600,
+.bg-red-700 {
+  background-color: #ef4444;
+}
+
+.bg-amber-50 {
+  background-color: rgba(245, 158, 11, 0.12);
+}
+
+.bg-indigo-50,
+.bg-blue-50 {
+  background-color: rgba(96, 165, 250, 0.12);
+}
+
+.bg-emerald-50 {
+  background-color: rgba(16, 185, 129, 0.12);
+}
+
+.text-white,
+.text-slate-950,
+.text-slate-900,
+.text-slate-800,
+.text-slate-700 {
+  color: #f5f4ed;
+}
+
+.text-slate-600,
+.text-slate-500,
+.text-slate-400 {
+  color: #a8a6a1;
+}
+
+.text-slate-300 {
+  color: #6b6962;
+}
+
+.text-red-700,
+.text-red-600,
+.text-rose-700,
+.text-rose-600 {
+  color: #ef4444;
+}
+
+.text-amber-900,
+.text-amber-800,
+.text-amber-700,
+.text-amber-600 {
+  color: #f59e0b;
+}
+
+.text-indigo-700,
+.text-indigo-600,
+.text-blue-700 {
+  color: #60a5fa;
+}
+
+.text-emerald-700,
+.text-emerald-600 {
+  color: #10b981;
+}
+
+.border-slate-100,
+.border-slate-200,
+.border-slate-300 {
+  border-color: #3a3a36;
+}
+
+.border-red-200,
+.border-rose-200,
+.border-red-400 {
+  border-color: #ef4444;
+}
+
+.border-amber-200,
+.border-amber-300 {
+  border-color: #f59e0b;
+}
+
+.border-indigo-200,
+.border-blue-500 {
+  border-color: #60a5fa;
+}
+
+button,
+input,
+textarea,
+select,
+a {
+  --wails-draggable: no-drag;
+}
+
+.titlebar-drag {
+  --wails-draggable: drag;
+  user-select: none;
+}
+
+.titlebar-no-drag {
+  --wails-draggable: no-drag;
+}
+
+.titlebar-icon-button,
+.titlebar-window-button {
+  display: inline-flex;
+  width: 24px;
+  height: 24px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  color: #a8a6a1;
+  font-size: 12px;
+  line-height: 1;
+  transition:
+    background-color 120ms ease,
+    color 120ms ease;
+}
+
+.titlebar-icon-button:hover:not(:disabled),
+.titlebar-window-button:hover {
+  background: #262624;
+  color: #f5f4ed;
+}
+
+.titlebar-icon-button:disabled {
+  cursor: default;
+  color: #4a4a45;
+}
+
+.titlebar-close-button:hover {
+  background: #ef4444;
+  color: #f5f4ed;
+}
+
+.titlebar-menu-item {
+  width: 100%;
+  border-radius: 4px;
+  padding: 6px 8px;
+  text-align: left;
+  color: #6b6962;
+}
+
+.command-group [cmdk-group-heading] {
+  padding: 8px 12px 4px;
+  color: #6b6962;
+  font-size: 11px;
+  line-height: 14px;
+  text-transform: uppercase;
+}
+
+.command-group [cmdk-item] {
+  transition:
+    background-color 120ms ease,
+    color 120ms ease;
 }
 
 /* 扩大 React Flow handle 的鼠标点击区域：在 handle 外加一圈透明区 */

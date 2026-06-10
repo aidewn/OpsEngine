@@ -36,6 +36,27 @@ func (s *scriptedLLM) ChatWithTools(messages []clients.ChatMessage, _ []clients.
 	return s.turns[i], nil
 }
 
+// ChatWithToolsStream 把当前 turn 的 content 分两段回推，模拟真实流式行为。
+// 没有内容则不回推（保持 tool-only turn 的语义）。
+func (s *scriptedLLM) ChatWithToolsStream(messages []clients.ChatMessage, _ []clients.ToolSpec, onContent func(string)) (clients.ChatCompletion, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.seenCalls = append(s.seenCalls, messages)
+	i := s.idx
+	if i >= len(s.turns) {
+		i = len(s.turns) - 1
+	}
+	s.idx++
+	turn := s.turns[i]
+	// 把整段 content 切成两段推回，验证调用方按顺序累积
+	if turn.Content != "" && onContent != nil {
+		half := len(turn.Content) / 2
+		onContent(turn.Content[:half])
+		onContent(turn.Content[half:])
+	}
+	return turn, nil
+}
+
 // echoTool 返回固定文本，记录被调用次数。
 type echoTool struct {
 	called int
@@ -50,6 +71,51 @@ func (e *echoTool) Spec() tools.Spec {
 func (e *echoTool) Execute(_ tools.ToolContext, _ map[string]any) (tools.Result, error) {
 	e.called++
 	return tools.Result{Output: "hello world", DisplaySummary: "echo"}, nil
+}
+
+// TestToolLoopStreamsFinalContentToUI 验证最终回复 content 在流式过程中
+// 通过 EventDelta 推送到 UI，而不是循环结束后一次性 emit。
+// 这是 chat 工具循环用户体验改进的核心验证点。
+func TestToolLoopStreamsFinalContentToUI(t *testing.T) {
+	reg := tools.NewRegistry()
+	if err := reg.Register(&echoTool{}); err != nil {
+		t.Fatal(err)
+	}
+	llm := &scriptedLLM{turns: []clients.ChatCompletion{
+		// 第一轮纯工具调用，无 content
+		{ToolCalls: []clients.ToolCall{{
+			ID: "c1", Type: "function",
+			Function: clients.ToolCallFunc{Name: "echo", Arguments: "{}"},
+		}}},
+		// 第二轮纯文本最终回复——scriptedLLM 会把它切成两段流式推
+		{Content: "已完成分析。"},
+	}}
+	sessions := newMemSessions()
+	sessions.data["s"] = core.AISession{ID: "s", EnvironmentID: "e"}
+	emit := &bufEmitter{}
+	rt := &Runtime{
+		Sessions: sessions, Emit: emit, LLM: llm, Tools: reg,
+		Environments: func(string) (core.EnvironmentDef, error) {
+			return core.EnvironmentDef{ID: "e"}, nil
+		},
+	}
+	if err := rt.Run(Request{RequestID: "r", SessionID: "s", Message: "做点事"}); err != nil {
+		t.Fatal(err)
+	}
+	// 期望至少 2 个 EventDelta（来自 scriptedLLM 把 content 切两段）
+	deltas := []string{}
+	for _, e := range emit.events {
+		if e.Type == EventDelta {
+			deltas = append(deltas, e.Text)
+		}
+	}
+	if len(deltas) < 2 {
+		t.Fatalf("最终 content 应该被切成多段 delta 推送，实际只收到 %d 段: %#v", len(deltas), deltas)
+	}
+	// 拼接后应等于完整文本
+	if got := strings.Join(deltas, ""); got != "已完成分析。" {
+		t.Fatalf("delta 拼接结果与原文不一致: %q", got)
+	}
 }
 
 // TestToolLoopExecutesAndConverges 验证 一次工具调用 → 一次最终文本 这条主路径。

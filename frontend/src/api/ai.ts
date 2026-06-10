@@ -134,6 +134,7 @@ export function useStartAIAssistant(): UseMutationResult<
     mutationFn: (request) => StartAIAssistant(request as never),
     onSuccess: (_data, vars) => {
       qc.invalidateQueries({ queryKey: ['workflows'] });
+      qc.invalidateQueries({ queryKey: ['assembles'] });
       qc.invalidateQueries({ queryKey: KEY.sessions });
       qc.invalidateQueries({ queryKey: KEY.session(vars.session_id) });
     },

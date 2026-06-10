@@ -104,6 +104,8 @@ func (s *AISessionStore) loadLocked(id string) (core.AISession, error) {
 	if session.Scope == "" {
 		if strings.TrimSpace(session.ConfigID) != "" {
 			session.Scope = core.AISessionScopeConfig
+		} else if strings.TrimSpace(session.EnvironmentID) == "" {
+			session.Scope = core.AISessionScopeGeneral
 		} else {
 			session.Scope = core.AISessionScopeEnvironment
 		}

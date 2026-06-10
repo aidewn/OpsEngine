@@ -24,7 +24,16 @@ interface TestResultState {
   message: string;
 }
 
-export function EnvironmentDetailPage() {
+interface EnvironmentDetailPageProps {
+  backTo?: string;
+  // backLabel 默认按 backTo 推断，避免"返回首页"实际跳回环境列表这种标签骗人的情况。
+  backLabel?: string;
+}
+
+export function EnvironmentDetailPage({ backTo = '/', backLabel }: EnvironmentDetailPageProps) {
+  // 自动推断标签：根路径 → "返回首页"，环境配置入口 → "返回环境列表"。
+  const resolvedBackLabel =
+    backLabel ?? (backTo === '/' ? '← 返回首页' : '← 返回环境列表');
   const { id } = useParams<{ id: string }>();
   const { data: env, isLoading, error } = useEnvironment(id);
   const update = useUpdateEnvironment();
@@ -124,10 +133,10 @@ export function EnvironmentDetailPage() {
     <div className="mx-auto flex h-full max-w-3xl flex-col px-6 py-8">
       <header className="mb-4">
         <Link
-          to="/"
+          to={backTo}
           className="text-xs text-slate-500 hover:text-slate-700"
         >
-          ← 返回首页
+          {resolvedBackLabel}
         </Link>
         <h1 className="mt-2 text-2xl font-semibold text-slate-900">环境配置</h1>
         <div className="mt-0.5 font-mono text-xs text-slate-500">{env.id}</div>

@@ -18,6 +18,8 @@ const (
 	EventDone EventType = "done"
 	// EventWorkflow 工作流生成完成的副带数据（workflow id/name）。
 	EventWorkflow EventType = "workflow"
+	// EventAssemble 集合生成/更新完成的副带数据（assemble id/name）。
+	EventAssemble EventType = "assemble"
 	// EventDoc OpsDoc 生成完成的副带数据（doc id/title）。
 	// 当前架构分析路径在调用 OpsDocStore.Save 后用它告知前端"查看文档"按钮可用。
 	EventDoc EventType = "doc"
@@ -39,6 +41,10 @@ type Event struct {
 	Text          string         `json:"text,omitempty"`
 	WorkflowID    string         `json:"workflow_id,omitempty"`
 	WorkflowName  string         `json:"workflow_name,omitempty"`
+	AssembleID    string         `json:"assemble_id,omitempty"`
+	AssembleName  string         `json:"assemble_name,omitempty"`
+	ArtifactType  string         `json:"artifact_type,omitempty"`
+	ActionType    string         `json:"action_type,omitempty"`
 	DocID         string         `json:"doc_id,omitempty"`
 	DocTitle      string         `json:"doc_title,omitempty"`
 	TargetOptions []TargetOption `json:"target_options,omitempty"`

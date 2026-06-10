@@ -22,7 +22,7 @@ func TestNormalizeAISettingsTrimsAndFillsDefaults(t *testing.T) {
 	if got.DeepSeekBaseURL == "" || got.DeepSeekModel == "" {
 		t.Fatalf("空字段未补默认: %#v", got)
 	}
-	if got.TimeoutSeconds != 60 {
+	if got.TimeoutSeconds != 120 {
 		t.Fatalf("Timeout 未补默认: %d", got.TimeoutSeconds)
 	}
 }

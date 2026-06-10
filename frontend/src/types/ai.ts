@@ -24,6 +24,10 @@ export interface AISessionMessage {
   progress?: string[];
   workflow_id?: string;
   workflow_name?: string;
+  assemble_id?: string;
+  assemble_name?: string;
+  artifact_type?: 'assemble' | 'workflow' | 'doc';
+  action_type?: 'create' | 'update';
   /** 指向消息产生时落地的 OpsDoc，前端用于"查看文档"跳转。 */
   doc_id?: string;
   doc_title?: string;
@@ -37,7 +41,7 @@ export interface AISessionMessage {
 // AISessionScope 标识会话工作范围：
 //  - 'environment'：环境级，Agent 可看到环境下所有配置（默认）
 //  - 'config'：单配置范围，强绑 ConfigID（旧行为）
-export type AISessionScope = 'environment' | 'config';
+export type AISessionScope = 'general' | 'environment' | 'config';
 
 // AISession 是一次完整的 AI 对话上下文。
 export interface AISession {
@@ -61,11 +65,15 @@ export interface AIAssistantRequest {
   /** 已存在的会话 ID。 */
   session_id: string;
   /** 兼容字段；传 auto 时由后端根据输入判断行为。 */
-  operation?: 'auto';
+  operation?: 'auto' | 'create_assemble' | 'update_assemble' | 'update_workflow';
   /** 用户输入内容。 */
   message: string;
   /** target_select 后用户选定的本轮目标配置。 */
   target_config_id?: string;
+  /** 当前正在迭代的资产类型。 */
+  artifact_type?: 'assemble' | 'workflow';
+  /** 当前正在迭代的资产 ID。 */
+  artifact_id?: string;
 }
 
 // AITargetOption 是后端要求用户选择目标配置时返回的候选项。
@@ -78,10 +86,14 @@ export interface AITargetOption {
 export interface AIAssistantEvent {
   request_id: string;
   session_id?: string;
-  type: 'delta' | 'progress' | 'workflow' | 'doc' | 'target_select' | 'done' | 'error';
+  type: 'delta' | 'progress' | 'workflow' | 'assemble' | 'doc' | 'target_select' | 'done' | 'error';
   text?: string;
   workflow_id?: string;
   workflow_name?: string;
+  assemble_id?: string;
+  assemble_name?: string;
+  artifact_type?: 'assemble' | 'workflow' | 'doc';
+  action_type?: 'create' | 'update';
   doc_id?: string;
   doc_title?: string;
   target_options?: AITargetOption[];

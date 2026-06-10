@@ -35,6 +35,9 @@ type Request struct {
 	Message   string
 	// TargetConfigID 是前端在 target_select 后回传的本轮目标配置；只影响当前 turn。
 	TargetConfigID string
+	// ArtifactType / ArtifactID 指向用户正在迭代的资产。
+	ArtifactType string
+	ArtifactID   string
 }
 
 // Runtime 持有完成一轮所需的全部依赖。
@@ -42,6 +45,7 @@ type Request struct {
 type Runtime struct {
 	Sessions     SessionStore
 	Workflows    WorkflowSaver
+	Assembles    AssembleSaver
 	OpsDocs      OpsDocSaver
 	Environments EnvironmentLookup
 	EnvList      EnvironmentLister
@@ -68,6 +72,8 @@ func (r *Runtime) Run(req Request) error {
 	req.SessionID = strings.TrimSpace(req.SessionID)
 	req.Message = strings.TrimSpace(req.Message)
 	req.TargetConfigID = strings.TrimSpace(req.TargetConfigID)
+	req.ArtifactType = strings.TrimSpace(req.ArtifactType)
+	req.ArtifactID = strings.TrimSpace(req.ArtifactID)
 	decision := intent.Resolve(req.Operation, req.Message)
 
 	if req.RequestID == "" {
@@ -116,6 +122,12 @@ func (r *Runtime) Run(req Request) error {
 	switch decision.Kind {
 	case intent.KindInspectServer:
 		r.handleInspection(req, session)
+	case intent.KindCreateAssemble:
+		r.handleAssemble(req, session, false)
+	case intent.KindUpdateAssemble:
+		r.handleAssemble(req, session, true)
+	case intent.KindUpdateWorkflow:
+		r.handleWorkflowUpdate(req, session)
 	case intent.KindGenerateWorkflow:
 		r.handleWorkflow(req, session)
 	case intent.KindTroubleshoot:

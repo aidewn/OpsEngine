@@ -13,13 +13,39 @@ import (
 
 // Register 把内置工具注册到给定 Registry。
 // 调用方（ai.go）在 App 启动时调用一次即可。
+//
+// 工具分组：
+//   - env_*：环境清单
+//   - ssh_*：SSH 主机操作（命令、日志、文件读取）
+//   - docker_*：Docker 容器与镜像
+//   - k8s_*：K8s Pod 与 Workload
+//   - jenkins_*：Jenkins 任务
+//   - local_*：OpsEngine 主机本机文件
 func Register(reg *tools.Registry) error {
 	for _, t := range []tools.Tool{
+		// 环境
 		EnvInventory{},
+		// SSH 主机
 		SSHInspect{},
 		SSHListDir{},
 		SSHReadLog{},
+		SSHReadFile{},
+		SSHFindFiles{},
 		SSHProcessList{},
+		// Docker
+		DockerListContainers{},
+		DockerContainerLogs{},
+		DockerContainerInspect{},
+		DockerListImages{},
+		// K8s
+		K8sListPods{},
+		K8sListWorkloads{},
+		K8sDescribePod{},
+		// Jenkins
+		JenkinsListJobs{},
+		// Local（OpsEngine 主机）
+		LocalListDir{},
+		LocalFindFiles{},
 	} {
 		if err := reg.Register(t); err != nil {
 			return err

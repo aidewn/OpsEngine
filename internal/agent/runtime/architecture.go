@@ -22,6 +22,10 @@ import (
 // handleArchitecture 处理 intent.KindAnalyzeArchitecture。
 func (r *Runtime) handleArchitecture(req Request, session core.AISession) {
 	progress := []string{}
+	if session.EnvironmentID == "" {
+		r.emitError(req.RequestID, session.ID, "架构分析需要真实环境上下文。请先在 Chat 顶部选择环境，再重新发送架构分析需求。")
+		return
+	}
 
 	if r.OpsDocs == nil {
 		r.emitError(req.RequestID, session.ID, "文档存储未注入，无法生成架构报告")

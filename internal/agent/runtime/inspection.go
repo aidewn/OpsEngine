@@ -36,6 +36,10 @@ func (r *Runtime) resolveSSHTarget(session core.AISession, targetConfigID string
 // handleInspection 处理 intent.KindInspectServer。
 func (r *Runtime) handleInspection(req Request, session core.AISession) {
 	progress := []string{}
+	if session.EnvironmentID == "" {
+		r.emitError(req.RequestID, session.ID, "巡检需要真实环境上下文。请先在 Chat 顶部选择环境或 SSH 配置，再重新发送巡检需求。")
+		return
+	}
 
 	r.emitProgress(req.RequestID, session.ID, "正在请求大模型生成巡检计划", &progress)
 	systemPrompt, err := prompt.BuildInspectionPlanPrompt(prompt.InspectionInputs{

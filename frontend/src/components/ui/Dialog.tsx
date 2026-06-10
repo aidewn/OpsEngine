@@ -1,6 +1,5 @@
-// 基于 Radix Dialog 的模态框封装
-// 仅暴露最常用的 API，复杂场景再扩展
-
+// 基于 Radix Dialog 的模态框封装。
+// 阶段 1 增加暗色 token 与尺寸配置。
 import * as RadixDialog from '@radix-ui/react-dialog';
 import { type ReactNode } from 'react';
 import { cn } from '@/lib/cn';
@@ -12,8 +11,17 @@ interface DialogProps {
   description?: string;
   children: ReactNode;
   footer?: ReactNode;
+  size?: 'sm' | 'md' | 'lg' | 'xl' | 'fullscreen';
   contentClassName?: string;
 }
+
+const sizeClass = {
+  sm: 'max-w-sm',
+  md: 'max-w-md',
+  lg: 'max-w-2xl',
+  xl: 'max-w-5xl',
+  fullscreen: 'h-[calc(100vh-48px)] max-w-[calc(100vw-48px)]',
+};
 
 export function Dialog({
   open,
@@ -22,6 +30,7 @@ export function Dialog({
   description,
   children,
   footer,
+  size = 'md',
   contentClassName,
 }: DialogProps) {
   return (
@@ -29,23 +38,24 @@ export function Dialog({
       <RadixDialog.Portal>
         <RadixDialog.Overlay
           className={cn(
-            'fixed inset-0 z-40 bg-black/40',
+            'fixed inset-0 z-40 bg-ops-overlay',
             'data-[state=open]:animate-in data-[state=open]:fade-in-0',
           )}
         />
         <RadixDialog.Content
           className={cn(
-            'fixed left-1/2 top-1/2 z-50 w-full max-w-md -translate-x-1/2 -translate-y-1/2',
-            'rounded-lg bg-white p-6 shadow-xl',
+            'fixed left-1/2 top-1/2 z-50 w-full -translate-x-1/2 -translate-y-1/2',
+            'rounded-lg border border-ops-border-subtle bg-ops-elevated p-6 text-ops-primary shadow-2xl',
             'focus:outline-none',
+            sizeClass[size],
             contentClassName,
           )}
         >
-          <RadixDialog.Title className="text-lg font-semibold text-slate-900">
+          <RadixDialog.Title className="text-lg font-semibold text-ops-primary">
             {title}
           </RadixDialog.Title>
           {description && (
-            <RadixDialog.Description className="mt-1 text-sm text-slate-500">
+            <RadixDialog.Description className="mt-1 text-sm text-ops-secondary">
               {description}
             </RadixDialog.Description>
           )}

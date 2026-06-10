@@ -1,0 +1,125 @@
+id = "8cace09d-a9bc-4f60-b67e-c6e5894eeee9"
+name = "部署"
+description = ""
+
+[[variables]]
+  name = "SSH"
+  var_type = "LinuxSshConnection"
+
+[[nodes]]
+  id = "b688eee9-b72a-4d45-855f-179f3472a1c9"
+  type = "system_ready"
+  [nodes.config]
+  [nodes.position]
+    x = 80.0
+    y = 80.0
+
+[[nodes]]
+  id = "27632bf8-d703-4189-8ec8-fd9eeeb348d2"
+  type = "system_update"
+  [nodes.config]
+    delta_seconds = 60.0
+    delta_type = "interval"
+  [nodes.position]
+    x = 80.0
+    y = 280.0
+
+[[nodes]]
+  id = "0c2cfad1-a960-447c-8bdf-c90fabec4370"
+  type = "system_over"
+  [nodes.config]
+  [nodes.position]
+    x = 80.0
+    y = 480.0
+
+[[nodes]]
+  id = "9a2facc4-32de-44a8-a6cd-b752ec049e83"
+  type = "assemble:4dd29e36-e086-45c1-8032-dacedd20837f"
+  [nodes.config]
+  [nodes.position]
+    x = 653.5259616471606
+    y = 29.213780605145274
+
+[[nodes]]
+  id = "cb7fef8e-0710-411a-965d-15221d76ebd7"
+  type = "env_connect_ssh"
+  [nodes.config]
+    config_id = "cc951b78-46bc-4777-ac8f-41b7f560bec9"
+    environment_id = "1638a7ba-e778-4267-b296-1afba582fea6"
+  [nodes.position]
+    x = 306.5
+    y = 75.5
+
+[[nodes]]
+  id = "93c41853-7c1c-467b-b4cc-6303dd5f21ad"
+  type = "assemble:24711966-b120-4927-b6b0-4a9b27136d4b"
+  [nodes.config]
+  [nodes.position]
+    x = 976.1242817633612
+    y = 73.44504906089603
+
+[[nodes]]
+  id = "b3d64ab3-7758-4979-b4e5-8f0683efe5b8"
+  type = "var_set"
+  [nodes.config]
+    var_name = "SSH"
+    var_type = "LinuxSshConnection"
+  [nodes.position]
+    x = 485.98889393775937
+    y = -3.9646289196916413
+
+[[edges]]
+  [edges.from]
+    node = "b688eee9-b72a-4d45-855f-179f3472a1c9"
+    port = "exec_out"
+  [edges.to]
+    node = "cb7fef8e-0710-411a-965d-15221d76ebd7"
+    port = "exec_in"
+
+[[edges]]
+  [edges.from]
+    node = "cb7fef8e-0710-411a-965d-15221d76ebd7"
+    port = "client"
+  [edges.to]
+    node = "9a2facc4-32de-44a8-a6cd-b752ec049e83"
+    port = "param_ssh"
+
+[[edges]]
+  [edges.from]
+    node = "9a2facc4-32de-44a8-a6cd-b752ec049e83"
+    port = "exec_out"
+  [edges.to]
+    node = "93c41853-7c1c-467b-b4cc-6303dd5f21ad"
+    port = "exec_in"
+
+[[edges]]
+  [edges.from]
+    node = "cb7fef8e-0710-411a-965d-15221d76ebd7"
+    port = "client"
+  [edges.to]
+    node = "93c41853-7c1c-467b-b4cc-6303dd5f21ad"
+    port = "param_param_ssh"
+
+[[edges]]
+  [edges.from]
+    node = "cb7fef8e-0710-411a-965d-15221d76ebd7"
+    port = "client"
+  [edges.to]
+    node = "b3d64ab3-7758-4979-b4e5-8f0683efe5b8"
+    port = "value"
+
+[[edges]]
+  [edges.from]
+    node = "cb7fef8e-0710-411a-965d-15221d76ebd7"
+    port = "exec_out"
+  [edges.to]
+    node = "b3d64ab3-7758-4979-b4e5-8f0683efe5b8"
+    port = "exec_in"
+
+[[edges]]
+  [edges.from]
+    node = "b3d64ab3-7758-4979-b4e5-8f0683efe5b8"
+    port = "exec_out"
+  [edges.to]
+    node = "9a2facc4-32de-44a8-a6cd-b752ec049e83"
+    port = "exec_in"

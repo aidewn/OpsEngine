@@ -14,6 +14,12 @@ const (
 	KindChat Kind = "chat"
 	// KindGenerateWorkflow 用户明确要求生成可执行工作流。
 	KindGenerateWorkflow Kind = "generate_workflow"
+	// KindCreateAssemble 用户明确要求生成可复用集合。
+	KindCreateAssemble Kind = "create_assemble"
+	// KindUpdateAssemble 用户要求修改当前或指定集合。
+	KindUpdateAssemble Kind = "update_assemble"
+	// KindUpdateWorkflow 用户要求修改当前或指定工作流。
+	KindUpdateWorkflow Kind = "update_workflow"
 	// KindInspectServer 用户要求做服务器巡检：走两阶段生成（LLM 出 Plan，后端拼工作流）。
 	// 比 KindGenerateWorkflow 更具体、更稳定，所以路由时应优先命中。
 	KindInspectServer Kind = "inspect_server"
@@ -56,6 +62,17 @@ var troubleshootKeywords = []string{
 var workflowKeywords = []string{
 	"工作流", "流程",
 	"workflow", "pipeline",
+}
+
+// assembleKeywords 触发 create_assemble。集合是可复用资产，优先于工作流判定。
+var assembleKeywords = []string{
+	"集合", "可复用节点", "复用模块", "assemble", "module",
+}
+
+// updateKeywords 触发当前资产迭代，需结合 operation 或前端传入的上下文使用。
+var updateKeywords = []string{
+	"修改", "调整", "更新", "改成", "再加", "加一个", "删除", "移除",
+	"update", "modify", "change", "add", "remove",
 }
 
 // negativeKeywords 命中其一时强制回退到 chat，覆盖"解释一下"/"不要生成"等场景。
@@ -109,8 +126,19 @@ func Resolve(operation, message string) Result {
 			return Result{Kind: KindAnalyzeArchitecture, Reason: "命中架构关键词：" + kw}
 		}
 	}
+	for _, kw := range assembleKeywords {
+		if strings.Contains(text, kw) {
+			if containsAny(text, updateKeywords) {
+				return Result{Kind: KindUpdateAssemble, Reason: "命中集合修改关键词：" + kw}
+			}
+			return Result{Kind: KindCreateAssemble, Reason: "命中集合关键词：" + kw}
+		}
+	}
 	for _, kw := range workflowKeywords {
 		if strings.Contains(text, kw) {
+			if containsAny(text, updateKeywords) {
+				return Result{Kind: KindUpdateWorkflow, Reason: "命中工作流修改关键词：" + kw}
+			}
 			return Result{Kind: KindGenerateWorkflow, Reason: "命中工作流关键词：" + kw}
 		}
 	}
@@ -119,3 +147,12 @@ func Resolve(operation, message string) Result {
 
 // String 让 Kind 可直接拼接到日志/事件文本中。
 func (k Kind) String() string { return string(k) }
+
+func containsAny(text string, keywords []string) bool {
+	for _, kw := range keywords {
+		if strings.Contains(text, kw) {
+			return true
+		}
+	}
+	return false
+}

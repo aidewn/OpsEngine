@@ -23,6 +23,8 @@ import (
 type Draft struct {
 	Name        string             `json:"name"`
 	Description string             `json:"description"`
+	Params      []core.ParamDef    `json:"params"`
+	Returns     []core.ParamDef    `json:"returns"`
 	Variables   []core.VariableDef `json:"variables"`
 	Nodes       []DraftNode        `json:"nodes"`
 	Edges       []DraftEdge        `json:"edges"`
@@ -81,6 +83,22 @@ func ParseDraft(reply string) (Draft, error) {
 // Materialize 把草案转成 core.WorkflowDef：临时 id 重写、节点类型校验、边重映射，最后跑整体校验。
 // checker 为 nil 时跳过节点类型校验（仅供单元测试使用，生产路径必须传入）。
 func Materialize(draft Draft, checker NodeTypeChecker) (core.WorkflowDef, error) {
+	return materializeWorkflow(draft, "", checker)
+}
+
+// MaterializeWorkflowUpdate 把草案落成指定 ID 的工作流，用于 AI 直接更新已有工作流。
+func MaterializeWorkflowUpdate(draft Draft, existing core.WorkflowDef, checker NodeTypeChecker) (core.WorkflowDef, error) {
+	wf, err := materializeWorkflow(draft, existing.ID, checker)
+	if err != nil {
+		return core.WorkflowDef{}, err
+	}
+	if strings.TrimSpace(wf.Name) == "" {
+		wf.Name = existing.Name
+	}
+	return wf, nil
+}
+
+func materializeWorkflow(draft Draft, fixedID string, checker NodeTypeChecker) (core.WorkflowDef, error) {
 	idMap := make(map[string]string, len(draft.Nodes))
 	nodes := make([]core.NodeInstance, 0, len(draft.Nodes))
 	for _, n := range draft.Nodes {
@@ -135,7 +153,7 @@ func Materialize(draft Draft, checker NodeTypeChecker) (core.WorkflowDef, error)
 		variables = []core.VariableDef{}
 	}
 	wf := core.WorkflowDef{
-		ID:          uuid.New().String(),
+		ID:          chooseID(fixedID),
 		Name:        name,
 		Description: strings.TrimSpace(draft.Description),
 		Variables:   variables,
@@ -146,4 +164,96 @@ func Materialize(draft Draft, checker NodeTypeChecker) (core.WorkflowDef, error)
 		return core.WorkflowDef{}, fmt.Errorf("AI 生成工作流校验失败: %w", err)
 	}
 	return wf, nil
+}
+
+// MaterializeAssemble 把草案转成集合定义，并执行集合专用校验。
+func MaterializeAssemble(draft Draft, fixedID string, checker NodeTypeChecker) (core.AssembleDef, error) {
+	idMap := make(map[string]string, len(draft.Nodes))
+	nodes := make([]core.NodeInstance, 0, len(draft.Nodes))
+	for _, n := range draft.Nodes {
+		tempID := strings.TrimSpace(n.ID)
+		if tempID == "" {
+			return core.AssembleDef{}, errors.New("AI 节点缺少 id")
+		}
+		if _, dup := idMap[tempID]; dup {
+			return core.AssembleDef{}, fmt.Errorf("AI 节点 id 重复: %s", tempID)
+		}
+		typeID := strings.TrimSpace(n.TypeID)
+		if typeID == "system_ready" {
+			return core.AssembleDef{}, errors.New("集合不能包含 system_ready，请使用 assemble_start 作为入口")
+		}
+		if checker != nil {
+			if err := checker(typeID); err != nil {
+				return core.AssembleDef{}, err
+			}
+		}
+		instanceID := uuid.New().String()
+		idMap[tempID] = instanceID
+		cfg := n.Config
+		if cfg == nil {
+			cfg = map[string]any{}
+		}
+		nodes = append(nodes, core.NodeInstance{
+			InstanceID: instanceID,
+			TypeID:     typeID,
+			Config:     cfg,
+			Position:   core.Position{X: n.Position.X, Y: n.Position.Y},
+		})
+	}
+
+	edges := make([]core.EdgeConfig, 0, len(draft.Edges))
+	for _, e := range draft.Edges {
+		fromID, ok := idMap[e.From.Node]
+		if !ok {
+			return core.AssembleDef{}, fmt.Errorf("边引用未知节点: %s", e.From.Node)
+		}
+		toID, ok := idMap[e.To.Node]
+		if !ok {
+			return core.AssembleDef{}, fmt.Errorf("边引用未知节点: %s", e.To.Node)
+		}
+		edges = append(edges, core.EdgeConfig{
+			From: core.PortRef{Node: fromID, Port: strings.TrimSpace(e.From.Port)},
+			To:   core.PortRef{Node: toID, Port: strings.TrimSpace(e.To.Port)},
+		})
+	}
+
+	name := strings.TrimSpace(draft.Name)
+	if name == "" {
+		name = "AI 生成集合"
+	}
+	asm := core.AssembleDef{
+		ID:          chooseID(fixedID),
+		Name:        name,
+		Description: strings.TrimSpace(draft.Description),
+		Params:      safeParams(draft.Params),
+		Returns:     safeParams(draft.Returns),
+		Variables:   safeVariables(draft.Variables),
+		Nodes:       nodes,
+		Edges:       edges,
+	}
+	if err := engine.ValidateAssemble(asm); err != nil {
+		return core.AssembleDef{}, fmt.Errorf("AI 生成集合校验失败: %w", err)
+	}
+	return asm, nil
+}
+
+func chooseID(fixedID string) string {
+	if strings.TrimSpace(fixedID) != "" {
+		return strings.TrimSpace(fixedID)
+	}
+	return uuid.New().String()
+}
+
+func safeParams(params []core.ParamDef) []core.ParamDef {
+	if params == nil {
+		return []core.ParamDef{}
+	}
+	return params
+}
+
+func safeVariables(variables []core.VariableDef) []core.VariableDef {
+	if variables == nil {
+		return []core.VariableDef{}
+	}
+	return variables
 }

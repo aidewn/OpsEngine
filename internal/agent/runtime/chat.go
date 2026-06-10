@@ -73,19 +73,15 @@ func (r *Runtime) runConversationTurn(req Request, session core.AISession, opts 
 
 	assistant := strings.Builder{}
 	if r.Tools != nil && !r.Tools.IsEmpty() {
-		// 启用工具时走非流式工具循环；最终回复一次性 emit 成 delta，保持前端渲染契约。
+		// 启用工具时走流式工具循环：runChatToolLoop 内部对每轮 LLM 调用
+		// 走 ChatWithToolsStream 并把 content delta 直接 Emit，所以这里
+		// 拿到的 text 已经被前端渲染过；只需累积进 assistant 用于落库。
 		text, err := r.runChatToolLoop(req, session, messages, &progress)
 		if err != nil {
 			r.emitError(req.RequestID, session.ID, err.Error())
 			return
 		}
 		assistant.WriteString(text)
-		if text != "" {
-			r.Emit.Emit(Event{
-				RequestID: req.RequestID, SessionID: session.ID,
-				Type: EventDelta, Text: text,
-			})
-		}
 	} else {
 		_, err = r.LLM.ChatStream(messages, func(delta string) {
 			assistant.WriteString(delta)
@@ -120,6 +116,9 @@ func (r *Runtime) runConversationTurn(req Request, session core.AISession, opts 
 // 返回 Inventory 与渲染好的文本；任意一步失败时返回零值，调用方继续往下走。
 func (r *Runtime) buildInventory(req Request, session core.AISession, progress *[]string) (agentctx.Inventory, string) {
 	if r.Environments == nil {
+		return agentctx.Inventory{}, ""
+	}
+	if strings.TrimSpace(session.EnvironmentID) == "" {
 		return agentctx.Inventory{}, ""
 	}
 	env, err := r.Environments(session.EnvironmentID)

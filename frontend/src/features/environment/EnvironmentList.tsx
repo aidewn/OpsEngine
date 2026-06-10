@@ -8,7 +8,11 @@ import { Dialog } from '@/components/ui/Dialog';
 import { useEnvironments, useDeleteEnvironment } from '@/api/environments';
 import { CreateEnvironmentDialog } from './CreateEnvironmentDialog';
 
-export function EnvironmentList() {
+interface EnvironmentListProps {
+  detailPathPrefix?: string;
+}
+
+export function EnvironmentList({ detailPathPrefix = '/environments' }: EnvironmentListProps) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deleteDialog, setDeleteDialog] = useState<{
     open: boolean;
@@ -45,7 +49,7 @@ export function EnvironmentList() {
             {data.map((env) => (
               <li key={env.id}>
                 <div className="flex items-center justify-between px-4 py-3 hover:bg-slate-50">
-                  <Link to={`/environments/${env.id}`} className="flex-1">
+                  <Link to={`${detailPathPrefix}/${env.id}`} className="flex-1">
                     <div className="text-sm font-medium text-slate-900">
                       {env.name}
                     </div>

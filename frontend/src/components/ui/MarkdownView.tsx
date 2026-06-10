@@ -1,17 +1,17 @@
-// 轻量 Markdown 渲染组件，覆盖 OpsDoc 报告常用的标题/列表/引用/代码块/行内代码/粗体。
-// 不引入 react-markdown 等依赖以保持 bundle 体积；如果未来报告需要表格、链接等更多语法，再切换库。
-
+// 轻量 Markdown 渲染组件，覆盖 OpsDoc 报告常用的标题、列表、引用、代码块、行内代码和粗体。
+// 暂不引入 react-markdown，后续需要表格或链接等更多语法时再切换库。
 import type { JSX } from 'react';
+import { MermaidView } from './MermaidView';
 
 export function MarkdownView({ body, className }: { body: string; className?: string }) {
   return (
-    <div className={`space-y-3 text-sm leading-6 text-slate-800 ${className ?? ''}`.trim()}>
+    <div className={`space-y-3 text-sm leading-6 text-ops-primary ${className ?? ''}`.trim()}>
       {renderBlocks(body)}
     </div>
   );
 }
 
-// renderBlocks 把 Markdown 切成段落级块（代码块 / 标题 / 列表 / 引用 / 普通段）。
+// renderBlocks 把 Markdown 切成段落级块。
 function renderBlocks(body: string) {
   const lines = body.split(/\r?\n/);
   const blocks: JSX.Element[] = [];
@@ -35,17 +35,22 @@ function renderBlocks(body: string) {
   for (const line of lines) {
     if (line.startsWith('```')) {
       if (code) {
-        blocks.push(
-          <pre
-            key={`code-${blocks.length}`}
-            className="overflow-auto rounded-md bg-slate-950 px-3 py-2 text-xs leading-5 text-slate-100"
-          >
-            {codeLang && (
-              <div className="mb-1 text-[10px] uppercase text-slate-400">{codeLang}</div>
-            )}
-            <code>{code.join('\n')}</code>
-          </pre>,
-        );
+        const codeBody = code.join('\n');
+        if (codeLang.toLowerCase() === 'mermaid') {
+          blocks.push(<MermaidView key={`mermaid-${blocks.length}`} source={codeBody} />);
+        } else {
+          blocks.push(
+            <pre
+              key={`code-${blocks.length}`}
+              className="overflow-auto rounded-md bg-ops-input px-3 py-2 text-xs leading-5 text-ops-primary"
+            >
+              {codeLang && (
+                <div className="mb-1 text-[10px] uppercase text-ops-tertiary">{codeLang}</div>
+              )}
+              <code>{codeBody}</code>
+            </pre>,
+          );
+        }
         code = null;
         codeLang = '';
       } else {
@@ -70,14 +75,14 @@ function renderBlocks(body: string) {
       flushList();
       const level = heading[1]!.length;
       const text = heading[2]!;
-      const className =
+      const headingClassName =
         level === 1
-          ? 'border-b border-slate-200 pb-2 text-lg font-semibold text-slate-950'
+          ? 'border-b border-ops-border-subtle pb-2 text-lg font-semibold text-ops-primary'
           : level === 2
-            ? 'pt-2 text-base font-semibold text-slate-900'
-            : 'text-sm font-semibold text-slate-800';
+            ? 'pt-2 text-base font-semibold text-ops-primary'
+            : 'text-sm font-semibold text-ops-primary';
       blocks.push(
-        <div key={`heading-${blocks.length}`} className={className}>
+        <div key={`heading-${blocks.length}`} className={headingClassName}>
           {renderInline(text)}
         </div>,
       );
@@ -88,7 +93,7 @@ function renderBlocks(body: string) {
       blocks.push(
         <blockquote
           key={`quote-${blocks.length}`}
-          className="rounded-md border-l-4 border-amber-300 bg-amber-50 px-3 py-2 text-amber-900"
+          className="rounded-md border-l-4 border-ops-warning bg-ops-warning-soft px-3 py-2 text-ops-primary"
         >
           {renderInline(trimmed.replace(/^>\s?/, ''))}
         </blockquote>,
@@ -111,7 +116,7 @@ function renderBlocks(body: string) {
   return blocks;
 }
 
-// renderInline 处理行内代码（`code`）与粗体（**bold**）。
+// renderInline 处理行内代码与粗体。
 function renderInline(text: string) {
   const parts = text.split(/(`[^`]+`|\*\*[^*]+\*\*)/g);
   return parts.map((part, index) => {
@@ -119,7 +124,7 @@ function renderInline(text: string) {
       return (
         <code
           key={index}
-          className="rounded bg-slate-100 px-1 py-0.5 font-mono text-xs text-slate-800"
+          className="rounded bg-ops-input px-1 py-0.5 font-mono text-xs text-ops-primary"
         >
           {part.slice(1, -1)}
         </code>
@@ -127,7 +132,7 @@ function renderInline(text: string) {
     }
     if (part.startsWith('**') && part.endsWith('**')) {
       return (
-        <strong key={index} className="font-semibold text-slate-950">
+        <strong key={index} className="font-semibold text-ops-primary">
           {part.slice(2, -2)}
         </strong>
       );

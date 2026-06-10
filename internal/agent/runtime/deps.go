@@ -20,7 +20,14 @@ type SessionStore interface {
 
 // WorkflowSaver 让 Runtime 只能写工作流，不能列举或删除，缩小可影响范围。
 type WorkflowSaver interface {
+	Get(id string) (core.WorkflowDef, error)
 	Save(wf core.WorkflowDef) error
+}
+
+// AssembleSaver 让 Runtime 可以读取并保存集合，用于 AI 生成与迭代可复用资产。
+type AssembleSaver interface {
+	Get(id string) (core.AssembleDef, error)
+	Save(asm core.AssembleDef) error
 }
 
 // OpsDocSaver 让 Runtime 只能写文档；列举/删除走 ai.go 的 RPC。
@@ -48,4 +55,7 @@ type LLMProvider interface {
 	// ChatWithTools 支持 OpenAI function calling 协议；非流式。
 	// 工具未启用时（tools 为 nil 或空），等价于 Chat 但返回 ChatCompletion 结构。
 	ChatWithTools(messages []clients.ChatMessage, tools []clients.ToolSpec) (clients.ChatCompletion, error)
+	// ChatWithToolsStream 是 ChatWithTools 的流式版本；content 通过 onContent 实时回调，
+	// 同时累积 tool_calls 等流式结束后一并返回。chat 工具循环用它给用户实时反馈。
+	ChatWithToolsStream(messages []clients.ChatMessage, tools []clients.ToolSpec, onContent func(string)) (clients.ChatCompletion, error)
 }

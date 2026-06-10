@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 )
 
 // TestValidateReturnsConfigError 验证 BaseURL/Model 缺失时归为配置错误。
@@ -66,6 +67,34 @@ func TestInvalidJSONIsResponseError(t *testing.T) {
 	var llmErr *LLMError
 	if !errors.As(err, &llmErr) || llmErr.Kind != LLMErrorResponse {
 		t.Fatalf("expected LLMErrorResponse, got %v", err)
+	}
+}
+
+// TestSlowResponseTimeoutIsNetworkError 验证响应读取阶段的超时不再被误判为"解析失败"。
+// 模拟：server 接受连接、返回 200，但故意延迟 1.5s 写响应体，客户端 timeout 1s。
+func TestSlowResponseTimeoutIsNetworkError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(200)
+		// flush header 后阻塞，让客户端 timeout 在读 body 时触发
+		if f, ok := w.(http.Flusher); ok {
+			f.Flush()
+		}
+		time.Sleep(1500 * time.Millisecond)
+		_, _ = w.Write([]byte(`{"choices":[{"message":{"content":"hi"}}]}`))
+	}))
+	defer srv.Close()
+	c := LLMClient{BaseURL: srv.URL, Model: "x", TimeoutSeconds: 1}
+	_, err := c.Chat(context.Background(), []ChatMessage{{Role: "user", Content: "hi"}})
+	var llmErr *LLMError
+	if !errors.As(err, &llmErr) {
+		t.Fatalf("expected LLMError, got %v", err)
+	}
+	if llmErr.Kind != LLMErrorNetwork {
+		t.Fatalf("expected LLMErrorNetwork (timeout in read), got Kind=%s msg=%s", llmErr.Kind, llmErr.Error())
+	}
+	if !strings.Contains(llmErr.Error(), "请求超时") {
+		t.Fatalf("expected 请求超时 hint, got %s", llmErr.Error())
 	}
 }
 

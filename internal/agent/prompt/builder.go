@@ -47,6 +47,31 @@ func BuildWorkflowSystemPrompt(in WorkflowInputs) (string, error) {
 	})
 }
 
+// BuildAssembleSystemPrompt 渲染集合生成/修改场景的 system prompt。
+func BuildAssembleSystemPrompt(in WorkflowInputs, current string) (string, error) {
+	nodeJSON, err := marshalJSON(SummarizeNodeTypes(in.NodeTypes))
+	if err != nil {
+		return "", err
+	}
+	envJSON, err := marshalJSON(SummarizeEnvironments(in.Environments))
+	if err != nil {
+		return "", err
+	}
+	prefJSON, err := marshalJSON(map[string]string{
+		"environment_id": in.PreferredEnvironmentID,
+		"ssh_config_id":  in.PreferredConfigID,
+	})
+	if err != nil {
+		return "", err
+	}
+	return renderTemplate(templateAssembleGeneration, map[string]string{
+		"NodeCatalog":     nodeJSON,
+		"Environments":    envJSON,
+		"Preference":      prefJSON,
+		"CurrentAssemble": current,
+	})
+}
+
 // InspectionInputs 是巡检计划 prompt 的注入参数。
 // 比 WorkflowInputs 窄：模型不需要节点目录，只需要知道目标环境是哪个。
 type InspectionInputs struct {

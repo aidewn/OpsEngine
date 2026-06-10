@@ -13,6 +13,7 @@ import {
 } from 'react';
 import { EventsOn } from '@wails/runtime/runtime';
 import { useQueryClient } from '@tanstack/react-query';
+import { hasWailsRuntime } from '@/lib/wailsRuntime';
 import type {
   ExecutionRecord,
   ExecutionSnapshot,
@@ -271,6 +272,8 @@ export function ExecutionStoreProvider({ children }: { children: ReactNode }) {
   const qc = useQueryClient();
 
   useEffect(() => {
+    if (!hasWailsRuntime()) return undefined;
+
     const invalidateList = () => {
       qc.invalidateQueries({ queryKey: ['executions'] });
     };

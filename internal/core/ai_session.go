@@ -8,12 +8,14 @@ import "time"
 //
 //   - AISessionScopeEnvironment：环境级会话，Agent 可看到环境下所有配置，适合架构分析、多机巡检。
 //   - AISessionScopeConfig：单配置会话（旧行为），强绑某个 SSH/Docker/K8s 配置。
+//   - AISessionScopeGeneral：通用会话，不绑定环境，适合生成/修改工作流、集合等可复用资产。
 //
 // 新建会话默认环境级；显式指定 ConfigID 时才会落到 config 范围。
 // 旧会话文件没有 Scope 字段，store 加载时按 ConfigID 是否为空自动补值（参见 AISessionStore.loadLocked）。
 type AISessionScope string
 
 const (
+	AISessionScopeGeneral     AISessionScope = "general"
 	AISessionScopeEnvironment AISessionScope = "environment"
 	AISessionScopeConfig      AISessionScope = "config"
 )
@@ -38,6 +40,10 @@ type AISessionMessage struct {
 	Progress     []string             `json:"progress,omitempty"      toml:"progress,omitempty"`
 	WorkflowID   string               `json:"workflow_id,omitempty"   toml:"workflow_id,omitempty"`
 	WorkflowName string               `json:"workflow_name,omitempty" toml:"workflow_name,omitempty"`
+	AssembleID   string               `json:"assemble_id,omitempty"   toml:"assemble_id,omitempty"`
+	AssembleName string               `json:"assemble_name,omitempty" toml:"assemble_name,omitempty"`
+	ArtifactType string               `json:"artifact_type,omitempty" toml:"artifact_type,omitempty"`
+	ActionType   string               `json:"action_type,omitempty"   toml:"action_type,omitempty"`
 	// DocID / DocTitle 指向消息产生时落地的 OpsDoc，前端用于"查看文档"跳转。
 	// 当前仅 architecture handler 在使用；troubleshoot 通过用户手动"保存为报告"产文档，不预填这两字段。
 	DocID    string `json:"doc_id,omitempty"    toml:"doc_id,omitempty"`

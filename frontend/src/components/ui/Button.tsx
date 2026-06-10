@@ -1,9 +1,8 @@
+// 通用按钮：统一暗色主题下的按钮形态。
 import { forwardRef, type ButtonHTMLAttributes } from 'react';
 import { cn } from '@/lib/cn';
 
-// 通用按钮，三种 variant + 两种 size
-
-type Variant = 'primary' | 'secondary' | 'ghost' | 'danger';
+type Variant = 'primary' | 'accent' | 'secondary' | 'ghost' | 'danger';
 type Size = 'sm' | 'md';
 
 export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
@@ -13,11 +12,13 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 
 const variantClass: Record<Variant, string> = {
   primary:
-    'bg-slate-900 text-white hover:bg-slate-800 disabled:bg-slate-300 disabled:text-slate-500',
+    'bg-ops-accent text-ops-inverse hover:bg-ops-accent-hover disabled:bg-ops-border-subtle disabled:text-ops-tertiary',
+  accent:
+    'bg-ops-accent text-ops-inverse hover:bg-ops-accent-hover disabled:bg-ops-border-subtle disabled:text-ops-tertiary',
   secondary:
-    'bg-white text-slate-900 border border-slate-300 hover:bg-slate-50 disabled:opacity-50',
-  ghost: 'bg-transparent text-slate-700 hover:bg-slate-100',
-  danger: 'bg-red-600 text-white hover:bg-red-700 disabled:opacity-50',
+    'border border-ops-border-subtle bg-ops-surface text-ops-primary hover:bg-ops-elevated disabled:opacity-50',
+  ghost: 'bg-transparent text-ops-secondary hover:bg-ops-surface hover:text-ops-primary',
+  danger: 'bg-ops-danger text-ops-primary hover:bg-ops-danger/90 disabled:opacity-50',
 };
 
 const sizeClass: Record<Size, string> = {
@@ -31,7 +32,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       ref={ref}
       className={cn(
         'inline-flex items-center justify-center rounded-md font-medium transition-colors',
-        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400',
+        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ops-border-focus',
         'disabled:cursor-not-allowed',
         variantClass[variant],
         sizeClass[size],

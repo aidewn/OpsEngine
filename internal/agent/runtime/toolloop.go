@@ -21,7 +21,7 @@ import (
 )
 
 // defaultMaxToolRounds 是默认工具循环上限。
-// 5 轮够覆盖"看清单 → 看进程 → 看日志 → 总结"这种典型链路，又能拦住模型卡死的循环调用。
+// 50 轮够覆盖"看清单 → 看进程 → 看日志 → 总结"这种典型链路，又能拦住模型卡死的循环调用。
 const defaultMaxToolRounds = 50
 
 // runChatToolLoop 执行带工具的 chat 多轮调用，返回最终文本回复。
@@ -45,11 +45,27 @@ func (r *Runtime) runChatToolLoop(
 	}
 
 	for round := 0; round < maxRounds; round++ {
-		completion, err := r.LLM.ChatWithTools(messages, specs)
+		// 每轮调用前推一条心跳进度，避免长时间无反馈让用户以为卡住
+		if round == 0 {
+			r.emitProgress(req.RequestID, session.ID, "正在思考…", progress)
+		} else {
+			r.emitProgress(req.RequestID, session.ID, "正在基于工具结果继续推理…", progress)
+		}
+
+		// 走流式：content 一边出一边推送给前端，让用户看到模型实时输出
+		completion, err := r.LLM.ChatWithToolsStream(messages, specs, func(delta string) {
+			if delta == "" || r.Emit == nil {
+				return
+			}
+			r.Emit.Emit(Event{
+				RequestID: req.RequestID, SessionID: session.ID,
+				Type: EventDelta, Text: delta,
+			})
+		})
 		if err != nil {
 			return "", err
 		}
-		// 没有工具调用 → 当前轮就是最终回复
+		// 没有工具调用 → 当前轮就是最终回复（content 已经流式推完）
 		if len(completion.ToolCalls) == 0 {
 			return completion.Content, nil
 		}

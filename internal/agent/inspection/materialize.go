@@ -110,8 +110,16 @@ func Materialize(plan Plan, environmentID, configID string) (core.WorkflowDef, e
 	if err := plan.Validate(); err != nil {
 		return core.WorkflowDef{}, err
 	}
-	if err := assertSafeCommands(plan.Items); err != nil {
-		return core.WorkflowDef{}, err
+
+	// 先把每个 Item 翻译成具体 shell 命令；安全检查在 RenderCommand 内部完成（仅 shell Kind 走黑名单，
+	// 其余 Kind 命令由 Materializer 自己拼接，参数走 shellQuote 防注入）。
+	commands := make([]string, len(plan.Items))
+	for i, it := range plan.Items {
+		cmd, err := RenderCommand(it)
+		if err != nil {
+			return core.WorkflowDef{}, fmt.Errorf("巡检项 %q: %w", it.Title, err)
+		}
+		commands[i] = cmd
 	}
 
 	readyID := uuid.New().String()
@@ -140,8 +148,7 @@ func Materialize(plan Plan, environmentID, configID string) (core.WorkflowDef, e
 		},
 	}
 
-	// 逐项追加 linux_exec_command 节点。
-	// prevExecNode 跟踪当前 exec 链尾，让 N 个命令串行执行。
+	// 逐项追加 linux_exec_command 节点；命令文本来自上面的 commands 切片。
 	prevExecNode, prevExecPort := sshID, "exec_out"
 	for i, item := range plan.Items {
 		cmdID := uuid.New().String()
@@ -153,12 +160,12 @@ func Materialize(plan Plan, environmentID, configID string) (core.WorkflowDef, e
 			InstanceID: cmdID,
 			TypeID:     "linux_exec_command",
 			Config: map[string]any{
-				"command":         strings.TrimSpace(item.Command),
+				"command":         commands[i],
 				"timeout_seconds": int64(timeout),
-				// fail_on_error=false 让单项失败不中断后续巡检——巡检的本质是"尽量多采集"。
-				"fail_on_error": false,
-				// title 字段不在节点 schema 内，但保留进 config 方便前端展示。
+				"fail_on_error":   false,
+				// title / kind 不在节点 schema 内但保留进 config 方便前端 + 报告生成识别
 				"title": strings.TrimSpace(item.Title),
+				"kind":  string(item.resolveKind()),
 			},
 			Position: core.Position{
 				X: canvasOriginX + canvasStepX*float64(2+i),
@@ -196,17 +203,160 @@ func Materialize(plan Plan, environmentID, configID string) (core.WorkflowDef, e
 	return wf, nil
 }
 
-// assertSafeCommands 扫描所有 item.Command，命中黑名单立即拒绝。
-// 黑名单不可能穷尽所有危险操作，但能拦下最常见的破坏性命令。
-// 后续 P7 Agent Tool Registry 落地后，这一层应升级为统一的权限校验。
-func assertSafeCommands(items []Item) error {
-	for _, it := range items {
-		lower := strings.ToLower(it.Command)
-		for _, token := range dangerousTokens {
-			if strings.Contains(lower, token) {
-				return fmt.Errorf("巡检项 %q 命中危险命令禁令 %q", it.Title, token)
+// RenderCommand 把单条巡检项翻译成具体 shell 命令。
+//
+// 安全约束：
+//   - 只有 Kind=shell 接受用户/模型传入的任意命令，走 dangerousTokens 黑名单。
+//   - 其余 Kind 由 Materializer 拼模板，参数（path/container/service/...）必须走 shellQuoteArg
+//     做单引号转义，杜绝 ;`$| 等元字符注入。
+//   - 用户传入的 namespace / label selector 也会走 shellQuoteArg 即使它们看起来"安全"。
+func RenderCommand(it Item) (string, error) {
+	kind := it.resolveKind()
+	switch kind {
+	case ItemKindShell:
+		cmd := strings.TrimSpace(it.Command)
+		if err := assertSafeShellCommand(it.Title, cmd); err != nil {
+			return "", err
+		}
+		return cmd, nil
+	case ItemKindReadFile:
+		if err := assertSafePath(it.Path); err != nil {
+			return "", err
+		}
+		// head -c 65536：限制读取 64KB，避免 cat 大文件撑爆 LLM 上下文
+		return fmt.Sprintf("head -c 65536 %s 2>&1", shellQuoteArg(it.Path)), nil
+	case ItemKindReadLog:
+		if err := assertSafePath(it.Path); err != nil {
+			return "", err
+		}
+		lines := it.TailLines
+		if lines <= 0 {
+			lines = 100
+		}
+		if lines > 1000 {
+			lines = 1000
+		}
+		return fmt.Sprintf("tail -n %d %s 2>&1", lines, shellQuoteArg(it.Path)), nil
+	case ItemKindFindFiles:
+		if err := assertSafePath(it.Root); err != nil {
+			return "", err
+		}
+		pattern := strings.TrimSpace(it.Pattern)
+		if pattern == "" {
+			pattern = "*"
+		}
+		if err := assertSafeArg(pattern); err != nil {
+			return "", fmt.Errorf("pattern: %w", err)
+		}
+		// -maxdepth 5 + head -n 200 防止深目录或海量结果拖垮巡检
+		return fmt.Sprintf("find %s -maxdepth 5 -name %s 2>/dev/null | head -n 200",
+			shellQuoteArg(it.Root), shellQuoteArg(pattern)), nil
+	case ItemKindDockerList:
+		// 含 stopped；输出 "name\timage\tstatus"，便于阅读
+		return "docker ps -a --format '{{.Names}}\\t{{.Image}}\\t{{.Status}}' 2>&1", nil
+	case ItemKindDockerLogs:
+		if err := assertSafeArg(it.Container); err != nil {
+			return "", fmt.Errorf("container: %w", err)
+		}
+		lines := it.TailLines
+		if lines <= 0 {
+			lines = 200
+		}
+		if lines > 1000 {
+			lines = 1000
+		}
+		return fmt.Sprintf("docker logs --tail %d %s 2>&1",
+			lines, shellQuoteArg(it.Container)), nil
+	case ItemKindK8sPods:
+		var b strings.Builder
+		b.WriteString("kubectl get pods")
+		if ns := strings.TrimSpace(it.Namespace); ns != "" {
+			if err := assertSafeArg(ns); err != nil {
+				return "", fmt.Errorf("namespace: %w", err)
 			}
+			b.WriteString(" -n ")
+			b.WriteString(shellQuoteArg(ns))
+		}
+		if sel := strings.TrimSpace(it.LabelSelector); sel != "" {
+			// label selector 允许 key=value,key2=value2 形式；ascii + 等号逗号是安全的
+			if err := assertSafeArg(sel); err != nil {
+				return "", fmt.Errorf("label_selector: %w", err)
+			}
+			b.WriteString(" -l ")
+			b.WriteString(shellQuoteArg(sel))
+		}
+		b.WriteString(" -o wide 2>&1")
+		return b.String(), nil
+	case ItemKindK8sDescribe:
+		// Workload 形如 "Deployment/nginx"。已在 Validate 中确认含 "/"。
+		// 把它直接放入 describe 参数：kubectl describe deployment/nginx [-n ns]
+		workload := strings.TrimSpace(it.Workload)
+		if err := assertSafeArg(workload); err != nil {
+			return "", fmt.Errorf("workload: %w", err)
+		}
+		var b strings.Builder
+		b.WriteString("kubectl describe ")
+		b.WriteString(shellQuoteArg(workload))
+		if ns := strings.TrimSpace(it.Namespace); ns != "" {
+			if err := assertSafeArg(ns); err != nil {
+				return "", fmt.Errorf("namespace: %w", err)
+			}
+			b.WriteString(" -n ")
+			b.WriteString(shellQuoteArg(ns))
+		}
+		b.WriteString(" 2>&1")
+		return b.String(), nil
+	case ItemKindSystemd:
+		if err := assertSafeArg(it.Service); err != nil {
+			return "", fmt.Errorf("service: %w", err)
+		}
+		// --no-pager 避免 less 阻塞 SSH 会话
+		return fmt.Sprintf("systemctl status %s --no-pager 2>&1", shellQuoteArg(it.Service)), nil
+	case ItemKindPortListen:
+		// 优先 ss（现代发行版），缺则 netstat 兜底
+		return "(ss -tlnp 2>/dev/null || netstat -tlnp 2>/dev/null) | head -n 80", nil
+	default:
+		return "", fmt.Errorf("未知 Kind: %s", kind)
+	}
+}
+
+// assertSafeShellCommand 校验任意 shell 命令是否命中危险黑名单。
+func assertSafeShellCommand(title, cmd string) error {
+	lower := strings.ToLower(cmd)
+	for _, token := range dangerousTokens {
+		if strings.Contains(lower, token) {
+			return fmt.Errorf("命令命中危险禁令 %q（%s）", token, title)
 		}
 	}
 	return nil
+}
+
+// assertSafePath 校验 LLM 传入路径：必须绝对路径、不含 shell 元字符。
+func assertSafePath(path string) error {
+	p := strings.TrimSpace(path)
+	if p == "" {
+		return errors.New("path 不能为空")
+	}
+	if !strings.HasPrefix(p, "/") {
+		return fmt.Errorf("path 必须是绝对路径: %q", p)
+	}
+	return assertSafeArg(p)
+}
+
+// assertSafeArg 校验参数不含 shell 元字符。
+// 后续走 shellQuoteArg 单引号包裹，理论上能兜住所有元字符，但 args 内含单引号会被分段，
+// 这里直接拒绝单引号 + 控制字符，避免边界情况。
+func assertSafeArg(s string) error {
+	if strings.ContainsAny(s, "`$|&;\n\r<>\\") {
+		return fmt.Errorf("参数含非法字符: %q", s)
+	}
+	if strings.Contains(s, "'") {
+		return fmt.Errorf("参数不允许包含单引号: %q", s)
+	}
+	return nil
+}
+
+// shellQuoteArg 把参数用单引号包裹，单引号本身已经在 assertSafeArg 拒绝，无需再转义。
+func shellQuoteArg(s string) string {
+	return "'" + s + "'"
 }

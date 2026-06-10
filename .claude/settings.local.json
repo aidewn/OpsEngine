@@ -82,7 +82,15 @@
       "Bash(\"C:/Program Files/Go/bin/go.exe\" test ./internal/agent/runtime/ ./internal/agent/report/ ./internal/agent/intent/ ./internal/clients/ ./internal/agent/tools/...)",
       "Bash(findstr /R \"FAIL ^ok\")",
       "Bash(\"C:/Program Files/Go/bin/go.exe\" test ./internal/agent/architecture/ -v)",
-      "Bash(\"C:/Program Files/Go/bin/go.exe\" test ./internal/agent/architecture/)"
+      "Bash(\"C:/Program Files/Go/bin/go.exe\" test ./internal/agent/architecture/)",
+      "Bash(\"C:/Program Files/Go/bin/go.exe\" -C C:/Users/m1832/GolandProjects/OpsEngine list -f '{{join .GoFiles \"\\\\n\"}}' ./internal/nodes/arith ./internal/nodes/compare ./internal/nodes/logic ./internal/nodes/flow)",
+      "Bash(\"C:/Program Files/Go/bin/go.exe\" -C C:/Users/m1832/GolandProjects/OpsEngine doc -short OpsEngine/internal/nodes/env_probe_k8s_pods)",
+      "Bash(\"C:/Program Files/Go/bin/go.exe\" -C C:/Users/m1832/GolandProjects/OpsEngine doc -short OpsEngine/internal/nodes/env_probe_k8s_workloads)",
+      "Bash(\"C:/Program Files/Go/bin/go.exe\" -C C:/Users/m1832/GolandProjects/OpsEngine doc -short OpsEngine/internal/nodes/docker_logs)",
+      "Bash(\"C:/Program Files/Go/bin/go.exe\" build ./internal/agent/tools/builtin/)",
+      "Bash(\"C:/Program Files/Go/bin/go.exe\" test ./internal/agent/inspection/ -v)",
+      "Bash(\"C:/Program Files/Go/bin/go.exe\" test ./internal/clients/ -v -run \"TestSlowResponse|TestValidate|Test401|Test500|TestInvalidJSON|TestUnreachable\")",
+      "Bash(\"C:/Program Files/Go/bin/go.exe\" build ./internal/clients/)"
     ]
   }
 }

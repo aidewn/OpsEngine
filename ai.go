@@ -47,6 +47,8 @@ type AIAssistantRequest struct {
 	Operation      string `json:"operation"`
 	Message        string `json:"message"`
 	TargetConfigID string `json:"target_config_id,omitempty"`
+	ArtifactType   string `json:"artifact_type,omitempty"`
+	ArtifactID     string `json:"artifact_id,omitempty"`
 }
 
 // AIAssistantEvent 是后端推送给前端的 AI 助手事件。
@@ -58,6 +60,12 @@ type AIAssistantEvent struct {
 	Text          string                 `json:"text,omitempty"`
 	WorkflowID    string                 `json:"workflow_id,omitempty"`
 	WorkflowName  string                 `json:"workflow_name,omitempty"`
+	AssembleID    string                 `json:"assemble_id,omitempty"`
+	AssembleName  string                 `json:"assemble_name,omitempty"`
+	ArtifactType  string                 `json:"artifact_type,omitempty"`
+	ActionType    string                 `json:"action_type,omitempty"`
+	DocID         string                 `json:"doc_id,omitempty"`
+	DocTitle      string                 `json:"doc_title,omitempty"`
 	TargetOptions []runtime.TargetOption `json:"target_options,omitempty"`
 }
 
@@ -117,18 +125,25 @@ func (a *App) GetAISession(id string) (core.AISession, error) {
 }
 
 // CreateAISession 创建空会话。
-//   - environmentID 必填
+//   - environmentID 为空：通用会话，可生成/修改集合和工作流等可复用资产
 //   - configID 可选：空字符串 → 环境级会话；非空 → 校验是该环境下的 SSH 配置并落到 config 范围
 //
 // 环境级会话让 Agent 看到整个环境，适合架构分析、多机巡检等；
 // config 级会话强绑某个 SSH 配置，等于旧行为。
 func (a *App) CreateAISession(environmentID, configID, title string) (core.AISession, error) {
-	if err := a.validateEnvironment(environmentID); err != nil {
-		return core.AISession{}, err
-	}
+	environmentID = strings.TrimSpace(environmentID)
 	configID = strings.TrimSpace(configID)
-	scope := core.AISessionScopeEnvironment
+	scope := core.AISessionScopeGeneral
+	if environmentID != "" {
+		if err := a.validateEnvironment(environmentID); err != nil {
+			return core.AISession{}, err
+		}
+		scope = core.AISessionScopeEnvironment
+	}
 	if configID != "" {
+		if environmentID == "" {
+			return core.AISession{}, errors.New("选择 SSH 配置前请先选择环境")
+		}
 		if err := a.validateSSHConfig(environmentID, configID); err != nil {
 			return core.AISession{}, err
 		}
@@ -208,10 +223,12 @@ func (a *App) StartAIAssistant(req AIAssistantRequest) error {
 		a.emitAIAssistantText(requestID, sessionID, "error", err.Error())
 		return nil
 	}
-	// 环境级会话只校验环境存在；若 ConfigID 已设则附加 SSH 校验。
-	if err := a.validateEnvironment(session.EnvironmentID); err != nil {
-		a.emitAIAssistantText(requestID, sessionID, "error", err.Error())
-		return nil
+	// 通用会话不校验环境；环境/config 会话仍保持原有校验。
+	if strings.TrimSpace(session.EnvironmentID) != "" {
+		if err := a.validateEnvironment(session.EnvironmentID); err != nil {
+			a.emitAIAssistantText(requestID, sessionID, "error", err.Error())
+			return nil
+		}
 	}
 	if session.ConfigID != "" {
 		if err := a.validateSSHConfig(session.EnvironmentID, session.ConfigID); err != nil {
@@ -221,6 +238,10 @@ func (a *App) StartAIAssistant(req AIAssistantRequest) error {
 	}
 	targetConfigID := strings.TrimSpace(req.TargetConfigID)
 	if targetConfigID != "" {
+		if strings.TrimSpace(session.EnvironmentID) == "" {
+			a.emitAIAssistantText(requestID, sessionID, "error", "通用会话需要先选择环境后才能选择 SSH 目标")
+			return nil
+		}
 		if err := a.validateSSHConfig(session.EnvironmentID, targetConfigID); err != nil {
 			a.emitAIAssistantText(requestID, sessionID, "error", err.Error())
 			return nil
@@ -235,6 +256,7 @@ func (a *App) StartAIAssistant(req AIAssistantRequest) error {
 	rt := &runtime.Runtime{
 		Sessions:     a.aiSessionStore,
 		Workflows:    a.workflowStore,
+		Assembles:    a.assembleStore,
 		OpsDocs:      a.opsDocStore,
 		Environments: a.lookupEnvironment,
 		EnvList:      a.listEnvironmentsForPrompt,
@@ -250,6 +272,8 @@ func (a *App) StartAIAssistant(req AIAssistantRequest) error {
 		Operation:      req.Operation,
 		Message:        req.Message,
 		TargetConfigID: targetConfigID,
+		ArtifactType:   req.ArtifactType,
+		ArtifactID:     req.ArtifactID,
 	})
 }
 
@@ -305,6 +329,12 @@ func (a *App) emitRuntimeEvent(e runtime.Event) {
 		Text:          e.Text,
 		WorkflowID:    e.WorkflowID,
 		WorkflowName:  e.WorkflowName,
+		AssembleID:    e.AssembleID,
+		AssembleName:  e.AssembleName,
+		ArtifactType:  e.ArtifactType,
+		ActionType:    e.ActionType,
+		DocID:         e.DocID,
+		DocTitle:      e.DocTitle,
 		TargetOptions: e.TargetOptions,
 	})
 }
@@ -318,7 +348,7 @@ func (a *App) emitAIAssistantText(requestID, sessionID, eventType, text string) 
 	})
 }
 
-// validateEnvironment 校验环境存在。所有 AI 会话都必须绑定一个有效环境。
+// validateEnvironment 校验环境存在。通用 AI 会话可不绑定环境，调用前需判断是否为空。
 func (a *App) validateEnvironment(environmentID string) error {
 	environmentID = strings.TrimSpace(environmentID)
 	if environmentID == "" {
@@ -407,6 +437,13 @@ func (l *llmAdapter) ChatWithTools(messages []clients.ChatMessage, toolSpecs []c
 	return l.client.ChatWithTools(ctx, messages, toolSpecs)
 }
 
+// ChatWithToolsStream 实现 runtime.LLMProvider；流式工具调用让用户看到实时 content。
+func (l *llmAdapter) ChatWithToolsStream(messages []clients.ChatMessage, toolSpecs []clients.ToolSpec, onContent func(string)) (clients.ChatCompletion, error) {
+	ctx, cancel := context.WithTimeout(l.parent, l.timeout)
+	defer cancel()
+	return l.client.ChatWithToolsStream(ctx, messages, toolSpecs, onContent)
+}
+
 // ── 设置加载与默认值 ───────────────────────────────────────
 
 // loadAISettings 从本地 TOML 文件读取配置。
@@ -426,11 +463,12 @@ func loadAISettings() (AISettings, error) {
 }
 
 // defaultAISettings 返回默认连接配置（指向 DeepSeek）。
+// TimeoutSeconds 默认 120：生成集合 / 复杂工作流时 60s 经常不够（DeepSeek 大量推理时尾部读取阶段也会触发 deadline）。
 func defaultAISettings() AISettings {
 	return AISettings{
 		DeepSeekBaseURL: clients.DefaultDeepSeekBaseURL,
 		DeepSeekModel:   clients.DefaultDeepSeekModel,
-		TimeoutSeconds:  60,
+		TimeoutSeconds:  120,
 	}
 }
 
@@ -446,7 +484,7 @@ func normalizeAISettings(settings AISettings) AISettings {
 		settings.DeepSeekModel = clients.DefaultDeepSeekModel
 	}
 	if settings.TimeoutSeconds <= 0 {
-		settings.TimeoutSeconds = 60
+		settings.TimeoutSeconds = 120
 	}
 	return settings
 }

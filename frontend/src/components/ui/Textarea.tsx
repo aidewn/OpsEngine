@@ -1,3 +1,4 @@
+// Textarea 组件：统一多行输入框的暗色 token。
 import { forwardRef, type TextareaHTMLAttributes } from 'react';
 import { cn } from '@/lib/cn';
 
@@ -8,10 +9,10 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
     <textarea
       ref={ref}
       className={cn(
-        'w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm',
-        'placeholder:text-slate-400',
-        'focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500',
-        'disabled:cursor-not-allowed disabled:bg-slate-50',
+        'w-full rounded-md border border-ops-border-strong bg-ops-input px-3 py-2 text-sm text-ops-primary',
+        'placeholder:text-ops-tertiary',
+        'focus:border-ops-border-focus focus:outline-none focus:ring-1 focus:ring-ops-border-focus',
+        'disabled:cursor-not-allowed disabled:text-ops-tertiary',
         className,
       )}
       {...props}
