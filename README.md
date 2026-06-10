@@ -1,41 +1,66 @@
 # OpsEngine
 
-面向运维场景的可视化工作流桌面应用。通过节点图画出执行流与数据流，在本地运行并实时查看状态与日志；支持将子流程封装为可复用的**集合**（Assemble），在工作流或其它集合中调用。
+面向运维场景的可视化工作流桌面应用。通过节点图画出执行流与数据流，在本地运行并实时查看状态与日志；支持将子流程封装为可复用的**集合**（Assemble），在工作流或其它集合中调用。内置 **配置环境**、**AI 助手** 与 **运维报告**，帮助从对话、编排到执行与复盘形成闭环。
 
 ## 功能概览
-- **多环境管理**：基于文件配置，为单个环境指定多个连接配置
-![alt text](image-6.png)
+
+- **多环境管理**：按业务/项目集中管理 SSH、Docker、K8s、Jenkins 等连接配置，支持连通性测试与编辑态探测
+
+  ![配置环境](image-6.png)
+
 - **工作流编辑**：基于 React Flow 的画布，拖拽节点、连线，自动保存位置
-![alt text](image-1.png)
+
+  ![工作流画布](image-1.png)
+
 - **集合（子流程）**：参数 / 返回值端口，保存时检测循环引用
-![alt text](image.png)
+
+  ![集合](image.png)
+
 - **三阶段生命周期**：`system_ready`（启动）→ `system_update`（周期/手动增量，可选）→ `system_over`（收尾）
-![alt text](image-2.png)
-- **流程控制**：并行（`parallel`）、后台线程（`thread`）、中断（`break`）、停止执行
-![alt text](image-3.png)
+
+  ![生命周期](image-2.png)
+
+- **流程控制**：并行（`parallel`）、后台线程（`thread`）、条件分支（`branch`）、循环（`for_loop` / `while_loop`）、中断（`break`）、停止执行
+
+  ![流程控制](image-3.png)
+
 - **本地执行引擎**：Exec / Data 双流调度，集合调用栈以 Frame 树记录状态与日志
-![alt text](image-4.png)
+
+  ![执行引擎](image-4.png)
+
 - **实时反馈**：通过 Wails 事件推送节点状态、日志、变量变更
-![alt text](image-5.png)
-- **持久化**：工作流、集合、终态执行记录以 TOML 保存在 `data/` 目录
-- **ai对话**：根据指定环境进行对话分析
-![alt text](image-7.png)
-- **ai对话-自动生成工作流**：根据指定环境进行工作流生成
-![alt text](image-8.png) ![alt text](image-9.png)
-> 业务向节点（SSH、Docker、K8s 等）端口类型已在模型中预留；当前内置节点以流程与示例（如 `print`）为主，便于扩展。
+
+  ![实时反馈](image-5.png)
+
+- **运维节点**：Linux SSH 远程操作、Docker 镜像/容器全链路、K8s 连接与工作负载变更、环境连接/探测节点等
+
+- **持久化**：工作流、集合、环境、AI 会话、运维报告、终态执行记录均以 TOML 保存在 `data/` 目录
+
+- **AI 助手**：绑定环境上下文，支持运维问答、排障、服务器巡检、架构分析、工作流/集合生成与修改（OpenAI 兼容 API）
+
+  ![AI 对话](image-7.png)
+
+- **AI 生成工作流**：根据环境与需求自动生成可审查、可执行的运维编排
+
+  ![AI 生成工作流](image-8.png) ![AI 生成工作流详情](image-9.png)
+
+- **运维报告（OpsDoc）**：将 AI 对话或执行结果沉淀为 Markdown 报告，支持巡检报告自动生成
 
 ## 技术栈
 
 | 层级 | 技术 |
 |------|------|
-| 桌面壳 | [Wails v2](https://wails.io)（Go + WebView） |
-| 后端 | Go 1.25、uber/zap、BurntSushi/toml |
-| 前端 | React 18、TypeScript、Vite、@xyflow/react、Tailwind CSS |
+| 桌面壳 | [Wails v2](https://wails.io)（Go + WebView，无边框窗口 + 文件拖拽） |
+| 后端 | Go 1.26、uber/zap、BurntSushi/toml |
+| 执行引擎 | `internal/engine`（Exec/Data 双流、Frame 调用栈、Wails 事件） |
+| AI Runtime | `internal/agent`（意图路由、工具循环、巡检/架构/工作流生成） |
+| 客户端 | `internal/clients`（SSH、Docker、K8s、Jenkins、LLM） |
+| 前端 | React 18、TypeScript、Vite、@xyflow/react、Tailwind CSS、Radix UI、TanStack Query |
 | 通信 | Wails 方法绑定 + 运行时事件（无独立 HTTP 服务） |
 
 ## 环境要求
 
-- **Go** 1.25+
+- **Go** 1.26+
 - **Node.js** 18+ 与 npm
 - **Wails CLI** v2
 
@@ -49,7 +74,7 @@
 ## 快速开始
 
 ```bash
-git clone https://github.com/<your-org>/OpsEngine.git
+git clone https://github.com/aidewn/OpsEngine.git
 cd OpsEngine
 
 # 开发模式（热重载：Go 后端 + 前端）
@@ -62,10 +87,14 @@ wails dev
 
 ```
 data/
-├── workflows/    # 工作流定义（*.toml）
-├── assembles/    # 集合定义（*.toml）
-├── executions/   # 终态执行记录（*.toml，已在 .gitignore）
-└── logs/         # 运行日志（已在 .gitignore）
+├── workflows/      # 工作流定义（*.toml）
+├── assembles/      # 集合定义（*.toml）
+├── environments/   # 环境及连接配置（*.toml）
+├── ai-sessions/    # AI 会话记录（*.toml）
+├── docs/           # 运维报告 Markdown + 元数据
+├── settings/       # 应用设置（如 ai.toml）
+├── executions/     # 终态执行记录（*.toml，已在 .gitignore）
+└── logs/           # 运行日志（已在 .gitignore）
 ```
 
 ### 构建发布版
@@ -83,14 +112,16 @@ make test
 go test ./...
 ```
 
-引擎相关测试集中在 `internal/engine/`。
+引擎与 Agent 相关测试分别集中在 `internal/engine/` 与 `internal/agent/`。
 
 ## 使用说明
 
-1. 启动应用后，在首页 **工作流** 标签创建并打开工作流。
-2. 画布上编辑节点与连线；右侧可查看节点详情与工作流变量。
-3. 在 **集合** 标签维护可复用子图；保存后会在工作流画布的「添加节点」中作为 `assemble:<id>` 出现。
-4. 运行工作流后，在 **执行** 标签或执行详情页查看实时状态与历史记录。
+1. 启动应用后，在 **设置** 中配置 AI 连接（OpenAI 兼容 API）与 **配置环境**（SSH/Docker/K8s/Jenkins 凭证）。
+2. 首页 **Chat** 标签：选择环境创建 AI 会话，可进行运维问答、排障、巡检、架构分析或生成工作流/集合。
+3. **工作流** 标签 / 左侧栏：创建并打开工作流或集合，在画布上编辑节点与连线。
+4. 在 **集合** 中维护可复用子图；保存后会在工作流画布的「添加节点」中作为 `assemble:<id>` 出现。
+5. 运行工作流后，在 **执行** 详情页查看实时状态、调用栈与历史记录；可将执行结果生成巡检报告。
+6. **报告** 标签：浏览 AI 对话或执行沉淀的 OpsDoc 文档。
 
 ### 端口与连线规则（摘要）
 
@@ -103,28 +134,53 @@ go test ./...
 
 保存工作流 / 集合时，后端会校验结构合法性；画布连接时支持拖到已有入边端口自动替换旧连接。
 
+### 内置节点分类（摘要）
+
+| 分类 | 代表节点 |
+|------|----------|
+| 系统事件 | `system_ready` / `system_update` / `system_over` |
+| 集合 | `assemble_start` / `assemble_end` / `assemble_param` / `assemble:<id>` |
+| 流程控制 | `parallel` / `thread` / `break` / `branch` / `for_loop` / `while_loop` |
+| 变量与工具 | `varset` / `varget` / `print` / `to_string` / `text_template` / `regex_extract` |
+| Linux SSH | `linux_exec_command` / `linux_file_*` / `linux_upload_file` / `ssh_with_linux` 等 |
+| Docker | `docker_connect` / `docker_pull` / `docker_run` / `docker_build` / `docker_push` 等 |
+| Kubernetes | `k8s_connect` / `k8s_find_workload` / `k8s_set_workload_image` |
+| 环境连接 | `env_connect_ssh` / `env_connect_docker` / `env_connect_k8s` / `env_connect_jenkins` / `env_connect_localhost` |
+| 环境探测 | `env_probe_ssh_*` / `env_probe_docker_*` / `env_probe_k8s_*` / `env_probe_jenkins_*` / `env_probe_localhost_*` |
+
+完整节点列表见 [docs/introduction.md](docs/introduction.md)。
+
 ## 架构
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│  React 前端（frontend/src）                              │
-│  画布 · 执行监控 · Wails JS 绑定                         │
-└───────────────────────────┬─────────────────────────────┘
-                            │ Bind + Events
-┌───────────────────────────▼─────────────────────────────┐
-│  app.go（Wails 入口：CRUD、RunWorkflow、GetNodeTypes）   │
-└───────────────────────────┬─────────────────────────────┘
-                            │
-        ┌───────────────────┼───────────────────┐
-        ▼                   ▼                   ▼
-  internal/store      internal/engine     internal/nodes
-  TOML 持久化          执行 / 调度 / 校验    内置节点注册
+┌─────────────────────────────────────────────────────────────┐
+│  React 前端（frontend/src）                                  │
+│  画布 · 执行监控 · AI 助手 · 环境配置 · Wails JS 绑定         │
+└────────────────────────────┬────────────────────────────────┘
+                             │ Bind + Events
+┌────────────────────────────▼────────────────────────────────┐
+│  main.go / app.go / ai.go / ops_doc.go（Wails 入口层）       │
+└────────────────────────────┬────────────────────────────────┘
+                             │
+     ┌───────────────────────┼───────────────────────┐
+     ▼                       ▼                       ▼
+ internal/store        internal/engine          internal/nodes
+ TOML 持久化            执行 / 调度 / 校验         内置节点注册
+     │                       │
+     │               internal/probe（编辑态探测）
+     ▼
+ internal/agent          internal/clients
+ AI Runtime              SSH / Docker / K8s / Jenkins / LLM
 ```
 
 **执行事件名**（前后端约定，见 `internal/engine/events.go`）：
 
 - `execution:started` / `execution:status` / `execution:finished`
 - `execution:node` / `execution:log` / `execution:variable`
+
+**AI 助手事件名**（见 `ai.go` → `internal/agent/runtime`）：
+
+- `ai:assistant`（流式文本、工作流/集合/文档产出、工具进度等）
 
 事件 payload 可含 `framePath`，用于定位集合调用栈内的节点状态。
 
@@ -133,23 +189,27 @@ go test ./...
 ```
 OpsEngine/
 ├── main.go                 # Wails 应用入口
-├── app.go                  # 暴露给前端的 API
+├── app.go                  # 工作流/集合/执行/环境/探测 API
+├── ai.go                   # AI 设置、会话、助手入口
+├── ops_doc.go              # 运维报告 CRUD 与巡检报告生成
 ├── Makefile
 ├── wails.json
-├── docs/
-│   └── phase8-13-plan.md   # 后续迭代计划
+├── docs/                   # 技术文档（见 docs/README.md）
 ├── data/                   # 本地数据（部分目录不入库）
 ├── frontend/               # React 前端
 │   └── src/
 │       ├── pages/          # 路由页面
-│       ├── features/       # workflow / assemble / execution
+│       ├── features/       # workflow / assemble / execution / ai / opsDocs
 │       ├── api/            # Wails 调用封装
 │       └── types/          # 与 Go 结构对齐的 TS 类型
 └── internal/
     ├── core/               # 领域模型
     ├── engine/             # 执行引擎
     ├── nodes/              # 内置节点（init 注册）
-    └── store/              # TOML 存储
+    ├── store/              # TOML 存储
+    ├── clients/            # 外部系统客户端
+    ├── probe/              # 编辑态环境探测
+    └── agent/              # AI Runtime（intent / runtime / tools / report）
 ```
 
 ## 开发指南
@@ -160,9 +220,11 @@ OpsEngine/
 2. 在包内 `init()` 中调用 `engine.Register`。
 3. 在 `internal/nodes/nodes.go` 增加匿名 import，触发注册。
 
+详见 [docs/node-development.md](docs/node-development.md)。
+
 ### 前后端协作
 
-- **绑定方法**：`app.go` 中 `App` 的 public 方法自动生成前端调用（`wails dev` 后出现在 `frontend/wailsjs/go/main/App`）。
+- **绑定方法**：`app.go` / `ai.go` / `ops_doc.go` 中 `App` 的 public 方法自动生成前端调用（`wails dev` 后出现在 `frontend/wailsjs/go/main/App`）。
 - **类型**：Go 的 `json` tag 与 `frontend/src/types/` 保持一致（snake_case）。
 - **集合节点类型**：运行时由 `GetNodeTypes()` 将每个 `AssembleDef` 转为 `assemble:<id>` 节点类型。
 
@@ -194,18 +256,27 @@ npm run dev
 | [architecture.md](docs/architecture.md) | 架构分层、执行/事件/Frame 调用分析 |
 | [node-development.md](docs/node-development.md) | 新增内置节点开发手册 |
 | [source-reading.md](docs/source-reading.md) | 源码阅读顺序与调试入口 |
+| [environment-plan.md](docs/environment-plan.md) | 配置环境与环境探测节点（已实现） |
+| [execution-ux-plan.md](docs/execution-ux-plan.md) | 执行列表/详情体验改进 |
+| [agent-runtime-architecture-optimization.md](docs/agent-runtime-architecture-optimization.md) | AI Agent Runtime 架构 |
+| [plugin-platform.md](docs/plugin-platform.md) | 插件平台规划（Lua 扩展节点） |
+| [opsengine-long-term-development-tasks.md](docs/opsengine-long-term-development-tasks.md) | 长期演进路线图 |
 
 ## 路线图
 
-MVP（Phase 0–7）已完成。后续体验与能力见 [docs/phase8-13-plan.md](docs/phase8-13-plan.md)，包括端口重连、配置表单、Frame 树 UI、框选复制等。
+核心 MVP（工作流引擎、集合、执行监控、Docker/K8s 节点、配置环境、AI 助手）已可用。后续重点包括：
+
+- 插件平台与 Lua 扩展节点（见 [plugin-platform.md](docs/plugin-platform.md)）
+- AI Runtime 持续演进：更稳定的两阶段工作流生成、安全策略、上下文预算（见 [opsengine-long-term-development-tasks.md](docs/opsengine-long-term-development-tasks.md)）
+- 前端体验迭代（见 [frontend-redesign.md](docs/frontend-redesign.md)）
 
 ## 参与贡献
 
 欢迎 Issue 与 Pull Request。提交前请：
 
 1. 运行 `make test` 确保通过。
-2. 遵循仓库内 `CLAUDE.md` 的约定（注释使用中文、改动保持精简）。
-3. 不提交 `data/executions`、`data/logs` 等本地运行数据。
+2. 遵循仓库内 `AGENTS.md` 的约定（注释使用中文、改动保持精简）。
+3. 不提交 `data/executions`、`data/logs`、`data/ai-sessions` 等本地运行数据。
 
 ## 许可证
 
