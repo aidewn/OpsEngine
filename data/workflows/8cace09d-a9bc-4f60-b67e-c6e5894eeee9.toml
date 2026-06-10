@@ -33,14 +33,6 @@ description = ""
     y = 480.0
 
 [[nodes]]
-  id = "9a2facc4-32de-44a8-a6cd-b752ec049e83"
-  type = "assemble:4dd29e36-e086-45c1-8032-dacedd20837f"
-  [nodes.config]
-  [nodes.position]
-    x = 653.5259616471606
-    y = 29.213780605145274
-
-[[nodes]]
   id = "cb7fef8e-0710-411a-965d-15221d76ebd7"
   type = "env_connect_ssh"
   [nodes.config]
@@ -54,6 +46,10 @@ description = ""
   id = "93c41853-7c1c-467b-b4cc-6303dd5f21ad"
   type = "assemble:24711966-b120-4927-b6b0-4a9b27136d4b"
   [nodes.config]
+    param_redis_data_volume_default = "./redis"
+    param_redis_image_default = "redis"
+    param_redis_password_default = "199932"
+    param_redis_port_default = "6379"
   [nodes.position]
     x = 976.1242817633612
     y = 73.44504906089603
@@ -74,22 +70,6 @@ description = ""
     port = "exec_out"
   [edges.to]
     node = "cb7fef8e-0710-411a-965d-15221d76ebd7"
-    port = "exec_in"
-
-[[edges]]
-  [edges.from]
-    node = "cb7fef8e-0710-411a-965d-15221d76ebd7"
-    port = "client"
-  [edges.to]
-    node = "9a2facc4-32de-44a8-a6cd-b752ec049e83"
-    port = "param_ssh"
-
-[[edges]]
-  [edges.from]
-    node = "9a2facc4-32de-44a8-a6cd-b752ec049e83"
-    port = "exec_out"
-  [edges.to]
-    node = "93c41853-7c1c-467b-b4cc-6303dd5f21ad"
     port = "exec_in"
 
 [[edges]]
@@ -121,5 +101,5 @@ description = ""
     node = "b3d64ab3-7758-4979-b4e5-8f0683efe5b8"
     port = "exec_out"
   [edges.to]
-    node = "9a2facc4-32de-44a8-a6cd-b752ec049e83"
+    node = "93c41853-7c1c-467b-b4cc-6303dd5f21ad"
     port = "exec_in"

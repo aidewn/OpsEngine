@@ -4,48 +4,15 @@
 
 ## 功能概览
 
-- **多环境管理**：按业务/项目集中管理 SSH、Docker、K8s、Jenkins 等连接配置，支持连通性测试与编辑态探测
+- **  全新页面 **
 
-  ![配置环境](image-6.png)
+![alt text](image-10.png)
 
-- **工作流编辑**：基于 React Flow 的画布，拖拽节点、连线，自动保存位置
-
-  ![工作流画布](image-1.png)
-
-- **集合（子流程）**：参数 / 返回值端口，保存时检测循环引用
-
-  ![集合](image.png)
-
-- **三阶段生命周期**：`system_ready`（启动）→ `system_update`（周期/手动增量，可选）→ `system_over`（收尾）
-
-  ![生命周期](image-2.png)
-
-- **流程控制**：并行（`parallel`）、后台线程（`thread`）、条件分支（`branch`）、循环（`for_loop` / `while_loop`）、中断（`break`）、停止执行
-
-  ![流程控制](image-3.png)
-
-- **本地执行引擎**：Exec / Data 双流调度，集合调用栈以 Frame 树记录状态与日志
-
-  ![执行引擎](image-4.png)
-
-- **实时反馈**：通过 Wails 事件推送节点状态、日志、变量变更
-
-  ![实时反馈](image-5.png)
-
-- **运维节点**：Linux SSH 远程操作、Docker 镜像/容器全链路、K8s 连接与工作负载变更、环境连接/探测节点等
-
-- **持久化**：工作流、集合、环境、AI 会话、运维报告、终态执行记录均以 TOML 保存在 `data/` 目录
-
-- **AI 助手**：绑定环境上下文，支持运维问答、排障、服务器巡检、架构分析、工作流/集合生成与修改（OpenAI 兼容 API）
-
-  ![AI 对话](image-7.png)
-
-- **AI 生成工作流**：根据环境与需求自动生成可审查、可执行的运维编排
-
-  ![AI 生成工作流](image-8.png) ![AI 生成工作流详情](image-9.png)
-
-- **运维报告（OpsDoc）**：将 AI 对话或执行结果沉淀为 Markdown 报告，支持巡检报告自动生成
-
+- **  全新页面 **
+自动生成工作流
+![alt text](image-11.png)
+![alt text](image-12.png)
+![alt text](image-13.png)
 ## 技术栈
 
 | 层级 | 技术 |

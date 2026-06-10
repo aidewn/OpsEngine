@@ -96,3 +96,40 @@ func TestMaterializeRejectsDanglingEdge(t *testing.T) {
 		t.Fatalf("expected dangling edge error, got %v", err)
 	}
 }
+
+// TestParseDraftAcceptsInstanceID 验证模型回显 instance_id 时能被 normalize 成临时 id。
+func TestParseDraftAcceptsInstanceID(t *testing.T) {
+	reply := `{"name":"更新","nodes":[
+		{"instance_id":"abc-123","type_id":"system_ready","config":{},"position":{"x":0,"y":0}},
+		{"instance_id":"def-456","type_id":"print","config":{"text":"hi"},"position":{"x":100,"y":0}}
+	],"edges":[{"from":{"node":"abc-123","port":"exec_out"},"to":{"node":"def-456","port":"exec_in"}}]}`
+	draft, err := ParseDraft(reply)
+	if err != nil {
+		t.Fatalf("ParseDraft() error = %v", err)
+	}
+	if draft.Nodes[0].ID != "abc-123" {
+		t.Fatalf("node0 id = %q, want abc-123", draft.Nodes[0].ID)
+	}
+	wf, err := Materialize(draft, realChecker)
+	if err != nil {
+		t.Fatalf("Materialize() error = %v", err)
+	}
+	if len(wf.Edges) != 1 {
+		t.Fatalf("edges = %d", len(wf.Edges))
+	}
+}
+
+// TestParseDraftAutoAssignsMissingID 验证缺失 id 的节点会自动分配 n1/n2。
+func TestParseDraftAutoAssignsMissingID(t *testing.T) {
+	reply := `{"name":"新建","nodes":[
+		{"type_id":"system_ready","config":{},"position":{"x":0,"y":0}},
+		{"type_id":"print","config":{"text":"x"},"position":{"x":100,"y":0}}
+	],"edges":[{"from":{"node":"n1","port":"exec_out"},"to":{"node":"n2","port":"exec_in"}}]}`
+	draft, err := ParseDraft(reply)
+	if err != nil {
+		t.Fatalf("ParseDraft() error = %v", err)
+	}
+	if draft.Nodes[0].ID != "n1" || draft.Nodes[1].ID != "n2" {
+		t.Fatalf("auto ids = %q, %q", draft.Nodes[0].ID, draft.Nodes[1].ID)
+	}
+}

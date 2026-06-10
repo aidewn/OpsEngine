@@ -28,6 +28,7 @@
 - 必须有且仅有一个 system_ready 节点作为入口
 - 只能使用上面列出的 type_id，未列出的禁止使用
 - 节点 id 用 n1/n2 等临时占位，后端会替换成 UUID
+- 修改已有工作流/集合时，也可沿用 JSON 里的 instance_id 作为节点 id，边中的 node 字段需与之一致
 - environment_id / config_id 必须在已配置环境中存在
 - exec_out 输出端口最多连一条边；数据输入端口最多连一条入边
 - 端口 id 必须使用节点类型定义中的端口 id，不能编造

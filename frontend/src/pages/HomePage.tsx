@@ -22,6 +22,7 @@ export function HomePage() {
     if (tab === 'reports') return <OpsDocList />;
     return (
       <AIAssistantPanel
+        embedded
         selectedSessionID={selectedSessionID}
         onSelectedSessionChange={(id) => {
           const next = new URLSearchParams(searchParams);
@@ -36,13 +37,13 @@ export function HomePage() {
         }}
         focusInputOnOpen={focusAI}
         showSessionSidebar={false}
-        className="h-full"
+        className="h-full min-h-0"
       />
     );
   }, [focusAI, searchParams, selectedSessionID, setSearchParams, tab]);
 
   return (
-    <div className="h-full overflow-auto px-6 py-6">
+    <div className={tab === 'chat' ? 'h-full min-h-0' : 'h-full overflow-auto px-6 py-6'}>
       <ErrorBoundary>{content}</ErrorBoundary>
     </div>
   );

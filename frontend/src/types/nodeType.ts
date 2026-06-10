@@ -42,7 +42,8 @@ export type FieldType =
   | 'return_select'
   | 'env_select'
   | 'env_config_select'
-  | 'file_path';
+  | 'file_path'
+  | 'param_list';
 
 export interface PortDef {
   id: string;

@@ -11,6 +11,10 @@ import {
   resolvePortType,
 } from '@/types/nodeType';
 import type { GraphDef } from './canvasMapping';
+import {
+  parseTextTemplateParams,
+  TEXT_TEMPLATE_TYPE,
+} from './textTemplatePorts';
 
 export interface ResolvedGraphPort {
   id: string;
@@ -71,6 +75,17 @@ export function resolveGraphPort(
   }
   if (node.type_id === ASSEMBLE_END) {
     return fromParamList(portId, 'return_', graph.returns, 'input');
+  }
+  if (node.type_id === TEXT_TEMPLATE_TYPE && portId.startsWith('param_')) {
+    const name = portId.slice('param_'.length);
+    if (parseTextTemplateParams(node.config).includes(name)) {
+      return {
+        id: portId,
+        label: name,
+        portType: 'String',
+        direction: 'input',
+      };
+    }
   }
 
   return null;

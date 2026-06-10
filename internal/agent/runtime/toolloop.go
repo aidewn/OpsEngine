@@ -43,12 +43,7 @@ func (r *Runtime) runChatToolLoop(
 		maxRounds = defaultMaxToolRounds
 	}
 	specs := buildToolSpecs(r.Tools)
-	toolCtx := tools.ToolContext{
-		SessionID:         session.ID,
-		EnvironmentID:     session.EnvironmentID,
-		PreferredConfigID: session.ConfigID,
-		EnvLookup:         r.Environments,
-	}
+	toolCtx := buildToolContext(r, session)
 
 	for round := 0; round < maxRounds; round++ {
 		// 每轮调用前推一条心跳进度，避免长时间无反馈让用户以为卡住
@@ -81,17 +76,30 @@ func (r *Runtime) runChatToolLoop(
 			}
 		}()
 
-		// 走流式：content 一边出一边推送给前端，让用户看到模型实时输出
-		completion, err := r.LLM.ChatWithToolsStream(messages, specs, func(delta string) {
-			if delta == "" || r.Emit == nil {
-				return
+		// 走流式：content 一边出一边推送给前端；LLM 网络类错误自动重试
+		var completion clients.ChatCompletion
+		var err error
+		for attempt := 0; attempt < defaultArtifactGenRetries; attempt++ {
+			if attempt > 0 {
+				r.emitProgress(req.RequestID, session.ID, "模型调用失败，正在重试…", progress)
 			}
-			gotDelta.Store(true)
-			r.Emit.Emit(Event{
-				RequestID: req.RequestID, SessionID: session.ID,
-				Type: EventDelta, Text: delta,
+			completion, err = r.LLM.ChatWithToolsStream(messages, specs, func(delta string) {
+				if delta == "" || r.Emit == nil {
+					return
+				}
+				gotDelta.Store(true)
+				r.Emit.Emit(Event{
+					RequestID: req.RequestID, SessionID: session.ID,
+					Type: EventDelta, Text: delta,
+				})
 			})
-		})
+			if err == nil {
+				break
+			}
+			if attempt >= defaultArtifactGenRetries-1 || !isRetryableLLMError(err) {
+				break
+			}
+		}
 		close(stopHeartbeat)
 		if err != nil {
 			return "", err
@@ -232,4 +240,32 @@ func summarizeArgs(args map[string]any) string {
 		joined = joined[:77] + "..."
 	}
 	return "(" + joined + ")"
+}
+
+// buildToolContext 组装工具执行上下文，合并 Registry 注入与 Runtime 回调。
+func buildToolContext(r *Runtime, session core.AISession) tools.ToolContext {
+	ctx := tools.ToolContext{
+		SessionID:         session.ID,
+		EnvironmentID:     session.EnvironmentID,
+		PreferredConfigID: session.ConfigID,
+		EnvLookup:         r.Environments,
+	}
+	if r.Tools != nil {
+		deps := r.Tools.Deps()
+		ctx.NodeCatalog = deps.NodeCatalog
+		ctx.WorkflowGet = deps.WorkflowGet
+		ctx.AssembleGet = deps.AssembleGet
+		ctx.WorkflowList = deps.WorkflowList
+		ctx.AssembleList = deps.AssembleList
+	}
+	if ctx.NodeCatalog == nil && r.Nodes != nil {
+		ctx.NodeCatalog = r.Nodes
+	}
+	if ctx.WorkflowGet == nil && r.Workflows != nil {
+		ctx.WorkflowGet = r.Workflows.Get
+	}
+	if ctx.AssembleGet == nil && r.Assembles != nil {
+		ctx.AssembleGet = r.Assembles.Get
+	}
+	return ctx
 }

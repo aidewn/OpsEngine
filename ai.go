@@ -66,6 +66,8 @@ type AIAssistantEvent struct {
 	ActionType    string                 `json:"action_type,omitempty"`
 	DocID         string                 `json:"doc_id,omitempty"`
 	DocTitle      string                 `json:"doc_title,omitempty"`
+	NodeCount     int                    `json:"node_count,omitempty"`
+	ChangeSummary string                 `json:"change_summary,omitempty"`
 	TargetOptions []runtime.TargetOption `json:"target_options,omitempty"`
 }
 
@@ -197,6 +199,52 @@ func (a *App) DeleteAISession(id string) error {
 		return errors.New("会话存储未初始化")
 	}
 	return a.aiSessionStore.Delete(id)
+}
+
+// SetAISessionActiveArtifact 进入 artifact 编辑模式（持久化到会话，刷新不丢）。
+func (a *App) SetAISessionActiveArtifact(sessionID, artifactType, artifactID, artifactName string) error {
+	if a.aiSessionStore == nil {
+		return errors.New("会话存储未初始化")
+	}
+	sessionID = strings.TrimSpace(sessionID)
+	artifactType = strings.TrimSpace(artifactType)
+	artifactID = strings.TrimSpace(artifactID)
+	artifactName = strings.TrimSpace(artifactName)
+	if sessionID == "" || artifactType == "" || artifactID == "" {
+		return errors.New("session_id、artifact_type、artifact_id 不能为空")
+	}
+	if artifactType != "workflow" && artifactType != "assemble" {
+		return errors.New("artifact_type 必须是 workflow 或 assemble")
+	}
+	session, err := a.aiSessionStore.Get(sessionID)
+	if err != nil {
+		return err
+	}
+	session.ActiveArtifactType = artifactType
+	session.ActiveArtifactID = artifactID
+	session.ActiveArtifactName = artifactName
+	session.UpdatedAt = time.Now()
+	return a.aiSessionStore.Save(session)
+}
+
+// ClearAISessionActiveArtifact 退出 artifact 编辑模式。
+func (a *App) ClearAISessionActiveArtifact(sessionID string) error {
+	if a.aiSessionStore == nil {
+		return errors.New("会话存储未初始化")
+	}
+	sessionID = strings.TrimSpace(sessionID)
+	if sessionID == "" {
+		return errors.New("session_id 不能为空")
+	}
+	session, err := a.aiSessionStore.Get(sessionID)
+	if err != nil {
+		return err
+	}
+	session.ActiveArtifactType = ""
+	session.ActiveArtifactID = ""
+	session.ActiveArtifactName = ""
+	session.UpdatedAt = time.Now()
+	return a.aiSessionStore.Save(session)
 }
 
 // ── 统一助手入口 ────────────────────────────────────────────
@@ -335,6 +383,8 @@ func (a *App) emitRuntimeEvent(e runtime.Event) {
 		ActionType:    e.ActionType,
 		DocID:         e.DocID,
 		DocTitle:      e.DocTitle,
+		NodeCount:     e.NodeCount,
+		ChangeSummary: e.ChangeSummary,
 		TargetOptions: e.TargetOptions,
 	})
 }

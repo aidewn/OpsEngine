@@ -38,6 +38,7 @@
 - 集合不能包含 system_ready 节点
 - 只能使用上面列出的 type_id，未列出的禁止使用
 - 节点 id 用 n1/n2 等临时占位，后端会替换成 UUID
+- 修改已有集合时，也可沿用 JSON 里的 instance_id 作为节点 id，边中的 node 字段需与之一致
 - params / returns 中声明的 name 必须与 assemble_param / return_set 等节点配置一致
 - 通用集合优先通过 params 接收可变值，不要硬编码密码、主机、路径等环境专属信息
 - 不确定的字段留空，并把疑问写入 notes 数组让用户补全

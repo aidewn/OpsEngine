@@ -54,6 +54,10 @@ type AISessionMessage struct {
 	// 前端据此决定是否显示"保存为报告"按钮，后端 SaveAssistantMessageAsDoc 据此推断 OpsDoc.Kind。
 	// 旧消息没有此字段，按空字符串处理。
 	Intent    string    `json:"intent,omitempty" toml:"intent,omitempty"`
+	// NodeCount 工作流/集合消息附带的节点数量摘要，供前端 ActionCard 展示。
+	NodeCount int `json:"node_count,omitempty" toml:"node_count,omitempty"`
+	// ChangeSummary 更新类消息的结构变更摘要（如「节点 5→7」）。
+	ChangeSummary string `json:"change_summary,omitempty" toml:"change_summary,omitempty"`
 	CreatedAt time.Time `json:"created_at" toml:"created_at"`
 }
 
@@ -69,6 +73,11 @@ type AISession struct {
 	ConfigID string `json:"config_id" toml:"config_id"`
 	// ContextPrefetched 标记是否已经预取过 SSH 服务器信息，避免每条消息重复采集。
 	ContextPrefetched bool               `json:"context_prefetched" toml:"context_prefetched"`
+	// ActiveArtifactType / ActiveArtifactID / ActiveArtifactName 是会话级「编辑模式」上下文。
+	// 对标 Claude Code 的 artifact 迭代：用户点「继续修改」后持久化，刷新不丢。
+	ActiveArtifactType string `json:"active_artifact_type,omitempty" toml:"active_artifact_type,omitempty"`
+	ActiveArtifactID   string `json:"active_artifact_id,omitempty"   toml:"active_artifact_id,omitempty"`
+	ActiveArtifactName string `json:"active_artifact_name,omitempty" toml:"active_artifact_name,omitempty"`
 	Messages          []AISessionMessage `json:"messages"           toml:"messages"`
 	CreatedAt         time.Time          `json:"created_at"         toml:"created_at"`
 	UpdatedAt         time.Time          `json:"updated_at"         toml:"updated_at"`

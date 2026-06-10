@@ -30,6 +30,8 @@ const (
 	// 出现原因：DeepSeek 在带 tools 请求里通常不真正逐 chunk 推 content，
 	// 思考阶段会有 10-60s 的"假死"窗口，需要心跳让用户知道还活着。
 	EventHeartbeat EventType = "heartbeat"
+	// EventArtifactMode 通知前端进入/退出 artifact 编辑模式。
+	EventArtifactMode EventType = "artifact_mode"
 )
 
 // TargetOption 是需要用户选择的目标配置候选项。
@@ -52,6 +54,8 @@ type Event struct {
 	ActionType    string         `json:"action_type,omitempty"`
 	DocID         string         `json:"doc_id,omitempty"`
 	DocTitle      string         `json:"doc_title,omitempty"`
+	NodeCount     int            `json:"node_count,omitempty"`
+	ChangeSummary string         `json:"change_summary,omitempty"`
 	TargetOptions []TargetOption `json:"target_options,omitempty"`
 }
 

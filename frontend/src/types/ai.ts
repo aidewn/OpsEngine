@@ -35,6 +35,10 @@ export interface AISessionMessage {
   hidden?: boolean;
   /** 产生该消息时的意图标签（'chat' / 'troubleshoot' / 'inspect_server' / ...），用于决定是否显示"保存为报告"等动作。 */
   intent?: string;
+  /** 工作流/集合节点数量摘要 */
+  node_count?: number;
+  /** 更新类消息的变更摘要 */
+  change_summary?: string;
   created_at: string;
 }
 
@@ -53,6 +57,10 @@ export interface AISession {
   /** 仅 scope='config' 时必填；环境级会话可以为空。 */
   config_id: string;
   context_prefetched: boolean;
+  /** 会话级 artifact 编辑模式（Claude Code 式迭代上下文） */
+  active_artifact_type?: 'assemble' | 'workflow' | '';
+  active_artifact_id?: string;
+  active_artifact_name?: string;
   messages: AISessionMessage[];
   created_at: string;
   updated_at: string;
@@ -105,5 +113,7 @@ export interface AIAssistantEvent {
   action_type?: 'create' | 'update';
   doc_id?: string;
   doc_title?: string;
+  node_count?: number;
+  change_summary?: string;
   target_options?: AITargetOption[];
 }

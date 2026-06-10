@@ -14,11 +14,13 @@ import (
 // TestRegisterAllBuiltinTools 验证全部内置工具都能进 Registry（隐式校验 Tier=Read 且无重名）。
 func TestRegisterAllBuiltinTools(t *testing.T) {
 	reg := tools.NewRegistry()
-	if err := Register(reg); err != nil {
+	if err := Register(reg, tools.RegistryDeps{}); err != nil {
 		t.Fatalf("Register error: %v", err)
 	}
 	want := []string{
 		"env_inventory",
+		"node_catalog", "probe_catalog", "run_probe",
+		"list_workflows", "get_workflow", "list_assembles", "get_assemble",
 		"ssh_inspect", "ssh_list_dir", "ssh_read_log", "ssh_read_file", "ssh_find_files", "ssh_process_list",
 		"docker_list_containers", "docker_container_logs", "docker_container_inspect", "docker_list_images",
 		"k8s_list_pods", "k8s_list_workloads", "k8s_describe_pod",

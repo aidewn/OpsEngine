@@ -6,11 +6,33 @@ package tools
 import (
 	"fmt"
 	"sort"
+
+	"OpsEngine/internal/core"
 )
 
 // Registry 维护 name → Tool 的映射。零值不可用，请用 NewRegistry。
 type Registry struct {
 	tools map[string]Tool
+	deps  RegistryDeps
+}
+
+// RegistryDeps 是工具 Execute 所需的运行时依赖。
+type RegistryDeps struct {
+	NodeCatalog  func() []core.NodeTypeDef
+	WorkflowGet  func(id string) (core.WorkflowDef, error)
+	AssembleGet  func(id string) (core.AssembleDef, error)
+	WorkflowList func() ([]core.WorkflowDef, error)
+	AssembleList func() ([]core.AssembleDef, error)
+}
+
+// SetDeps 注入工具运行时依赖。
+func (r *Registry) SetDeps(deps RegistryDeps) {
+	r.deps = deps
+}
+
+// Deps 返回已注入的依赖。
+func (r *Registry) Deps() RegistryDeps {
+	return r.deps
 }
 
 // NewRegistry 创建一个空注册表。

@@ -12,7 +12,6 @@ import (
 
 	"OpsEngine/internal/agent/prompt"
 	"OpsEngine/internal/agent/workflow"
-	"OpsEngine/internal/clients"
 	"OpsEngine/internal/core"
 
 	"github.com/google/uuid"
@@ -38,31 +37,25 @@ func (r *Runtime) handleWorkflow(req Request, session core.AISession) {
 		PreferredConfigID:      session.ConfigID,
 	})
 	if err != nil {
-		r.emitError(req.RequestID, session.ID, err.Error())
+		r.emitTurnError(req, &session, err.Error(), progress, "generate_workflow")
 		return
 	}
 
-	r.emitProgress(req.RequestID, session.ID, "正在请求大模型生成工作流", &progress)
-	reply, err := r.LLM.Chat([]clients.ChatMessage{
-		{Role: "system", Content: systemPrompt},
-		{Role: "user", Content: req.Message},
-	})
+	draft, err := r.requestArtifactDraft(req, session.ID, &progress, systemPrompt, req.Message,
+		func(d workflow.Draft) error {
+			_, err := workflow.Materialize(d, workflow.NodeTypeChecker(r.NodeChecker))
+			return err
+		},
+	)
 	if err != nil {
-		r.emitError(req.RequestID, session.ID, err.Error())
-		return
-	}
-
-	r.emitProgress(req.RequestID, session.ID, "正在解析模型返回", &progress)
-	draft, err := workflow.ParseDraft(reply)
-	if err != nil {
-		r.emitError(req.RequestID, session.ID, err.Error())
+		r.emitTurnError(req, &session, err.Error(), progress, "generate_workflow")
 		return
 	}
 
 	r.emitProgress(req.RequestID, session.ID, "正在校验工作流结构", &progress)
 	wf, err := workflow.Materialize(draft, workflow.NodeTypeChecker(r.NodeChecker))
 	if err != nil {
-		r.emitError(req.RequestID, session.ID, err.Error())
+		r.emitTurnError(req, &session, err.Error(), progress, "generate_workflow")
 		return
 	}
 
@@ -76,6 +69,12 @@ func (r *Runtime) handleWorkflow(req Request, session core.AISession) {
 		return
 	}
 
+	nodeCount := len(wf.Nodes)
+	if err := r.setSessionActiveArtifact(&session, "workflow", wf.ID, wf.Name); err != nil {
+		r.emitError(req.RequestID, session.ID, err.Error())
+		return
+	}
+
 	r.Emit.Emit(Event{
 		RequestID: req.RequestID, SessionID: session.ID,
 		Type:         EventWorkflow,
@@ -83,17 +82,19 @@ func (r *Runtime) handleWorkflow(req Request, session core.AISession) {
 		WorkflowName: wf.Name,
 		ArtifactType: "workflow",
 		ActionType:   "create",
+		NodeCount:    nodeCount,
 	})
 
 	session.Messages = append(session.Messages, core.AISessionMessage{
 		ID:           uuid.New().String(),
 		Role:         core.AIMessageRoleAssistant,
-		Content:      fmt.Sprintf("已生成工作流「%s」，可以直接打开查看。", wf.Name),
+		Content:      fmt.Sprintf("已生成工作流「%s」（%d 个节点），可直接打开查看或继续在此对话中迭代修改。", wf.Name, nodeCount),
 		Progress:     progress,
 		WorkflowID:   wf.ID,
 		WorkflowName: wf.Name,
 		ArtifactType: "workflow",
 		ActionType:   "create",
+		NodeCount:    nodeCount,
 		Intent:       "generate_workflow",
 		CreatedAt:    time.Now(),
 	})
@@ -147,26 +148,25 @@ func (r *Runtime) handleWorkflowUpdate(req Request, session core.AISession) {
 	}
 	currentJSON, _ := json.Marshal(existing)
 	userPrompt := fmt.Sprintf("请基于当前工作流 JSON 直接输出完整更新后的工作流草案 JSON。\n当前工作流：%s\n修改要求：%s", string(currentJSON), req.Message)
-
-	r.emitProgress(req.RequestID, session.ID, "正在请求大模型修改工作流", &progress)
-	reply, err := r.LLM.Chat([]clients.ChatMessage{
-		{Role: "system", Content: systemPrompt},
-		{Role: "user", Content: userPrompt},
-	})
-	if err != nil {
-		r.emitError(req.RequestID, session.ID, err.Error())
-		return
+	if isExecutionFailureReport(req.Message) {
+		r.emitProgress(req.RequestID, session.ID, "检测到执行失败日志，正在分析并修复…", &progress)
+		userPrompt = buildExecutionFixUserPrompt(req.Message)
 	}
-	r.emitProgress(req.RequestID, session.ID, "正在解析模型返回", &progress)
-	draft, err := workflow.ParseDraft(reply)
+
+	draft, err := r.requestArtifactDraft(req, session.ID, &progress, systemPrompt, userPrompt,
+		func(d workflow.Draft) error {
+			_, err := workflow.MaterializeWorkflowUpdate(d, existing, workflow.NodeTypeChecker(r.NodeChecker))
+			return err
+		},
+	)
 	if err != nil {
-		r.emitError(req.RequestID, session.ID, err.Error())
+		r.emitTurnError(req, &session, err.Error(), progress, "update_workflow")
 		return
 	}
 	r.emitProgress(req.RequestID, session.ID, "正在校验工作流结构", &progress)
 	wf, err := workflow.MaterializeWorkflowUpdate(draft, existing, workflow.NodeTypeChecker(r.NodeChecker))
 	if err != nil {
-		r.emitError(req.RequestID, session.ID, err.Error())
+		r.emitTurnError(req, &session, err.Error(), progress, "update_workflow")
 		return
 	}
 	r.emitProgress(req.RequestID, session.ID, "正在保存工作流", &progress)
@@ -174,25 +174,35 @@ func (r *Runtime) handleWorkflowUpdate(req Request, session core.AISession) {
 		r.emitError(req.RequestID, session.ID, err.Error())
 		return
 	}
+	nodeCount := len(wf.Nodes)
+	changeSummary := workflowChangeSummary(len(existing.Nodes), nodeCount)
+	if err := r.setSessionActiveArtifact(&session, "workflow", wf.ID, wf.Name); err != nil {
+		r.emitError(req.RequestID, session.ID, err.Error())
+		return
+	}
 	r.Emit.Emit(Event{
 		RequestID: req.RequestID, SessionID: session.ID,
-		Type:         EventWorkflow,
-		WorkflowID:   wf.ID,
-		WorkflowName: wf.Name,
-		ArtifactType: "workflow",
-		ActionType:   "update",
+		Type:          EventWorkflow,
+		WorkflowID:    wf.ID,
+		WorkflowName:  wf.Name,
+		ArtifactType:  "workflow",
+		ActionType:    "update",
+		NodeCount:     nodeCount,
+		ChangeSummary: changeSummary,
 	})
 	session.Messages = append(session.Messages, core.AISessionMessage{
-		ID:           uuid.New().String(),
-		Role:         core.AIMessageRoleAssistant,
-		Content:      fmt.Sprintf("已更新工作流「%s」。", wf.Name),
-		Progress:     progress,
-		WorkflowID:   wf.ID,
-		WorkflowName: wf.Name,
-		ArtifactType: "workflow",
-		ActionType:   "update",
-		Intent:       "update_workflow",
-		CreatedAt:    time.Now(),
+		ID:            uuid.New().String(),
+		Role:          core.AIMessageRoleAssistant,
+		Content:       fmt.Sprintf("已更新工作流「%s」（%s）。请重新运行验证；若仍失败，把新的日志贴回对话继续修复。", wf.Name, changeSummary),
+		Progress:      progress,
+		WorkflowID:    wf.ID,
+		WorkflowName:  wf.Name,
+		ArtifactType:  "workflow",
+		ActionType:    "update",
+		NodeCount:     nodeCount,
+		ChangeSummary: changeSummary,
+		Intent:        "update_workflow",
+		CreatedAt:     time.Now(),
 	})
 	session.UpdatedAt = time.Now()
 	if err := r.Sessions.Save(session); err != nil {

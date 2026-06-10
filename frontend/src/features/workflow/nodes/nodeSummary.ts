@@ -36,6 +36,16 @@ const summarizers: Record<string, Summarizer> = {
   compare_gt: (c) => compareSummary(c, '>'),
   compare_le: (c) => compareSummary(c, '<='),
   compare_ge: (c) => compareSummary(c, '>='),
+
+  text_template: (c) => {
+    const params = Array.isArray(c['params'])
+      ? (c['params'] as unknown[]).filter((x): x is string => typeof x === 'string')
+      : [];
+    if (params.length > 0) {
+      return `参数: ${params.slice(0, 4).join(', ')}${params.length > 4 ? '…' : ''}`;
+    }
+    return firstLineTruncated(c['template']);
+  },
 };
 
 // nodeSummary 返回该节点 instance 的副标题；缺省 null（不渲染）

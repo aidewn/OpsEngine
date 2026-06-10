@@ -69,7 +69,13 @@ func (a *App) startup(ctx context.Context) {
 
 	// 注册内置 Agent 工具（只读 tier）。失败仅记日志，不影响其他功能。
 	a.toolRegistry = tools.NewRegistry()
-	if err := builtin.Register(a.toolRegistry); err != nil {
+	if err := builtin.Register(a.toolRegistry, tools.RegistryDeps{
+		NodeCatalog:  a.GetNodeTypes,
+		WorkflowGet:  a.workflowStore.Get,
+		AssembleGet:  a.assembleStore.Get,
+		WorkflowList: a.workflowStore.List,
+		AssembleList: a.assembleStore.List,
+	}); err != nil {
 		zap.L().Warn("注册内置 Agent 工具失败", zap.Error(err))
 	}
 	a.engine = engine.New(

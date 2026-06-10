@@ -16,6 +16,11 @@ import { useNodeTypes } from '@/api/nodeTypes';
 import { getPortColor, resolvePortType } from '@/types/nodeType';
 import { useNodeExecState } from './useNodeExecState';
 import { effectiveBranchCount } from '../cleanupParallel';
+import {
+  parseTextTemplateParams,
+  TEXT_TEMPLATE_TYPE,
+  textTemplateInputPorts,
+} from '../textTemplatePorts';
 import { nodeSummary } from './nodeSummary';
 
 type Props = NodeProps & { data: NodeInstance };
@@ -67,7 +72,7 @@ export function GenericNode({ id, data, selected }: Props) {
   const def = nodeTypes?.find((t) => t.type_id === data.type_id);
   const execState = useNodeExecState(data.instance_id);
 
-  const inputPorts = def?.input_ports ?? [];
+  const inputPorts = effectiveInputPorts(data, def);
   const outputPorts = effectiveOutputPorts(data, def);
   const rowCount = Math.max(inputPorts.length, outputPorts.length);
   const title = nodeDisplayTitle(data, def);
@@ -220,6 +225,18 @@ function portTooltip(
   config: Record<string, unknown>,
 ): string {
   return `${port.label || port.id} (${resolvePortType(port, config)})`;
+}
+
+// effectiveInputPorts 计算节点实际可见的 input 端口
+// text_template：按 config.params 动态生成 param_<name>
+function effectiveInputPorts(
+  data: NodeInstance,
+  def: NodeTypeDef | undefined,
+): PortDef[] {
+  if (data.type_id === TEXT_TEMPLATE_TYPE) {
+    return textTemplateInputPorts(parseTextTemplateParams(data.config));
+  }
+  return def?.input_ports ?? [];
 }
 
 // effectiveOutputPorts 计算节点实际可见的输出端口列表

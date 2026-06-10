@@ -207,9 +207,37 @@ function FieldControl({
           value={(value as string) ?? ''}
           onChange={(e) => onChange(e.target.value)}
           placeholder={field.placeholder}
-          rows={4}
+          rows={field.id === 'template' ? 6 : 4}
         />
       );
+    case 'param_list': {
+      const lines = Array.isArray(value)
+        ? (value as unknown[]).filter((x): x is string => typeof x === 'string')
+        : typeof value === 'string'
+          ? value.split(/\r?\n/)
+          : [];
+      const text = lines.join('\n');
+      return (
+        <div className="space-y-1">
+          <Textarea
+            id={field.id}
+            value={text}
+            onChange={(e) => {
+              const list = e.target.value
+                .split(/\r?\n/)
+                .map((s) => s.trim())
+                .filter(Boolean);
+              onChange(list);
+            }}
+            placeholder={field.placeholder ?? '每行一个参数名，如 name\nhost'}
+            rows={4}
+          />
+          <p className="text-[10px] text-slate-400">
+            保存后节点左侧会出现同名 input 端口，模板中用 {'{{ 参数名 }}'} 引用。
+          </p>
+        </div>
+      );
+    }
     case 'password':
       return (
         <Input

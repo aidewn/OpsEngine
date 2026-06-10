@@ -6,6 +6,7 @@ package probe
 
 import (
 	"fmt"
+	"sort"
 	"sync"
 
 	"OpsEngine/internal/core"
@@ -39,6 +40,18 @@ func Lookup(typeID string) (ProbeFunc, bool) {
 	defer registryMu.RUnlock()
 	fn, ok := registry[typeID]
 	return fn, ok
+}
+
+// ListRegisteredTypeIDs 返回所有已注册探测节点 TypeID，按字典序排序。
+func ListRegisteredTypeIDs() []string {
+	registryMu.RLock()
+	defer registryMu.RUnlock()
+	out := make([]string, 0, len(registry))
+	for id := range registry {
+		out = append(out, id)
+	}
+	sort.Strings(out)
+	return out
 }
 
 // Run 调用注册表中的探测函数；TypeID 不存在时返回明确错误

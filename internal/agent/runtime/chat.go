@@ -78,7 +78,7 @@ func (r *Runtime) runConversationTurn(req Request, session core.AISession, opts 
 		// 拿到的 text 已经被前端渲染过；只需累积进 assistant 用于落库。
 		text, err := r.runChatToolLoop(req, session, messages, &progress)
 		if err != nil {
-			r.emitError(req.RequestID, session.ID, err.Error())
+			r.emitTurnError(req, &session, err.Error(), progress, opts.IntentTag)
 			return
 		}
 		assistant.WriteString(text)

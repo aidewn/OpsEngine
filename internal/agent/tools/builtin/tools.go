@@ -11,20 +11,26 @@ import (
 	"OpsEngine/internal/agent/tools"
 )
 
+// RegisterDeps 与 tools.RegistryDeps 同义，便于调用方注入依赖。
+type RegisterDeps = tools.RegistryDeps
+
 // Register 把内置工具注册到给定 Registry。
-// 调用方（ai.go）在 App 启动时调用一次即可。
-//
-// 工具分组：
-//   - env_*：环境清单
-//   - ssh_*：SSH 主机操作（命令、日志、文件读取）
-//   - docker_*：Docker 容器与镜像
-//   - k8s_*：K8s Pod 与 Workload
-//   - jenkins_*：Jenkins 任务
-//   - local_*：OpsEngine 主机本机文件
-func Register(reg *tools.Registry) error {
+// deps 注入节点目录与资产查询能力；调用方在 App 启动时调用一次即可。
+func Register(reg *tools.Registry, deps RegisterDeps) error {
+	// 把 deps 挂到 registry，Execute 时通过 ToolContext 传递（见 buildToolContext）。
+	reg.SetDeps(deps)
+
 	for _, t := range []tools.Tool{
 		// 环境
 		EnvInventory{},
+		// 节点目录与探测（覆盖全部 env_probe_* 与引擎节点元数据）
+		NodeCatalog{},
+		ProbeCatalog{},
+		RunProbe{},
+		ListWorkflows{},
+		GetWorkflow{},
+		ListAssembles{},
+		GetAssemble{},
 		// SSH 主机
 		SSHInspect{},
 		SSHListDir{},

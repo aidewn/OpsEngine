@@ -31,12 +31,13 @@ type Draft struct {
 	Notes       []string           `json:"notes"`
 }
 
-// DraftNode 是草案节点，id 为模型给的临时占位。
+// DraftNode 是草案节点，id 为模型给的临时占位（也兼容 instance_id 回显）。
 type DraftNode struct {
-	ID       string         `json:"id"`
-	TypeID   string         `json:"type_id"`
-	Config   map[string]any `json:"config"`
-	Position DraftPosition  `json:"position"`
+	ID         string         `json:"id"`
+	InstanceID string         `json:"instance_id,omitempty"`
+	TypeID     string         `json:"type_id"`
+	Config     map[string]any `json:"config"`
+	Position   DraftPosition  `json:"position"`
 }
 
 // DraftPosition 是画布坐标。
@@ -77,7 +78,54 @@ func ParseDraft(reply string) (Draft, error) {
 	if len(draft.Nodes) == 0 {
 		return Draft{}, errors.New("AI 返回的节点列表为空")
 	}
+	normalizeDraft(&draft)
 	return draft, nil
+}
+
+// draftNodeTempID 读取节点临时 id：优先 id，其次 instance_id（模型更新已有工作流时常回显后者）。
+func draftNodeTempID(n DraftNode) string {
+	if id := strings.TrimSpace(n.ID); id != "" {
+		return id
+	}
+	return strings.TrimSpace(n.InstanceID)
+}
+
+// normalizeDraft 补齐缺失/重复的节点临时 id，避免 Materialize 因「AI 节点缺少 id」失败。
+func normalizeDraft(d *Draft) {
+	used := make(map[string]struct{}, len(d.Nodes))
+	for i := range d.Nodes {
+		id := draftNodeTempID(d.Nodes[i])
+		if id == "" {
+			id = nextDraftNodeID(used)
+		}
+		id = ensureUniqueDraftNodeID(id, used)
+		d.Nodes[i].ID = id
+		used[id] = struct{}{}
+	}
+}
+
+// nextDraftNodeID 生成尚未占用的 n1/n2/… 占位 id。
+func nextDraftNodeID(used map[string]struct{}) string {
+	for i := 1; ; i++ {
+		id := fmt.Sprintf("n%d", i)
+		if _, ok := used[id]; !ok {
+			return id
+		}
+	}
+}
+
+// ensureUniqueDraftNodeID 在 id 冲突时追加数字后缀。
+func ensureUniqueDraftNodeID(id string, used map[string]struct{}) string {
+	if _, ok := used[id]; !ok {
+		return id
+	}
+	base := id
+	for i := 2; ; i++ {
+		candidate := fmt.Sprintf("%s_%d", base, i)
+		if _, ok := used[candidate]; !ok {
+			return candidate
+		}
+	}
 }
 
 // Materialize 把草案转成 core.WorkflowDef：临时 id 重写、节点类型校验、边重映射，最后跑整体校验。
@@ -99,10 +147,11 @@ func MaterializeWorkflowUpdate(draft Draft, existing core.WorkflowDef, checker N
 }
 
 func materializeWorkflow(draft Draft, fixedID string, checker NodeTypeChecker) (core.WorkflowDef, error) {
+	normalizeDraft(&draft)
 	idMap := make(map[string]string, len(draft.Nodes))
 	nodes := make([]core.NodeInstance, 0, len(draft.Nodes))
 	for _, n := range draft.Nodes {
-		tempID := strings.TrimSpace(n.ID)
+		tempID := draftNodeTempID(n)
 		if tempID == "" {
 			return core.WorkflowDef{}, errors.New("AI 节点缺少 id")
 		}
@@ -168,10 +217,11 @@ func materializeWorkflow(draft Draft, fixedID string, checker NodeTypeChecker) (
 
 // MaterializeAssemble 把草案转成集合定义，并执行集合专用校验。
 func MaterializeAssemble(draft Draft, fixedID string, checker NodeTypeChecker) (core.AssembleDef, error) {
+	normalizeDraft(&draft)
 	idMap := make(map[string]string, len(draft.Nodes))
 	nodes := make([]core.NodeInstance, 0, len(draft.Nodes))
 	for _, n := range draft.Nodes {
-		tempID := strings.TrimSpace(n.ID)
+		tempID := draftNodeTempID(n)
 		if tempID == "" {
 			return core.AssembleDef{}, errors.New("AI 节点缺少 id")
 		}

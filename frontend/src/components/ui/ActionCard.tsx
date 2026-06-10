@@ -5,6 +5,7 @@ import { cn } from '@/lib/cn';
 interface ActionCardProps {
   title: string;
   description?: string;
+  badge?: string;
   tone?: 'info' | 'success' | 'warning';
   primaryAction?: {
     label: string;
@@ -33,6 +34,7 @@ const toneClass = {
 export function ActionCard({
   title,
   description,
+  badge,
   tone = 'info',
   primaryAction,
   secondaryAction,
@@ -42,7 +44,14 @@ export function ActionCard({
     <div className={cn('mt-3 rounded-md border px-3 py-2', toneClass[tone])}>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <div className="truncate text-sm font-medium text-ops-primary">{title}</div>
+          <div className="flex items-center gap-2">
+            <div className="truncate text-sm font-medium text-ops-primary">{title}</div>
+            {badge ? (
+              <span className="shrink-0 rounded-sm bg-ops-elevated px-1.5 py-0.5 text-[10px] text-ops-secondary">
+                {badge}
+              </span>
+            ) : null}
+          </div>
           {description ? <div className="mt-1 text-xs text-ops-secondary">{description}</div> : null}
         </div>
         <div className="flex shrink-0 items-center gap-2">

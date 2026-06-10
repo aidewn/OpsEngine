@@ -10,7 +10,6 @@ import (
 
 	"OpsEngine/internal/agent/prompt"
 	"OpsEngine/internal/agent/workflow"
-	"OpsEngine/internal/clients"
 	"OpsEngine/internal/core"
 
 	"github.com/google/uuid"
@@ -64,30 +63,35 @@ func (r *Runtime) handleAssemble(req Request, session core.AISession, update boo
 		PreferredConfigID:      session.ConfigID,
 	}, currentJSON)
 	if err != nil {
-		r.emitError(req.RequestID, session.ID, err.Error())
+		r.emitTurnError(req, &session, err.Error(), progress, assembleIntent(update))
 		return
 	}
 
-	r.emitProgress(req.RequestID, session.ID, "正在请求大模型生成集合", &progress)
-	reply, err := r.LLM.Chat([]clients.ChatMessage{
-		{Role: "system", Content: systemPrompt},
-		{Role: "user", Content: req.Message},
-	})
-	if err != nil {
-		r.emitError(req.RequestID, session.ID, err.Error())
-		return
+	userPrompt := req.Message
+	if update {
+		if isExecutionFailureReport(req.Message) {
+			r.emitProgress(req.RequestID, session.ID, "检测到执行失败日志，正在分析并修复…", &progress)
+			userPrompt = buildExecutionFixUserPrompt(req.Message)
+		} else {
+			userPrompt = fmt.Sprintf("请基于当前集合修改：%s", req.Message)
+		}
 	}
 
-	r.emitProgress(req.RequestID, session.ID, "正在解析模型返回", &progress)
-	draft, err := workflow.ParseDraft(reply)
+	intentTag := assembleIntent(update)
+	draft, err := r.requestArtifactDraft(req, session.ID, &progress, systemPrompt, userPrompt,
+		func(d workflow.Draft) error {
+			_, err := workflow.MaterializeAssemble(d, fixedID, workflow.NodeTypeChecker(r.NodeChecker))
+			return err
+		},
+	)
 	if err != nil {
-		r.emitError(req.RequestID, session.ID, err.Error())
+		r.emitTurnError(req, &session, err.Error(), progress, intentTag)
 		return
 	}
 	r.emitProgress(req.RequestID, session.ID, "正在校验集合结构", &progress)
 	asm, err := workflow.MaterializeAssemble(draft, fixedID, workflow.NodeTypeChecker(r.NodeChecker))
 	if err != nil {
-		r.emitError(req.RequestID, session.ID, err.Error())
+		r.emitTurnError(req, &session, err.Error(), progress, intentTag)
 		return
 	}
 	if update && strings.TrimSpace(asm.Name) == "" {
@@ -99,33 +103,45 @@ func (r *Runtime) handleAssemble(req Request, session core.AISession, update boo
 		r.emitError(req.RequestID, session.ID, err.Error())
 		return
 	}
+	r.emitProgress(req.RequestID, session.ID, "集合已保存", &progress)
 
+	nodeCount := len(asm.Nodes)
+	changeSummary := ""
 	actionType := "create"
-	content := fmt.Sprintf("已生成集合「%s」，可以直接打开查看。", asm.Name)
+	content := fmt.Sprintf("已生成集合「%s」（%d 个节点），可直接打开或继续迭代修改。", asm.Name, nodeCount)
 	if update {
 		actionType = "update"
-		content = fmt.Sprintf("已更新集合「%s」。", asm.Name)
+		changeSummary = workflowChangeSummary(len(current.Nodes), nodeCount)
+		content = fmt.Sprintf("已更新集合「%s」（%s）。请重新运行验证；若仍失败，把新的日志贴回对话继续修复。", asm.Name, changeSummary)
+	}
+	if err := r.setSessionActiveArtifact(&session, "assemble", asm.ID, asm.Name); err != nil {
+		r.emitError(req.RequestID, session.ID, err.Error())
+		return
 	}
 	r.Emit.Emit(Event{
 		RequestID: req.RequestID, SessionID: session.ID,
-		Type:         EventAssemble,
-		AssembleID:   asm.ID,
-		AssembleName: asm.Name,
-		ArtifactType: "assemble",
-		ActionType:   actionType,
+		Type:          EventAssemble,
+		AssembleID:    asm.ID,
+		AssembleName:  asm.Name,
+		ArtifactType:  "assemble",
+		ActionType:    actionType,
+		NodeCount:     nodeCount,
+		ChangeSummary: changeSummary,
 	})
 
 	session.Messages = append(session.Messages, core.AISessionMessage{
-		ID:           uuid.New().String(),
-		Role:         core.AIMessageRoleAssistant,
-		Content:      content,
-		Progress:     progress,
-		AssembleID:   asm.ID,
-		AssembleName: asm.Name,
-		ArtifactType: "assemble",
-		ActionType:   actionType,
-		Intent:       "create_assemble",
-		CreatedAt:    time.Now(),
+		ID:            uuid.New().String(),
+		Role:          core.AIMessageRoleAssistant,
+		Content:       content,
+		Progress:      progress,
+		AssembleID:    asm.ID,
+		AssembleName:  asm.Name,
+		ArtifactType:  "assemble",
+		ActionType:    actionType,
+		NodeCount:     nodeCount,
+		ChangeSummary: changeSummary,
+		Intent:        "create_assemble",
+		CreatedAt:     time.Now(),
 	})
 	if update {
 		session.Messages[len(session.Messages)-1].Intent = "update_assemble"
@@ -136,6 +152,14 @@ func (r *Runtime) handleAssemble(req Request, session core.AISession, update boo
 		return
 	}
 	r.emitDone(req.RequestID, session.ID)
+}
+
+// assembleIntent 返回集合操作的 intent 标签。
+func assembleIntent(update bool) string {
+	if update {
+		return "update_assemble"
+	}
+	return "create_assemble"
 }
 
 // lastArtifactID 从历史 assistant 消息中找最近的指定类型产物。

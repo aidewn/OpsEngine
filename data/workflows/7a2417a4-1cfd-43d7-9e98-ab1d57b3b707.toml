@@ -1,0 +1,320 @@
+id = "7a2417a4-1cfd-43d7-9e98-ab1d57b3b707"
+name = "通用服务器巡检"
+description = "覆盖系统资源、服务状态、日志及容器化部署的日常检查"
+variables = []
+
+[[nodes]]
+  id = "d4ad2324-6a5b-4b84-8a08-9b2d0e731406"
+  type = "system_ready"
+  [nodes.config]
+  [nodes.position]
+    x = 80.0
+    y = 160.0
+
+[[nodes]]
+  id = "30fca89b-e5f7-4135-b8d3-794ed8e23561"
+  type = "env_connect_ssh"
+  [nodes.config]
+    config_id = "cc951b78-46bc-4777-ac8f-41b7f560bec9"
+    environment_id = "1638a7ba-e778-4267-b296-1afba582fea6"
+  [nodes.position]
+    x = 320.0
+    y = 160.0
+
+[[nodes]]
+  id = "e189a654-6791-4afd-a216-464b1eaf87eb"
+  type = "linux_exec_command"
+  [nodes.config]
+    command = "uname -a && cat /etc/os-release | head -5"
+    fail_on_error = false
+    kind = "shell"
+    timeout_seconds = 10
+    title = "系统信息"
+  [nodes.position]
+    x = 560.0
+    y = 160.0
+
+[[nodes]]
+  id = "219c0b75-00fa-4c94-a5a8-863a2d107806"
+  type = "linux_exec_command"
+  [nodes.config]
+    command = "uptime"
+    fail_on_error = false
+    kind = "shell"
+    timeout_seconds = 10
+    title = "系统负载"
+  [nodes.position]
+    x = 800.0
+    y = 160.0
+
+[[nodes]]
+  id = "c10fe994-dc47-46ee-85d3-4b612ef18f80"
+  type = "linux_exec_command"
+  [nodes.config]
+    command = "free -m"
+    fail_on_error = false
+    kind = "shell"
+    timeout_seconds = 10
+    title = "内存使用"
+  [nodes.position]
+    x = 1040.0
+    y = 160.0
+
+[[nodes]]
+  id = "6521609f-761c-4053-b0f8-8f81e21848a1"
+  type = "linux_exec_command"
+  [nodes.config]
+    command = "df -h"
+    fail_on_error = false
+    kind = "shell"
+    timeout_seconds = 10
+    title = "磁盘使用"
+  [nodes.position]
+    x = 1280.0
+    y = 160.0
+
+[[nodes]]
+  id = "491ae9b7-d782-4f6e-a27c-b5032983742d"
+  type = "linux_exec_command"
+  [nodes.config]
+    command = "(ss -tlnp 2>/dev/null || netstat -tlnp 2>/dev/null) | head -n 80"
+    fail_on_error = false
+    kind = "port_listen"
+    timeout_seconds = 10
+    title = "监听端口"
+  [nodes.position]
+    x = 1520.0
+    y = 160.0
+
+[[nodes]]
+  id = "a31c3790-bc66-4e57-bb31-86918c4235a2"
+  type = "linux_exec_command"
+  [nodes.config]
+    command = "tail -n 50 '/var/log/syslog' 2>&1"
+    fail_on_error = false
+    kind = "read_log"
+    timeout_seconds = 10
+    title = "系统日志"
+  [nodes.position]
+    x = 1760.0
+    y = 160.0
+
+[[nodes]]
+  id = "b276516c-2f92-475b-a8da-07c2ae45a9e4"
+  type = "linux_exec_command"
+  [nodes.config]
+    command = "ps aux --sort=-%mem | head -20"
+    fail_on_error = false
+    kind = "shell"
+    timeout_seconds = 10
+    title = "高内存进程"
+  [nodes.position]
+    x = 2000.0
+    y = 160.0
+
+[[nodes]]
+  id = "0ada1a2a-8b60-47d3-83b0-1d6a2a6af92c"
+  type = "linux_exec_command"
+  [nodes.config]
+    command = "systemctl status 'sshd' --no-pager 2>&1"
+    fail_on_error = false
+    kind = "systemd"
+    timeout_seconds = 10
+    title = "SSH 服务状态"
+  [nodes.position]
+    x = 2240.0
+    y = 160.0
+
+[[nodes]]
+  id = "ae00c8a9-212a-4bbc-a80c-cd8f3ff849be"
+  type = "linux_exec_command"
+  [nodes.config]
+    command = "docker ps -a --format '{{.Names}}\\t{{.Image}}\\t{{.Status}}' 2>&1"
+    fail_on_error = false
+    kind = "docker_list"
+    timeout_seconds = 10
+    title = "Docker 容器清单"
+  [nodes.position]
+    x = 2480.0
+    y = 160.0
+
+[[nodes]]
+  id = "bca2842e-00cd-4fbf-8989-85b6155faf6d"
+  type = "linux_exec_command"
+  [nodes.config]
+    command = "docker logs --tail 100 'nginx' 2>&1"
+    fail_on_error = false
+    kind = "docker_logs"
+    timeout_seconds = 10
+    title = "Nginx 容器日志"
+  [nodes.position]
+    x = 2720.0
+    y = 160.0
+
+[[edges]]
+  [edges.from]
+    node = "d4ad2324-6a5b-4b84-8a08-9b2d0e731406"
+    port = "exec_out"
+  [edges.to]
+    node = "30fca89b-e5f7-4135-b8d3-794ed8e23561"
+    port = "exec_in"
+
+[[edges]]
+  [edges.from]
+    node = "30fca89b-e5f7-4135-b8d3-794ed8e23561"
+    port = "exec_out"
+  [edges.to]
+    node = "e189a654-6791-4afd-a216-464b1eaf87eb"
+    port = "exec_in"
+
+[[edges]]
+  [edges.from]
+    node = "30fca89b-e5f7-4135-b8d3-794ed8e23561"
+    port = "client"
+  [edges.to]
+    node = "e189a654-6791-4afd-a216-464b1eaf87eb"
+    port = "client"
+
+[[edges]]
+  [edges.from]
+    node = "e189a654-6791-4afd-a216-464b1eaf87eb"
+    port = "exec_out"
+  [edges.to]
+    node = "219c0b75-00fa-4c94-a5a8-863a2d107806"
+    port = "exec_in"
+
+[[edges]]
+  [edges.from]
+    node = "30fca89b-e5f7-4135-b8d3-794ed8e23561"
+    port = "client"
+  [edges.to]
+    node = "219c0b75-00fa-4c94-a5a8-863a2d107806"
+    port = "client"
+
+[[edges]]
+  [edges.from]
+    node = "219c0b75-00fa-4c94-a5a8-863a2d107806"
+    port = "exec_out"
+  [edges.to]
+    node = "c10fe994-dc47-46ee-85d3-4b612ef18f80"
+    port = "exec_in"
+
+[[edges]]
+  [edges.from]
+    node = "30fca89b-e5f7-4135-b8d3-794ed8e23561"
+    port = "client"
+  [edges.to]
+    node = "c10fe994-dc47-46ee-85d3-4b612ef18f80"
+    port = "client"
+
+[[edges]]
+  [edges.from]
+    node = "c10fe994-dc47-46ee-85d3-4b612ef18f80"
+    port = "exec_out"
+  [edges.to]
+    node = "6521609f-761c-4053-b0f8-8f81e21848a1"
+    port = "exec_in"
+
+[[edges]]
+  [edges.from]
+    node = "30fca89b-e5f7-4135-b8d3-794ed8e23561"
+    port = "client"
+  [edges.to]
+    node = "6521609f-761c-4053-b0f8-8f81e21848a1"
+    port = "client"
+
+[[edges]]
+  [edges.from]
+    node = "6521609f-761c-4053-b0f8-8f81e21848a1"
+    port = "exec_out"
+  [edges.to]
+    node = "491ae9b7-d782-4f6e-a27c-b5032983742d"
+    port = "exec_in"
+
+[[edges]]
+  [edges.from]
+    node = "30fca89b-e5f7-4135-b8d3-794ed8e23561"
+    port = "client"
+  [edges.to]
+    node = "491ae9b7-d782-4f6e-a27c-b5032983742d"
+    port = "client"
+
+[[edges]]
+  [edges.from]
+    node = "491ae9b7-d782-4f6e-a27c-b5032983742d"
+    port = "exec_out"
+  [edges.to]
+    node = "a31c3790-bc66-4e57-bb31-86918c4235a2"
+    port = "exec_in"
+
+[[edges]]
+  [edges.from]
+    node = "30fca89b-e5f7-4135-b8d3-794ed8e23561"
+    port = "client"
+  [edges.to]
+    node = "a31c3790-bc66-4e57-bb31-86918c4235a2"
+    port = "client"
+
+[[edges]]
+  [edges.from]
+    node = "a31c3790-bc66-4e57-bb31-86918c4235a2"
+    port = "exec_out"
+  [edges.to]
+    node = "b276516c-2f92-475b-a8da-07c2ae45a9e4"
+    port = "exec_in"
+
+[[edges]]
+  [edges.from]
+    node = "30fca89b-e5f7-4135-b8d3-794ed8e23561"
+    port = "client"
+  [edges.to]
+    node = "b276516c-2f92-475b-a8da-07c2ae45a9e4"
+    port = "client"
+
+[[edges]]
+  [edges.from]
+    node = "b276516c-2f92-475b-a8da-07c2ae45a9e4"
+    port = "exec_out"
+  [edges.to]
+    node = "0ada1a2a-8b60-47d3-83b0-1d6a2a6af92c"
+    port = "exec_in"
+
+[[edges]]
+  [edges.from]
+    node = "30fca89b-e5f7-4135-b8d3-794ed8e23561"
+    port = "client"
+  [edges.to]
+    node = "0ada1a2a-8b60-47d3-83b0-1d6a2a6af92c"
+    port = "client"
+
+[[edges]]
+  [edges.from]
+    node = "0ada1a2a-8b60-47d3-83b0-1d6a2a6af92c"
+    port = "exec_out"
+  [edges.to]
+    node = "ae00c8a9-212a-4bbc-a80c-cd8f3ff849be"
+    port = "exec_in"
+
+[[edges]]
+  [edges.from]
+    node = "30fca89b-e5f7-4135-b8d3-794ed8e23561"
+    port = "client"
+  [edges.to]
+    node = "ae00c8a9-212a-4bbc-a80c-cd8f3ff849be"
+    port = "client"
+
+[[edges]]
+  [edges.from]
+    node = "ae00c8a9-212a-4bbc-a80c-cd8f3ff849be"
+    port = "exec_out"
+  [edges.to]
+    node = "bca2842e-00cd-4fbf-8989-85b6155faf6d"
+    port = "exec_in"
+
+[[edges]]
+  [edges.from]
+    node = "30fca89b-e5f7-4135-b8d3-794ed8e23561"
+    port = "client"
+  [edges.to]
+    node = "bca2842e-00cd-4fbf-8989-85b6155faf6d"
+    port = "client"

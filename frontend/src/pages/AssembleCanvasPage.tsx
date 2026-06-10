@@ -16,6 +16,7 @@ import { AddNodeDialog } from '@/features/workflow/AddNodeDialog';
 import { AssembleSidebar } from '@/features/assemble/AssembleSidebar';
 import { AssembleProvider } from '@/features/assemble/AssembleContext';
 import { cleanupParallelEdges } from '@/features/workflow/cleanupParallel';
+import { cleanupTextTemplateEdges } from '@/features/workflow/textTemplatePorts';
 import { useCopyPaste } from '@/features/clipboard/useCopyPaste';
 import { Button } from '@/components/ui/Button';
 import type { AssembleDef, ParamDef } from '@/types/assemble';
@@ -74,7 +75,7 @@ function AssembleCanvasInner({ assembleId: id }: { assembleId: string | undefine
 
   const handleAssembleChange = useCallback(
     (next: AssembleDef) => {
-      const cleaned = cleanupParallelEdges(next);
+      const cleaned = cleanupTextTemplateEdges(cleanupParallelEdges(next));
       update.mutate(cleaned);
     },
     [update],

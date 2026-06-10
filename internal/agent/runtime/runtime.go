@@ -74,7 +74,6 @@ func (r *Runtime) Run(req Request) error {
 	req.TargetConfigID = strings.TrimSpace(req.TargetConfigID)
 	req.ArtifactType = strings.TrimSpace(req.ArtifactType)
 	req.ArtifactID = strings.TrimSpace(req.ArtifactID)
-	decision := intent.Resolve(req.Operation, req.Message)
 
 	if req.RequestID == "" {
 		return errors.New("request_id 不能为空")
@@ -119,6 +118,15 @@ func (r *Runtime) Run(req Request) error {
 		return nil
 	}
 
+	decision := intent.Resolve(req.Operation, req.Message)
+	applyArtifactRouting(&req, session, &decision)
+	if isExplicitNewAsset(req.Message) && session.ActiveArtifactID != "" {
+		if err := r.clearSessionActiveArtifact(&session); err != nil {
+			r.emitError(req.RequestID, session.ID, err.Error())
+			return nil
+		}
+	}
+
 	switch decision.Kind {
 	case intent.KindInspectServer:
 		r.handleInspection(req, session)
@@ -146,6 +154,23 @@ func (r *Runtime) emitError(requestID, sessionID, text string) {
 		return
 	}
 	r.Emit.Emit(Event{RequestID: requestID, SessionID: sessionID, Type: EventError, Text: text})
+}
+
+// emitTurnError 将本轮失败写入会话历史后再推送 error 事件，避免错误只留在前端 pending 状态。
+func (r *Runtime) emitTurnError(req Request, session *core.AISession, text string, progress []string, intent string) {
+	if session != nil && r.Sessions != nil {
+		session.Messages = append(session.Messages, core.AISessionMessage{
+			ID:        uuid.New().String(),
+			Role:      core.AIMessageRoleAssistant,
+			Content:   text,
+			Progress:  progress,
+			Intent:    intent,
+			CreatedAt: time.Now(),
+		})
+		session.UpdatedAt = time.Now()
+		_ = r.Sessions.Save(*session)
+	}
+	r.emitError(req.RequestID, session.ID, text)
 }
 
 // emitProgress 是进度事件的便捷封装，同时把文本追加到调用方的 progress 切片。

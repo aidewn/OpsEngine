@@ -60,6 +60,13 @@ type ToolContext struct {
 	// 工具内部根据需要查找 EnvironmentDef 自行决定目标。
 	PreferredConfigID string
 	EnvLookup         func(environmentID string) (core.EnvironmentDef, error)
+	// NodeCatalog 返回当前可用节点类型（内置 + 动态 assemble:*）。
+	NodeCatalog func() []core.NodeTypeDef
+	// WorkflowGet / AssembleGet 供 Agent 在迭代前查看已有资产摘要。
+	WorkflowGet  func(id string) (core.WorkflowDef, error)
+	AssembleGet  func(id string) (core.AssembleDef, error)
+	WorkflowList func() ([]core.WorkflowDef, error)
+	AssembleList func() ([]core.AssembleDef, error)
 }
 
 // Tool 是工具的运行时接口。Execute 的 args 已由 LLM 的 function calling 协议解析为 map。

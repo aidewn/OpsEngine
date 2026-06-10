@@ -17,6 +17,7 @@ import { NodeDetailPanel, type GraphMetaPatch } from '@/features/workflow/NodeDe
 import { AddNodeDialog } from '@/features/workflow/AddNodeDialog';
 import { WorkflowSidebar } from '@/features/workflow/WorkflowSidebar';
 import { cleanupParallelEdges } from '@/features/workflow/cleanupParallel';
+import { cleanupTextTemplateEdges } from '@/features/workflow/textTemplatePorts';
 import { Button } from '@/components/ui/Button';
 import { buildDefaultConfig, type NodeTypeDef } from '@/types/nodeType';
 import { CenteredMessage } from '@/components/ui/CenteredMessage';
@@ -74,7 +75,7 @@ function WorkflowCanvasInner({ workflowId: id }: { workflowId: string | undefine
   const handleWorkflowChange = useCallback(
     (next: WorkflowDef) => {
       // 副作用：parallel 节点 branch_count 改小后清理超范围 exec_out 边
-      const cleaned = cleanupParallelEdges(next);
+      const cleaned = cleanupTextTemplateEdges(cleanupParallelEdges(next));
       update.mutate(cleaned);
     },
     [update],

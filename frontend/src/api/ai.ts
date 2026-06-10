@@ -9,10 +9,12 @@ import {
 } from '@tanstack/react-query';
 import {
   CreateAISession,
+  ClearAISessionActiveArtifact,
   DeleteAISession,
   GetAISession,
   GetAISettings,
   ListAISessions,
+  SetAISessionActiveArtifact,
   StartAIAssistant,
   TestAISettings,
   UpdateAISessionTitle,
@@ -119,6 +121,35 @@ export function useDeleteAISession(): UseMutationResult<void, Error, string> {
     mutationFn: (id) => DeleteAISession(id),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: KEY.sessions });
+    },
+  });
+}
+
+// useSetAISessionActiveArtifact 进入 artifact 编辑模式。
+export function useSetAISessionActiveArtifact(): UseMutationResult<
+  void,
+  Error,
+  { sessionID: string; artifactType: 'workflow' | 'assemble'; artifactID: string; artifactName: string }
+> {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ sessionID, artifactType, artifactID, artifactName }) =>
+      SetAISessionActiveArtifact(sessionID, artifactType, artifactID, artifactName),
+    onSuccess: (_data, vars) => {
+      qc.invalidateQueries({ queryKey: KEY.sessions });
+      qc.invalidateQueries({ queryKey: KEY.session(vars.sessionID) });
+    },
+  });
+}
+
+// useClearAISessionActiveArtifact 退出 artifact 编辑模式。
+export function useClearAISessionActiveArtifact(): UseMutationResult<void, Error, string> {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (sessionID) => ClearAISessionActiveArtifact(sessionID),
+    onSuccess: (_data, sessionID) => {
+      qc.invalidateQueries({ queryKey: KEY.sessions });
+      qc.invalidateQueries({ queryKey: KEY.session(sessionID) });
     },
   });
 }

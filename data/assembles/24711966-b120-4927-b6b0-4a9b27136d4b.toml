@@ -28,24 +28,24 @@ variables = []
   var_type = "bool"
 
 [[nodes]]
-  id = "7d699181-dfb9-4e63-98b1-314294091917"
+  id = "1c67bf4b-e57e-4c83-8b3f-681581a860a2"
   type = "assemble_start"
   [nodes.config]
   [nodes.position]
-    x = 78.37060469100132
-    y = 36.08614158656812
+    x = 83.07762500000001
+    y = 11.039749999999998
 
 [[nodes]]
-  id = "d31a7195-d025-470a-9b12-c8cf8876a053"
+  id = "f02fe6fd-f984-4129-a074-c7a9dd4699b7"
   type = "assemble_param"
   [nodes.config]
     param_name = "param_ssh"
   [nodes.position]
-    x = 80.0
-    y = 220.0
+    x = 73.45969873562393
+    y = 211.5974768639363
 
 [[nodes]]
-  id = "ba71655b-b402-4fb9-b80d-6dfb858eb4f4"
+  id = "c8525bf0-75f2-46cc-a091-69b8704cfb7b"
   type = "assemble_param"
   [nodes.config]
     param_name = "redis_port"
@@ -54,7 +54,7 @@ variables = []
     y = 320.0
 
 [[nodes]]
-  id = "e0adfbaf-d0ff-4004-91ef-2cb925fb67a9"
+  id = "5efefd22-e9d0-40f7-8008-47ae5cbbb881"
   type = "assemble_param"
   [nodes.config]
     param_name = "redis_image"
@@ -63,272 +63,138 @@ variables = []
     y = 420.0
 
 [[nodes]]
-  id = "6f006986-e77a-4880-922d-fb8145d45e5a"
+  id = "1e9c771f-c9cd-4d93-a2aa-3136f9f8a1f2"
   type = "assemble_param"
   [nodes.config]
     param_name = "redis_password"
   [nodes.position]
-    x = 80.0
-    y = 520.0
+    x = 37.94999999999999
+    y = 518.55
 
 [[nodes]]
-  id = "5a099e3d-20f6-4f15-9df1-e15c134339d3"
+  id = "c8df82d5-d37f-44a6-afc5-0fe95b0c7f3b"
   type = "assemble_param"
   [nodes.config]
     param_name = "redis_data_volume"
   [nodes.position]
-    x = 80.0
-    y = 620.0
+    x = 31.424999999999983
+    y = 641.025
 
 [[nodes]]
-  id = "c7fe025b-9911-41b8-95d1-108b86f332f9"
-  type = "math_add"
+  id = "bb3e9a6b-e284-460b-9c94-847b17a3b68d"
+  type = "text_template"
   [nodes.config]
-    a_default = "#!/bin/bash\nset -e\nCOMPOSE_DIR=/opt/redis\nmkdir -p $COMPOSE_DIR\n\nREDIS_PORT="
-    b_default = ""
-    var_type = "String"
+    params = ["redis_port_var", "redis_image_var", "redis_password_var", "redis_data_volume_var"]
+    template = "#!/bin/bash\nset -e\nCOMPOSE_DIR=/opt/redis\nmkdir -p $COMPOSE_DIR\n\nREDIS_PORT=\"{{ redis_port_var }}\"\nREDIS_IMAGE=\"{{ redis_image_var }}\"\nREDIS_PASSWORD=\"{{ redis_password_var }}\"\nDATA_VOLUME=\"{{ redis_data_volume_var }}\"\n\n# 设置默认值\nREDIS_PORT=${REDIS_PORT:-6379}\nREDIS_IMAGE=${REDIS_IMAGE:-redis:latest}\nREDIS_PASSWORD=${REDIS_PASSWORD:-}\nDATA_VOLUME=${DATA_VOLUME:-}\n\ncat > $COMPOSE_DIR/docker-compose.yml <<EOF\nservices:\n  redis:\n    image: \"${REDIS_IMAGE}\"\n    container_name: redis\n    ports:\n      - \"${REDIS_PORT}:6379\"\n    restart: unless-stopped\nEOF\n\nif [ -n \"$REDIS_PASSWORD\" ]; then\n  cat >> $COMPOSE_DIR/docker-compose.yml <<EOF\n    command: \"redis-server --requirepass ${REDIS_PASSWORD}\"\nEOF\nfi\n\nif [ -n \"$DATA_VOLUME\" ]; then\n  cat >> $COMPOSE_DIR/docker-compose.yml <<EOF\n    volumes:\n      - \"${DATA_VOLUME}:/data\"\nEOF\nfi\n\ncd $COMPOSE_DIR\nif command -v docker >/dev/null && docker compose version >/dev/null; then\n  docker compose up -d\nelif command -v docker-compose >/dev/null; then\n  docker-compose up -d\nelse\n  echo \"Docker Compose not found\"\n  exit 1\nfi"
   [nodes.position]
-    x = 300.0
-    y = 200.0
+    x = 312.9585484358439
+    y = 507.4566304092908
 
 [[nodes]]
-  id = "f25d31fd-5185-4fb8-9505-623420c774ec"
-  type = "math_add"
-  [nodes.config]
-    a_default = ""
-    b_default = "\nREDIS_IMAGE="
-    var_type = "String"
-  [nodes.position]
-    x = 500.0
-    y = 200.0
-
-[[nodes]]
-  id = "0e79c240-2a94-4dcf-b0d9-01d38b2f84d5"
-  type = "math_add"
-  [nodes.config]
-    a_default = ""
-    b_default = ""
-    var_type = "String"
-  [nodes.position]
-    x = 700.0
-    y = 200.0
-
-[[nodes]]
-  id = "95eef592-82e7-4519-965a-f9386ff35118"
-  type = "math_add"
-  [nodes.config]
-    a_default = ""
-    b_default = "\nREDIS_PASSWORD="
-    var_type = "String"
-  [nodes.position]
-    x = 900.0
-    y = 200.0
-
-[[nodes]]
-  id = "667c6493-7d17-45a1-9e68-afb16d2237a3"
-  type = "math_add"
-  [nodes.config]
-    a_default = ""
-    b_default = ""
-    var_type = "String"
-  [nodes.position]
-    x = 1100.0
-    y = 200.0
-
-[[nodes]]
-  id = "261fe6a8-947f-4f8a-8a6e-a4bb1bf0dfb9"
-  type = "math_add"
-  [nodes.config]
-    a_default = ""
-    b_default = "\nDATA_VOLUME="
-    var_type = "String"
-  [nodes.position]
-    x = 1300.0
-    y = 200.0
-
-[[nodes]]
-  id = "9812e468-8546-4dd7-9081-867574ea8389"
-  type = "math_add"
-  [nodes.config]
-    a_default = ""
-    b_default = ""
-    var_type = "String"
-  [nodes.position]
-    x = 1500.0
-    y = 200.0
-
-[[nodes]]
-  id = "f915f84e-5d5a-4d85-a54c-87966e836709"
-  type = "math_add"
-  [nodes.config]
-    a_default = ""
-    b_default = "\n\n# 设置默认值\nREDIS_PORT=${REDIS_PORT:-6379}\nREDIS_IMAGE=${REDIS_IMAGE:-redis:latest}\nREDIS_PASSWORD=${REDIS_PASSWORD:-}\nDATA_VOLUME=${DATA_VOLUME:-}\n\ncat > $COMPOSE_DIR/docker-compose.yml <<'EOF'\nversion: '3.8'\nservices:\n  redis:\n    image: $REDIS_IMAGE\n    container_name: redis\n    ports:\n      - \"${REDIS_PORT}:6379\"\n    restart: unless-stopped\nEOF\nif [ -n \"$REDIS_PASSWORD\" ]; then\n  sed -i \"/image:/a\\    command: redis-server --requirepass ${REDIS_PASSWORD}\" $COMPOSE_DIR/docker-compose.yml\nfi\nif [ -n \"$DATA_VOLUME\" ]; then\n  sed -i \"/restart:/a\\    volumes:\n      - ${DATA_VOLUME}:/data\" $COMPOSE_DIR/docker-compose.yml\nfi\ncd $COMPOSE_DIR\nif command -v docker &> /dev/null && docker compose version &> /dev/null; then\n  docker compose up -d\nelif command -v docker-compose &> /dev/null; then\n  docker-compose up -d\nelse\n  echo \"Docker Compose not found\"\n  exit 1\nfi"
-    var_type = "String"
-  [nodes.position]
-    x = 1683.68758345307
-    y = 98.57932320821848
-
-[[nodes]]
-  id = "706dde68-ef51-46c5-96a6-ac33067cf8a0"
+  id = "19e93698-2b81-473d-af1b-969d6f0ca371"
   type = "linux_exec_script"
   [nodes.config]
-    default_script = "#!/bin/bash\necho placeholder"
+    default_script = "#!/bin/bash\necho 'Error: no deployment script' && exit 1"
     fail_on_error = false
     interpreter = "bash"
     timeout_seconds = 120.0
   [nodes.position]
-    x = 1900.0
-    y = 200.0
+    x = 758.5531875
+    y = 387.55899999999997
 
 [[nodes]]
-  id = "213d271b-f2ec-40f0-aa51-9d71cd91007d"
+  id = "03879503-e7b3-4b73-8418-7381690e3f9c"
   type = "return_set"
   [nodes.config]
     return_name = "success"
   [nodes.position]
-    x = 2100.0
-    y = 200.0
+    x = 950.0
+    y = 400.0
 
 [[nodes]]
-  id = "40c3ae30-fe8e-4904-8a50-fa4dd4c62036"
+  id = "74369e97-74ad-49bf-bbc6-88d569466781"
   type = "assemble_end"
   [nodes.config]
   [nodes.position]
-    x = 2300.0
-    y = 200.0
+    x = 1135.5249999999999
+    y = 397.825
 
 [[edges]]
   [edges.from]
-    node = "7d699181-dfb9-4e63-98b1-314294091917"
+    node = "19e93698-2b81-473d-af1b-969d6f0ca371"
     port = "exec_out"
   [edges.to]
-    node = "706dde68-ef51-46c5-96a6-ac33067cf8a0"
+    node = "03879503-e7b3-4b73-8418-7381690e3f9c"
     port = "exec_in"
 
 [[edges]]
   [edges.from]
-    node = "d31a7195-d025-470a-9b12-c8cf8876a053"
+    node = "03879503-e7b3-4b73-8418-7381690e3f9c"
+    port = "exec_out"
+  [edges.to]
+    node = "74369e97-74ad-49bf-bbc6-88d569466781"
+    port = "exec_in"
+
+[[edges]]
+  [edges.from]
+    node = "f02fe6fd-f984-4129-a074-c7a9dd4699b7"
     port = "value"
   [edges.to]
-    node = "706dde68-ef51-46c5-96a6-ac33067cf8a0"
+    node = "19e93698-2b81-473d-af1b-969d6f0ca371"
     port = "client"
 
 [[edges]]
   [edges.from]
-    node = "ba71655b-b402-4fb9-b80d-6dfb858eb4f4"
-    port = "value"
+    node = "bb3e9a6b-e284-460b-9c94-847b17a3b68d"
+    port = "text"
   [edges.to]
-    node = "c7fe025b-9911-41b8-95d1-108b86f332f9"
-    port = "b"
-
-[[edges]]
-  [edges.from]
-    node = "c7fe025b-9911-41b8-95d1-108b86f332f9"
-    port = "result"
-  [edges.to]
-    node = "f25d31fd-5185-4fb8-9505-623420c774ec"
-    port = "a"
-
-[[edges]]
-  [edges.from]
-    node = "f25d31fd-5185-4fb8-9505-623420c774ec"
-    port = "result"
-  [edges.to]
-    node = "0e79c240-2a94-4dcf-b0d9-01d38b2f84d5"
-    port = "a"
-
-[[edges]]
-  [edges.from]
-    node = "e0adfbaf-d0ff-4004-91ef-2cb925fb67a9"
-    port = "value"
-  [edges.to]
-    node = "0e79c240-2a94-4dcf-b0d9-01d38b2f84d5"
-    port = "b"
-
-[[edges]]
-  [edges.from]
-    node = "0e79c240-2a94-4dcf-b0d9-01d38b2f84d5"
-    port = "result"
-  [edges.to]
-    node = "95eef592-82e7-4519-965a-f9386ff35118"
-    port = "a"
-
-[[edges]]
-  [edges.from]
-    node = "95eef592-82e7-4519-965a-f9386ff35118"
-    port = "result"
-  [edges.to]
-    node = "667c6493-7d17-45a1-9e68-afb16d2237a3"
-    port = "a"
-
-[[edges]]
-  [edges.from]
-    node = "6f006986-e77a-4880-922d-fb8145d45e5a"
-    port = "value"
-  [edges.to]
-    node = "667c6493-7d17-45a1-9e68-afb16d2237a3"
-    port = "b"
-
-[[edges]]
-  [edges.from]
-    node = "667c6493-7d17-45a1-9e68-afb16d2237a3"
-    port = "result"
-  [edges.to]
-    node = "261fe6a8-947f-4f8a-8a6e-a4bb1bf0dfb9"
-    port = "a"
-
-[[edges]]
-  [edges.from]
-    node = "261fe6a8-947f-4f8a-8a6e-a4bb1bf0dfb9"
-    port = "result"
-  [edges.to]
-    node = "9812e468-8546-4dd7-9081-867574ea8389"
-    port = "a"
-
-[[edges]]
-  [edges.from]
-    node = "5a099e3d-20f6-4f15-9df1-e15c134339d3"
-    port = "value"
-  [edges.to]
-    node = "9812e468-8546-4dd7-9081-867574ea8389"
-    port = "b"
-
-[[edges]]
-  [edges.from]
-    node = "9812e468-8546-4dd7-9081-867574ea8389"
-    port = "result"
-  [edges.to]
-    node = "f915f84e-5d5a-4d85-a54c-87966e836709"
-    port = "a"
-
-[[edges]]
-  [edges.from]
-    node = "f915f84e-5d5a-4d85-a54c-87966e836709"
-    port = "result"
-  [edges.to]
-    node = "706dde68-ef51-46c5-96a6-ac33067cf8a0"
+    node = "19e93698-2b81-473d-af1b-969d6f0ca371"
     port = "script"
 
 [[edges]]
   [edges.from]
-    node = "706dde68-ef51-46c5-96a6-ac33067cf8a0"
-    port = "exec_out"
-  [edges.to]
-    node = "213d271b-f2ec-40f0-aa51-9d71cd91007d"
-    port = "exec_in"
-
-[[edges]]
-  [edges.from]
-    node = "706dde68-ef51-46c5-96a6-ac33067cf8a0"
+    node = "19e93698-2b81-473d-af1b-969d6f0ca371"
     port = "success"
   [edges.to]
-    node = "213d271b-f2ec-40f0-aa51-9d71cd91007d"
+    node = "03879503-e7b3-4b73-8418-7381690e3f9c"
     port = "value"
 
 [[edges]]
   [edges.from]
-    node = "213d271b-f2ec-40f0-aa51-9d71cd91007d"
+    node = "c8525bf0-75f2-46cc-a091-69b8704cfb7b"
+    port = "value"
+  [edges.to]
+    node = "bb3e9a6b-e284-460b-9c94-847b17a3b68d"
+    port = "param_redis_port_var"
+
+[[edges]]
+  [edges.from]
+    node = "5efefd22-e9d0-40f7-8008-47ae5cbbb881"
+    port = "value"
+  [edges.to]
+    node = "bb3e9a6b-e284-460b-9c94-847b17a3b68d"
+    port = "param_redis_image_var"
+
+[[edges]]
+  [edges.from]
+    node = "1e9c771f-c9cd-4d93-a2aa-3136f9f8a1f2"
+    port = "value"
+  [edges.to]
+    node = "bb3e9a6b-e284-460b-9c94-847b17a3b68d"
+    port = "param_redis_password_var"
+
+[[edges]]
+  [edges.from]
+    node = "c8df82d5-d37f-44a6-afc5-0fe95b0c7f3b"
+    port = "value"
+  [edges.to]
+    node = "bb3e9a6b-e284-460b-9c94-847b17a3b68d"
+    port = "param_redis_data_volume_var"
+
+[[edges]]
+  [edges.from]
+    node = "1c67bf4b-e57e-4c83-8b3f-681581a860a2"
     port = "exec_out"
   [edges.to]
-    node = "40c3ae30-fe8e-4904-8a50-fa4dd4c62036"
+    node = "19e93698-2b81-473d-af1b-969d6f0ca371"
     port = "exec_in"

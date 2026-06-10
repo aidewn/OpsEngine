@@ -108,7 +108,7 @@ function ChatSidebar({ collapsed }: { collapsed: boolean }) {
           <button
             type="button"
             className="w-full rounded-md bg-ops-accent px-3 py-2 text-sm font-medium text-ops-inverse hover:bg-ops-accent-hover"
-            onClick={() => navigate('/?tab=chat')}
+            onClick={() => navigate({ pathname: '/', search: '?tab=chat' })}
           >
             + 新会话
           </button>
@@ -116,6 +116,11 @@ function ChatSidebar({ collapsed }: { collapsed: boolean }) {
         </div>
       ) : null}
       <SidebarList>
+        {sessions.length === 0 && !collapsed ? (
+          <div className="px-3 py-6 text-center text-xs text-ops-tertiary">
+            暂无会话，点击上方开始新对话
+          </div>
+        ) : null}
         {sessions.map((session) => (
           <SidebarItem
             key={session.id}
