@@ -26,7 +26,6 @@ func (r *Runtime) handleAssemble(req Request, session core.AISession, update boo
 
 	var current core.AssembleDef
 	currentJSON := ""
-	fixedID := ""
 	if update {
 		artifactID := strings.TrimSpace(req.ArtifactID)
 		if artifactID == "" {
@@ -42,7 +41,6 @@ func (r *Runtime) handleAssemble(req Request, session core.AISession, update boo
 			r.emitError(req.RequestID, session.ID, err.Error())
 			return
 		}
-		fixedID = current.ID
 		if raw, err := json.Marshal(current); err == nil {
 			currentJSON = string(raw)
 		}
@@ -69,19 +67,25 @@ func (r *Runtime) handleAssemble(req Request, session core.AISession, update boo
 
 	userPrompt := req.Message
 	if update {
-		if isExecutionFailureReport(req.Message) {
-			r.emitProgress(req.RequestID, session.ID, "检测到执行失败日志，正在分析并修复…", &progress)
-			userPrompt = buildExecutionFixUserPrompt(req.Message)
-		} else {
-			userPrompt = fmt.Sprintf("请基于当前集合修改：%s", req.Message)
+		userPrompt = fmt.Sprintf("请基于当前集合修改：%s", req.Message)
+	}
+
+	// 更新模式保留已有节点身份（diff 对齐 / 画布选中稳定），创建模式全新分配 ID。
+	materialize := func(d workflow.Draft) (core.AssembleDef, error) {
+		if update {
+			return workflow.MaterializeAssembleUpdate(d, current, workflow.NodeTypeChecker(r.NodeChecker))
 		}
+		return workflow.MaterializeAssemble(d, "", workflow.NodeTypeChecker(r.NodeChecker))
 	}
 
 	intentTag := assembleIntent(update)
 	draft, err := r.requestArtifactDraft(req, session.ID, &progress, systemPrompt, userPrompt,
 		func(d workflow.Draft) error {
-			_, err := workflow.MaterializeAssemble(d, fixedID, workflow.NodeTypeChecker(r.NodeChecker))
-			return err
+			asm, err := materialize(d)
+			if err != nil {
+				return err
+			}
+			return r.validateEnvRefs(asm.Nodes)
 		},
 	)
 	if err != nil {
@@ -89,7 +93,7 @@ func (r *Runtime) handleAssemble(req Request, session core.AISession, update boo
 		return
 	}
 	r.emitProgress(req.RequestID, session.ID, "正在校验集合结构", &progress)
-	asm, err := workflow.MaterializeAssemble(draft, fixedID, workflow.NodeTypeChecker(r.NodeChecker))
+	asm, err := materialize(draft)
 	if err != nil {
 		r.emitTurnError(req, &session, err.Error(), progress, intentTag)
 		return
@@ -111,7 +115,7 @@ func (r *Runtime) handleAssemble(req Request, session core.AISession, update boo
 	content := fmt.Sprintf("已生成集合「%s」（%d 个节点），可直接打开或继续迭代修改。", asm.Name, nodeCount)
 	if update {
 		actionType = "update"
-		changeSummary = workflowChangeSummary(len(current.Nodes), nodeCount)
+		changeSummary = workflow.DiffGraph(current.Nodes, asm.Nodes, current.Edges, asm.Edges).Summary()
 		content = fmt.Sprintf("已更新集合「%s」（%s）。请重新运行验证；若仍失败，把新的日志贴回对话继续修复。", asm.Name, changeSummary)
 	}
 	if err := r.setSessionActiveArtifact(&session, "assemble", asm.ID, asm.Name); err != nil {

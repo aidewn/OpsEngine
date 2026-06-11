@@ -26,6 +26,7 @@ import { useTabs } from '@/features/tabs/TabsContext';
 import { useRunWorkflow } from '@/api/executions';
 import { RunningBadge } from '@/features/execution/RunningBadge';
 import { useCopyPaste } from '@/features/clipboard/useCopyPaste';
+import { VersionHistoryDialog } from '@/features/workflow/VersionHistoryDialog';
 
 // 外壳组件：仅负责挂载 ReactFlowProvider
 // 内部 hook（如 useCopyPaste → useReactFlow）必须位于 Provider 子树才能正常工作
@@ -69,6 +70,7 @@ function WorkflowCanvasInner({ workflowId: id }: { workflowId: string | undefine
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [selectedNodeIds, setSelectedNodeIds] = useState<Set<string>>(new Set());
   const [addDialogOpen, setAddDialogOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const [pendingConnection, setPendingConnection] =
     useState<PendingConnection | null>(null);
 
@@ -209,7 +211,7 @@ function WorkflowCanvasInner({ workflowId: id }: { workflowId: string | undefine
       <header className="flex h-12 items-center border-b border-slate-200 bg-white px-4">
         <Link
           to="/"
-          className="mr-3 text-sm text-slate-500 hover:text-slate-900"
+          className="mr-3 text-sm text-slate-500 hover:text-ops-primary"
         >
           ← 返回
         </Link>
@@ -229,6 +231,14 @@ function WorkflowCanvasInner({ workflowId: id }: { workflowId: string | undefine
           </Button>
           <Button size="sm" variant="secondary" onClick={handleAddButtonClick}>
             + 添加节点
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => setHistoryOpen(true)}
+            title="查看与恢复历史版本"
+          >
+            🕘 历史
           </Button>
         </div>
       </header>
@@ -264,6 +274,13 @@ function WorkflowCanvasInner({ workflowId: id }: { workflowId: string | undefine
         pendingConnection={pendingConnection}
         onSelect={handleNodeTypeSelected}
       />
+      {workflow && (
+        <VersionHistoryDialog
+          workflowID={workflow.id}
+          open={historyOpen}
+          onOpenChange={setHistoryOpen}
+        />
+      )}
     </div>
   );
 }

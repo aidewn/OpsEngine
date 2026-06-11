@@ -32,6 +32,8 @@ const (
 	EventHeartbeat EventType = "heartbeat"
 	// EventArtifactMode 通知前端进入/退出 artifact 编辑模式。
 	EventArtifactMode EventType = "artifact_mode"
+	// EventWorkflowPending 确认模式下产生了等待用户应用的修改草案（diff 摘要在 ChangeSummary）。
+	EventWorkflowPending EventType = "workflow_pending"
 )
 
 // TargetOption 是需要用户选择的目标配置候选项。

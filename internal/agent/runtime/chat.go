@@ -20,12 +20,14 @@ import (
 	"github.com/google/uuid"
 )
 
-// turnOpts 把 chat / troubleshoot 之间的差异收敛到一个结构里。
+// turnOpts 把 chat / troubleshoot / 工作流生成 之间的差异收敛到一个结构里。
 type turnOpts struct {
 	// SystemKind 决定加载哪个 system 提示词。
 	SystemKind prompt.SystemPromptKind
 	// IntentTag 写到 AISessionMessage.Intent，前端据此决定是否显示"保存为报告"。
 	IntentTag string
+	// ExtraSystem 场景化追加的 system 段（如工作流编排任务引导），空时不注入。
+	ExtraSystem string
 }
 
 // handleChat 处理 intent.KindChat。
@@ -65,6 +67,7 @@ func (r *Runtime) runConversationTurn(req Request, session core.AISession, opts 
 	messages, err := prompt.BuildChatMessages(trimmed, prompt.ChatContext{
 		SystemKind: opts.SystemKind,
 		Inventory:  inventoryText,
+		Extra:      opts.ExtraSystem,
 	})
 	if err != nil {
 		r.emitError(req.RequestID, session.ID, err.Error())
@@ -76,7 +79,7 @@ func (r *Runtime) runConversationTurn(req Request, session core.AISession, opts 
 		// 启用工具时走流式工具循环：runChatToolLoop 内部对每轮 LLM 调用
 		// 走 ChatWithToolsStream 并把 content delta 直接 Emit，所以这里
 		// 拿到的 text 已经被前端渲染过；只需累积进 assistant 用于落库。
-		text, err := r.runChatToolLoop(req, session, messages, &progress)
+		text, err := r.runChatToolLoop(req, &session, messages, &progress)
 		if err != nil {
 			r.emitTurnError(req, &session, err.Error(), progress, opts.IntentTag)
 			return

@@ -20,6 +20,7 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { Label } from '@/components/ui/Label';
 import { MarkdownView } from '@/components/ui/MarkdownView';
 import { ProgressTimeline } from '@/components/ui/ProgressTimeline';
+import { Select } from '@/components/ui/Select';
 import { Textarea } from '@/components/ui/Textarea';
 import { useQueryClient } from '@tanstack/react-query';
 import { useRunWorkflow } from '@/api/executions';
@@ -29,6 +30,8 @@ import {
   useClearAISessionActiveArtifact,
   useCreateAISession,
   useDeleteAISession,
+  useApplyAIPendingDraft,
+  useDiscardAIPendingDraft,
   useSetAISessionActiveArtifact,
   useStartAIAssistant,
   useUpdateAISessionTitle,
@@ -41,6 +44,7 @@ import { hasWailsRuntime } from '@/lib/wailsRuntime';
 import { useTabs } from '@/features/tabs/TabsContext';
 import type {
   AIAssistantEvent,
+  AIPendingDraft,
   AITargetOption,
   AISession,
   AISessionMessage,
@@ -51,6 +55,8 @@ interface AIAssistantDialogProps {
   onOpenChange: (open: boolean) => void;
   initialMessage?: string;
   focusInputOnOpen?: boolean;
+  /** 从执行详情页发起「AI 修复」时的失败执行 ID，仅首条消息携带。 */
+  fixExecutionID?: string;
 }
 
 interface AIAssistantPanelProps {
@@ -58,6 +64,8 @@ interface AIAssistantPanelProps {
   selectedSessionID?: string | null;
   onSelectedSessionChange?: (id: string | null) => void;
   initialMessage?: string;
+  /** 失败执行修复上下文，首条消息发送后即清除。 */
+  fixExecutionID?: string;
   focusInputOnOpen?: boolean;
   showSessionSidebar?: boolean;
   /** 嵌入首页主区域时使用，去掉 Dialog 风格边框并撑满高度 */
@@ -109,6 +117,7 @@ export function AIAssistantDialog({
   onOpenChange,
   initialMessage,
   focusInputOnOpen = false,
+  fixExecutionID,
 }: AIAssistantDialogProps) {
   return (
     <Dialog
@@ -121,6 +130,7 @@ export function AIAssistantDialog({
       <AIAssistantPanel
         active={open}
         initialMessage={initialMessage}
+        fixExecutionID={fixExecutionID}
         focusInputOnOpen={focusInputOnOpen}
         showSessionSidebar
         className="h-[560px]"
@@ -136,6 +146,7 @@ export function AIAssistantPanel({
   selectedSessionID,
   onSelectedSessionChange,
   initialMessage,
+  fixExecutionID,
   focusInputOnOpen = false,
   showSessionSidebar = true,
   embedded = false,
@@ -228,6 +239,14 @@ export function AIAssistantPanel({
       setInput(initialMessage);
     }
   }, [active, initialMessage]);
+
+  // fix_execution 一次性上下文：面板激活时记录，首条消息成功发出后清除（重试时保留）。
+  const fixExecutionRef = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    if (active && fixExecutionID) {
+      fixExecutionRef.current = fixExecutionID;
+    }
+  }, [active, fixExecutionID]);
 
   // 侧栏切换会话时重置输入区；进行中的请求在后台继续，回到该会话后由服务端数据刷新。
   const prevSelectedIDRef = useRef<string | null | undefined>(undefined);
@@ -465,19 +484,24 @@ export function AIAssistantPanel({
         assistantProgress: [],
       });
 
+      const fixID = fixExecutionRef.current;
       try {
         await startAssistant.mutateAsync({
           request_id: requestID,
           session_id: sessionID,
-          operation: editingArtifact
-            ? editingArtifact.type === 'assemble'
-              ? 'update_assemble'
-              : 'update_workflow'
-            : 'auto',
+          operation: fixID
+            ? 'fix_execution'
+            : editingArtifact
+              ? editingArtifact.type === 'assemble'
+                ? 'update_assemble'
+                : 'update_workflow'
+              : 'auto',
           message,
           artifact_type: editingArtifact?.type,
           artifact_id: editingArtifact?.id,
+          execution_id: fixID,
         });
+        fixExecutionRef.current = undefined;
         await finalizeAssistantTurn(sessionID);
       } catch (err) {
         setPending((prev) =>
@@ -657,6 +681,14 @@ export function AIAssistantPanel({
           ) : null}
         </div>
 
+        {session?.pending_draft && selectedID && (
+          <PendingDraftCard
+            sessionID={selectedID}
+            draft={session.pending_draft}
+            onOpenWorkflow={handleOpenWorkflow}
+          />
+        )}
+
         <form onSubmit={handleSubmit} className="border-t border-ops-border-subtle bg-ops-surface p-3">
           {waitingForTarget ? (
             <div className="mb-2 flex items-center gap-2 rounded-md border border-ops-warning bg-ops-warning-soft px-3 py-2 text-xs text-ops-warning">
@@ -823,11 +855,10 @@ function NewSessionHeader({
     <div className="grid gap-3 border-b border-ops-border-subtle p-3 sm:grid-cols-2">
       <div className="space-y-1">
         <Label htmlFor="ai-environment">上下文环境（可选）</Label>
-        <select
+        <Select
           id="ai-environment"
           value={envID}
           onChange={(event) => onEnvChange(event.target.value)}
-          className="h-9 w-full rounded-md border border-ops-border-strong bg-ops-input px-3 text-sm text-ops-primary outline-none focus:border-ops-border-focus"
         >
           <option value="">不指定环境（通用资产生成）</option>
           {environments.map((env) => (
@@ -835,16 +866,15 @@ function NewSessionHeader({
               {env.name}
             </option>
           ))}
-        </select>
+        </Select>
       </div>
       <div className="space-y-1">
         <Label htmlFor="ai-ssh-config">SSH 配置（可选）</Label>
-        <select
+        <Select
           id="ai-ssh-config"
           value={configID}
           onChange={(event) => onConfigChange(event.target.value)}
           disabled={!envID}
-          className="h-9 w-full rounded-md border border-ops-border-strong bg-ops-input px-3 text-sm text-ops-primary outline-none focus:border-ops-border-focus disabled:text-ops-tertiary"
         >
           <option value="">不指定（环境级会话）</option>
           {sshConfigs.map((config) => (
@@ -852,7 +882,7 @@ function NewSessionHeader({
               {config.name}
             </option>
           ))}
-        </select>
+        </Select>
       </div>
     </div>
   );
@@ -1353,4 +1383,73 @@ function artifactCardDescription(
   if (changeSummary) parts.push(changeSummary);
   if (parts.length > 0) return parts.join(' · ');
   return fallback;
+}
+
+// PendingDraftCard 展示待确认的 AI 修改草案：diff 摘要 + 应用/放弃。
+// 基线漂移（草案生成后工作流被手工改过）时后端会拒绝应用并提示重新生成。
+function PendingDraftCard({
+  sessionID,
+  draft,
+  onOpenWorkflow,
+}: {
+  sessionID: string;
+  draft: AIPendingDraft;
+  onOpenWorkflow: (workflowID: string) => void;
+}) {
+  const applyDraft = useApplyAIPendingDraft();
+  const discardDraft = useDiscardAIPendingDraft();
+  const busy = applyDraft.isPending || discardDraft.isPending;
+
+  async function handleApply() {
+    try {
+      const wf = await applyDraft.mutateAsync(sessionID);
+      toast.success(`已应用修改草案「${wf.name}」`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : '应用失败');
+    }
+  }
+
+  async function handleDiscard() {
+    try {
+      await discardDraft.mutateAsync(sessionID);
+      toast.success('已放弃修改草案');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : '放弃失败');
+    }
+  }
+
+  return (
+    <div className="border-t border-ops-accent/40 bg-ops-accent-soft px-4 py-3">
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <div className="text-xs font-medium text-ops-primary">
+            待确认的修改草案：
+            <button
+              type="button"
+              className="ml-1 text-ops-accent hover:text-ops-accent-hover"
+              onClick={() => onOpenWorkflow(draft.artifact_id)}
+            >
+              {draft.artifact_name}
+            </button>
+          </div>
+          <div className="mt-0.5 truncate text-xs text-ops-secondary" title={draft.change_summary}>
+            {draft.change_summary}
+          </div>
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          <Button size="sm" disabled={busy} onClick={() => void handleApply()}>
+            {applyDraft.isPending ? '应用中...' : '应用'}
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            disabled={busy}
+            onClick={() => void handleDiscard()}
+          >
+            放弃
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
 }

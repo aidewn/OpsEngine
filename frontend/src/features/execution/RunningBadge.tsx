@@ -38,11 +38,11 @@ export function RunningBadge({ workflowID }: Props) {
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="flex items-center gap-1.5 rounded border border-slate-200 bg-white px-2 py-1 text-xs hover:bg-slate-50"
+        className="flex items-center gap-1.5 rounded border border-slate-200 bg-white px-2 py-1 text-xs hover:bg-ops-elevated"
       >
         {runningCount > 0 ? (
           <>
-            <span className="inline-block size-1.5 animate-pulse rounded-full bg-blue-500" />
+            <span className="inline-block size-1.5 animate-pulse rounded-full bg-ops-info" />
             <span className="text-slate-700">运行中 {runningCount}</span>
           </>
         ) : (
@@ -66,7 +66,7 @@ export function RunningBadge({ workflowID }: Props) {
                   type="button"
                   onClick={() => handleSelect(e.id, e.workflow_name)}
                   className={cn(
-                    'flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs hover:bg-slate-50',
+                    'flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs hover:bg-ops-elevated',
                   )}
                 >
                   <WorkflowStatusIcon status={e.status} size={12} />

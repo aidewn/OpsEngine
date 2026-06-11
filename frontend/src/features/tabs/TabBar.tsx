@@ -53,7 +53,7 @@ export function TabBar() {
               'group flex h-9 cursor-pointer items-center gap-1.5 border-b-2 px-3 text-xs transition-colors',
               isActive
                 ? 'border-blue-500 bg-slate-50 font-medium text-slate-900'
-                : 'border-transparent text-slate-500 hover:bg-slate-50',
+                : 'border-transparent text-slate-500 hover:bg-ops-elevated',
             )}
             title={`${tabKindLabel(tab.kind)}: ${tab.name}`}
           >
@@ -64,7 +64,7 @@ export function TabBar() {
               tabIndex={-1}
               onClick={(e) => handleClose(e, tab, idx)}
               className={cn(
-                'ml-1 inline-flex size-4 items-center justify-center rounded text-slate-400 hover:bg-slate-200 hover:text-slate-700',
+                'ml-1 inline-flex size-4 items-center justify-center rounded text-slate-400 hover:bg-ops-border-subtle hover:text-ops-primary',
                 !isActive && 'opacity-0 group-hover:opacity-100',
               )}
               title="关闭"

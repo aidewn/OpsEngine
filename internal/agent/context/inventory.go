@@ -37,24 +37,24 @@ type InventoryConfig struct {
 // 这些字段名出现在 EnvConfigItem.Fields 中时一律不进入 prompt。
 // 大小写不敏感匹配（实现里用 ToLower 后判断）。
 var sensitiveFieldKeys = map[string]bool{
-	"password":          true,
-	"passwd":            true,
-	"private_key":       true,
-	"private_key_path":  true,
-	"key":               true,
-	"token":             true,
-	"secret":            true,
-	"client_secret":     true,
-	"access_token":      true,
-	"refresh_token":     true,
-	"api_token":         true,
-	"api_key":           true,
-	"kubeconfig":        true,
-	"kubeconfig_path":   true,
-	"ca_cert":           true,
-	"ca_data":           true,
-	"client_cert":       true,
-	"client_key":        true,
+	"password":         true,
+	"passwd":           true,
+	"private_key":      true,
+	"private_key_path": true,
+	"key":              true,
+	"token":            true,
+	"secret":           true,
+	"client_secret":    true,
+	"access_token":     true,
+	"refresh_token":    true,
+	"api_token":        true,
+	"api_key":          true,
+	"kubeconfig":       true,
+	"kubeconfig_path":  true,
+	"ca_cert":          true,
+	"ca_data":          true,
+	"client_cert":      true,
+	"client_key":       true,
 }
 
 // hostFieldKeys 命中时把值脱敏成 `***.xxx`，保留末段方便用户对照。
@@ -87,17 +87,6 @@ func BuildInventory(env core.EnvironmentDef) Inventory {
 // IsEmpty 报告环境是否没有任何配置，调用方据此决定是否还要注入 inventory 到 prompt。
 func (inv Inventory) IsEmpty() bool { return len(inv.Configs) == 0 }
 
-// CountByKind 统计每种 kind 的配置数量，runtime/inspection 根据这个判断是否需要追问用户。
-func (inv Inventory) CountByKind(kind string) int {
-	n := 0
-	for _, c := range inv.Configs {
-		if c.Kind == kind {
-			n++
-		}
-	}
-	return n
-}
-
 // SingleSSH 返回唯一一条 SSH 配置的 ID；若 0 条或多条则返回空串。
 // inspection.PickSSHTarget 用它做"环境只有一台 SSH 时自动选定"的快路径。
 func (inv Inventory) SingleSSH() string {
@@ -117,9 +106,9 @@ func (inv Inventory) SingleSSH() string {
 // RenderText 把 Inventory 渲染为 Markdown，注入到 LLM system 消息。
 // 输出示例：
 //
-//   # 环境资产：生产环境
-//   - SSH `web-01` (id=cfg-1): user=deploy, host=***.10.5, port=22
-//   - K8s `prod-cluster` (id=cfg-3): server=https://***.example.com, namespaces=default,ops
+//	# 环境资产：生产环境
+//	- SSH `web-01` (id=cfg-1): user=deploy, host=***.10.5, port=22
+//	- K8s `prod-cluster` (id=cfg-3): server=https://***.example.com, namespaces=default,ops
 //
 // 排序：按 Kind 字典序，相同 Kind 内按 Name。
 func (inv Inventory) RenderText() string {

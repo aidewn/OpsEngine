@@ -23,6 +23,7 @@ type RegistryDeps struct {
 	AssembleGet  func(id string) (core.AssembleDef, error)
 	WorkflowList func() ([]core.WorkflowDef, error)
 	AssembleList func() ([]core.AssembleDef, error)
+	ExecutionGet func(id string) (core.ExecutionRecord, error)
 }
 
 // SetDeps 注入工具运行时依赖。
@@ -41,13 +42,15 @@ func NewRegistry() *Registry {
 }
 
 // Register 加入一个工具。
-// 安全策略：v1 只接受 TierRead；未来 P8 启用写工具时这里加分级允许逻辑。
+// 安全策略：只接受 TierRead 与 TierLowWrite。
+// low_write 仅限 propose 草案类工具——落盘前经完整校验，且确认模式下还需用户点应用；
+// TierHighWrite（直接改服务器状态）仍然禁止，必须走"工作流 → 用户审查 → 执行"。
 func (r *Registry) Register(t Tool) error {
 	spec := t.Spec()
 	if spec.Name == "" {
 		return fmt.Errorf("工具缺少 Name")
 	}
-	if spec.Tier != TierRead {
+	if spec.Tier != TierRead && spec.Tier != TierLowWrite {
 		return fmt.Errorf("工具 %s 的权限级别 %s 当前未启用", spec.Name, spec.Tier)
 	}
 	if _, dup := r.tools[spec.Name]; dup {

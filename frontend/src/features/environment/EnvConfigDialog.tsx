@@ -6,8 +6,8 @@ import { Dialog } from '@/components/ui/Dialog';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Label } from '@/components/ui/Label';
+import { Select } from '@/components/ui/Select';
 import { Textarea } from '@/components/ui/Textarea';
-import { cn } from '@/lib/cn';
 import { useUpdateEnvironment } from '@/api/environments';
 import type {
   EnvConfigItem,
@@ -152,22 +152,19 @@ export function EnvConfigDialog({
         </div>
         <div className="space-y-1">
           <Label htmlFor="env-config-kind">类型</Label>
-          <select
+          <Select
             id="env-config-kind"
             value={kind}
             onChange={(e) => handleKindChange(e.target.value as EnvConfigKind)}
             disabled={busy || !!editItem}
-            className={cn(
-              'w-full rounded border border-slate-300 bg-white px-2 py-1.5 text-xs',
-              editItem && 'cursor-not-allowed text-slate-500',
-            )}
+            className="h-8 px-2 text-xs"
           >
             {KIND_OPTIONS.map((o) => (
               <option key={o.value} value={o.value}>
                 {o.label}
               </option>
             ))}
-          </select>
+          </Select>
           {editItem && (
             <div className="text-[11px] text-slate-400">
               类型创建后不可更改

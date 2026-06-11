@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Dialog } from '@/components/ui/Dialog';
 import { Button } from '@/components/ui/Button';
 import { MarkdownView } from '@/components/ui/MarkdownView';
+import { Select } from '@/components/ui/Select';
 import {
   useDeleteOpsDoc,
   useGenerateInspectionReport,
@@ -118,10 +119,10 @@ export function InspectionReportDialog({
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex min-w-0 items-center gap-2">
             {relatedDocs.length > 0 && (
-              <select
+              <Select
                 value={selectedDocID ?? ''}
                 onChange={(event) => setSelectedDocID(event.target.value || undefined)}
-                className="h-8 max-w-[320px] rounded-md border border-slate-300 bg-white px-2 text-xs text-slate-700 outline-none focus:border-slate-500"
+                className="h-8 w-auto max-w-[320px] px-2 text-xs"
                 disabled={busy}
               >
                 {relatedDocs.map((item) => (
@@ -129,7 +130,7 @@ export function InspectionReportDialog({
                     {item.title} · {new Date(item.updated_at).toLocaleString()}
                   </option>
                 ))}
-              </select>
+              </Select>
             )}
             {doc && (
               <span className="truncate text-xs text-slate-500">

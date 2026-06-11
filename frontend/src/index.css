@@ -251,3 +251,17 @@ a {
   inset: -6px;
   border-radius: inherit;
 }
+
+/* React Flow 小地图/缩放控件默认是浅色主题，这里用官方 CSS 变量切到暗色 token */
+.react-flow {
+  --xy-minimap-background-color: #1f1f1d;
+  --xy-minimap-mask-background-color: rgba(26, 26, 25, 0.7);
+  --xy-minimap-node-background-color: #3a3a36;
+  --xy-minimap-node-stroke-color: #4a4a45;
+  --xy-controls-button-background-color: #262624;
+  --xy-controls-button-background-color-hover: #2f2f2c;
+  --xy-controls-button-color: #a8a6a1;
+  --xy-controls-button-color-hover: #f5f4ed;
+  --xy-controls-button-border-color: #3a3a36;
+  --xy-controls-box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+}

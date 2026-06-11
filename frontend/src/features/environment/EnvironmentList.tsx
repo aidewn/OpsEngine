@@ -1,5 +1,5 @@
 // 环境列表（嵌入首页 tab 内容区）
-// 与 WorkflowList 同构：header + 新建按钮 + loading/error/empty/list 四态 + 删除确认
+// 结构：header + 新建按钮 + loading/error/empty/list 四态 + 删除确认
 
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
@@ -45,10 +45,10 @@ export function EnvironmentList({ detailPathPrefix = '/environments' }: Environm
           <EmptyState onCreate={() => setDialogOpen(true)} />
         )}
         {data && data.length > 0 && (
-          <ul className="divide-y divide-slate-200 rounded-lg border border-slate-200 bg-white">
+          <ul className="divide-y divide-ops-border-subtle rounded-lg border border-slate-200 bg-white">
             {data.map((env) => (
               <li key={env.id}>
-                <div className="flex items-center justify-between px-4 py-3 hover:bg-slate-50">
+                <div className="flex items-center justify-between px-4 py-3 hover:bg-ops-elevated">
                   <Link to={`${detailPathPrefix}/${env.id}`} className="flex-1">
                     <div className="text-sm font-medium text-slate-900">
                       {env.name}

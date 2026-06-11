@@ -8,23 +8,6 @@ import (
 	"OpsEngine/internal/clients"
 )
 
-func TestIsExecutionFailureReport(t *testing.T) {
-	cases := []struct {
-		msg  string
-		want bool
-	}{
-		{"01:38:23 脚本执行失败 exit_code=1\nstderr: sed error", true},
-		{"执行失败了", true},
-		{"请把集合改简洁一点", false},
-		{"command failed with exit code 2", true},
-	}
-	for _, tc := range cases {
-		if got := isExecutionFailureReport(tc.msg); got != tc.want {
-			t.Fatalf("isExecutionFailureReport(%q) = %v, want %v", tc.msg, got, tc.want)
-		}
-	}
-}
-
 // seqLLM 按顺序返回预设回复，用于重试路径单测。
 type seqLLM struct {
 	replies []string

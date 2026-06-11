@@ -11,6 +11,8 @@ export interface AISettings {
   deepseek_model: string;
   /** 单次请求超时时间。 */
   timeout_seconds: number;
+  /** AI 修改已有资产的落盘策略：confirm（默认，先确认）/ auto（直接保存）。 */
+  apply_mode: 'confirm' | 'auto';
 }
 
 // AISessionMessageRole 是会话消息的角色枚举。
@@ -61,9 +63,23 @@ export interface AISession {
   active_artifact_type?: 'assemble' | 'workflow' | '';
   active_artifact_id?: string;
   active_artifact_name?: string;
+  /** 确认模式下等待用户应用的修改草案。 */
+  pending_draft?: AIPendingDraft | null;
   messages: AISessionMessage[];
   created_at: string;
   updated_at: string;
+}
+
+// AIPendingDraft 是等待确认的 AI 修改草案（对应后端 core.AIPendingDraft）。
+export interface AIPendingDraft {
+  artifact_type: string;
+  artifact_id: string;
+  artifact_name: string;
+  /** 落地校验后的完整资产 JSON（前端只透传，不解析）。 */
+  draft_json: string;
+  base_hash: string;
+  change_summary: string;
+  created_at: string;
 }
 
 // AIAssistantRequest 是统一 AI 助手请求。
@@ -73,7 +89,12 @@ export interface AIAssistantRequest {
   /** 已存在的会话 ID。 */
   session_id: string;
   /** 兼容字段；传 auto 时由后端根据输入判断行为。 */
-  operation?: 'auto' | 'create_assemble' | 'update_assemble' | 'update_workflow';
+  operation?:
+    | 'auto'
+    | 'create_assemble'
+    | 'update_assemble'
+    | 'update_workflow'
+    | 'fix_execution';
   /** 用户输入内容。 */
   message: string;
   /** target_select 后用户选定的本轮目标配置。 */
@@ -82,6 +103,8 @@ export interface AIAssistantRequest {
   artifact_type?: 'assemble' | 'workflow';
   /** 当前正在迭代的资产 ID。 */
   artifact_id?: string;
+  /** 要修复的失败执行 ID，operation=fix_execution 时必填。 */
+  execution_id?: string;
 }
 
 // AITargetOption 是后端要求用户选择目标配置时返回的候选项。

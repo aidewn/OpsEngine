@@ -41,9 +41,3 @@ func (e *WailsEmitter) Emit(event string, data any) {
 	}
 	wailsruntime.EventsEmit(e.ctx, event, data)
 }
-
-// NoopEmitter 静默实现，用于测试或未初始化场景
-type NoopEmitter struct{}
-
-// Emit 不做任何事
-func (NoopEmitter) Emit(event string, data any) {}

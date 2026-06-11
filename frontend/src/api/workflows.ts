@@ -13,8 +13,16 @@ import {
   CreateWorkflow,
   UpdateWorkflow,
   DeleteWorkflow,
+  ListWorkflowVersions,
+  RestoreWorkflowVersion,
 } from '@wails/go/main/App';
 import type { WorkflowDef } from '@/types/workflow';
+
+// 历史版本元信息（对应后端 store.VersionInfo）
+export interface WorkflowVersion {
+  version: string;
+  saved_at: string;
+}
 
 // 创建工作流的入参
 export interface CreateWorkflowInput {
@@ -33,6 +41,7 @@ export type WorkflowSummary = Pick<WorkflowDef, 'id' | 'name' | 'description'>;
 const KEY = {
   list: ['workflows'] as const,
   detail: (id: string) => ['workflows', id] as const,
+  versions: (id: string) => ['workflows', id, 'versions'] as const,
 };
 
 export function useWorkflows(): UseQueryResult<WorkflowSummary[]> {
@@ -103,6 +112,39 @@ export function useDeleteWorkflow(): UseMutationResult<void, Error, string> {
   return useMutation({
     mutationFn: (id) => DeleteWorkflow(id),
     onSuccess: () => {
+      qc.invalidateQueries({ queryKey: KEY.list });
+    },
+  });
+}
+
+// useWorkflowVersions 列出工作流历史版本（最新在前）
+export function useWorkflowVersions(
+  id: string | undefined,
+  enabled = true,
+): UseQueryResult<WorkflowVersion[]> {
+  return useQuery({
+    queryKey: id ? KEY.versions(id) : ['workflows', 'undefined', 'versions'],
+    queryFn: async () => {
+      const raw = await ListWorkflowVersions(id!);
+      return (Array.isArray(raw) ? raw : []) as WorkflowVersion[];
+    },
+    enabled: !!id && enabled,
+  });
+}
+
+// useRestoreWorkflowVersion 恢复历史版本为当前版本，成功后刷新详情与版本列表
+export function useRestoreWorkflowVersion(): UseMutationResult<
+  WorkflowDef,
+  Error,
+  { id: string; version: string }
+> {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, version }) =>
+      RestoreWorkflowVersion(id, version) as Promise<WorkflowDef>,
+    onSuccess: (restored, { id }) => {
+      qc.setQueryData(KEY.detail(id), restored);
+      qc.invalidateQueries({ queryKey: KEY.versions(id) });
       qc.invalidateQueries({ queryKey: KEY.list });
     },
   });

@@ -105,36 +105,3 @@ func findSSHConfig(env core.EnvironmentDef, configID string) (*core.EnvConfigIte
 	}
 	return nil, fmt.Errorf("配置未找到: %s", configID)
 }
-
-// ── 取值辅助 ──────────────────────────────────────────────
-
-func stringField(fields map[string]any, key string) string {
-	if fields == nil {
-		return ""
-	}
-	if v, ok := fields[key]; ok {
-		if s, ok := v.(string); ok {
-			return s
-		}
-	}
-	return ""
-}
-
-func intField(fields map[string]any, key string, fallback int) int {
-	if fields == nil {
-		return fallback
-	}
-	v, ok := fields[key]
-	if !ok {
-		return fallback
-	}
-	switch n := v.(type) {
-	case float64:
-		return int(n)
-	case int:
-		return n
-	case int64:
-		return int(n)
-	}
-	return fallback
-}

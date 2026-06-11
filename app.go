@@ -75,6 +75,8 @@ func (a *App) startup(ctx context.Context) {
 		AssembleGet:  a.assembleStore.Get,
 		WorkflowList: a.workflowStore.List,
 		AssembleList: a.assembleStore.List,
+		// 方法闭包在调用时取 a.engine，此处 engine 尚未创建也安全
+		ExecutionGet: a.getExecutionRecord,
 	}); err != nil {
 		zap.L().Warn("注册内置 Agent 工具失败", zap.Error(err))
 	}
@@ -138,9 +140,13 @@ func (a *App) CreateWorkflow(name string, description string) (string, error) {
 
 // UpdateWorkflow 整体覆盖更新工作流
 // 保存前校验：单例节点 + exec 输出端口单连接
+// 配置 Schema 校验暂为日志警告（存量数据过渡期，见 P2 计划），一个版本后转硬错误。
 func (a *App) UpdateWorkflow(wf core.WorkflowDef) error {
 	if err := engine.ValidateWorkflow(wf); err != nil {
 		return err
+	}
+	if err := engine.ValidateNodeConfigs(wf.Nodes); err != nil {
+		zap.L().Warn("工作流配置校验未通过（过渡期仅警告）", zap.String("workflow", wf.ID), zap.Error(err))
 	}
 	return a.workflowStore.Save(wf)
 }
@@ -148,6 +154,26 @@ func (a *App) UpdateWorkflow(wf core.WorkflowDef) error {
 // DeleteWorkflow 删除工作流
 func (a *App) DeleteWorkflow(id string) error {
 	return a.workflowStore.Delete(id)
+}
+
+// ListWorkflowVersions 列出工作流历史版本（最新在前）
+func (a *App) ListWorkflowVersions(id string) ([]store.VersionInfo, error) {
+	return a.workflowStore.ListVersions(id)
+}
+
+// RestoreWorkflowVersion 把指定历史版本恢复为当前版本（恢复前自动快照当前版本）
+func (a *App) RestoreWorkflowVersion(id, version string) (core.WorkflowDef, error) {
+	return a.workflowStore.RestoreVersion(id, version)
+}
+
+// ListAssembleVersions 列出集合历史版本（最新在前）
+func (a *App) ListAssembleVersions(id string) ([]store.VersionInfo, error) {
+	return a.assembleStore.ListVersions(id)
+}
+
+// RestoreAssembleVersion 把指定历史版本恢复为当前版本（恢复前自动快照当前版本）
+func (a *App) RestoreAssembleVersion(id, version string) (core.AssembleDef, error) {
+	return a.assembleStore.RestoreVersion(id, version)
 }
 
 // ── 集合 CRUD ───────────────────────────────────────────────
@@ -188,6 +214,9 @@ func (a *App) UpdateAssemble(a2 core.AssembleDef) error {
 	}
 	if err := a.checkCircularRef(a2); err != nil {
 		return err
+	}
+	if err := engine.ValidateNodeConfigs(a2.Nodes); err != nil {
+		zap.L().Warn("集合配置校验未通过（过渡期仅警告）", zap.String("assemble", a2.ID), zap.Error(err))
 	}
 	return a.assembleStore.Save(a2)
 }

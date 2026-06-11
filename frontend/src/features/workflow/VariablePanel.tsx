@@ -4,6 +4,7 @@
 
 import { useState } from 'react';
 import { Input } from '@/components/ui/Input';
+import { Select } from '@/components/ui/Select';
 import { Button } from '@/components/ui/Button';
 import { cn } from '@/lib/cn';
 import { getPortColor } from '@/types/nodeType';
@@ -88,7 +89,7 @@ export function VariablePanel<T extends VarItem>({
               setAdding(true);
               setEditingIdx(null);
             }}
-            className="text-xs text-blue-600 hover:text-blue-800"
+            className="text-xs text-ops-accent hover:text-ops-accent-hover"
           >
             + 添加
           </button>
@@ -136,7 +137,7 @@ export function VariablePanel<T extends VarItem>({
                 setAdding(false);
               }}
               className={cn(
-                'group flex items-center gap-2 rounded px-1.5 py-1 hover:bg-slate-50 cursor-pointer',
+                'group flex items-center gap-2 rounded px-1.5 py-1 hover:bg-ops-elevated cursor-pointer',
                 draggable && 'cursor-grab active:cursor-grabbing',
               )}
               title={draggable ? '点击编辑 / 拖到画布添加节点' : '点击编辑'}
@@ -159,7 +160,7 @@ export function VariablePanel<T extends VarItem>({
                     e.stopPropagation();
                     setDragPayload(e, secondaryPayload);
                   }}
-                  className="shrink-0 cursor-grab rounded bg-slate-100 px-1 py-px text-[9px] font-medium text-slate-600 hover:bg-slate-200 active:cursor-grabbing"
+                  className="shrink-0 cursor-grab rounded bg-slate-100 px-1 py-px text-[9px] font-medium text-slate-600 hover:bg-ops-border-subtle active:cursor-grabbing"
                   title={`拖到画布添加 ${secondaryLabel} 节点`}
                 >
                   {secondaryLabel}
@@ -173,7 +174,7 @@ export function VariablePanel<T extends VarItem>({
                   e.stopPropagation();
                   handleDelete(idx);
                 }}
-                className="shrink-0 rounded p-0.5 text-xs leading-none text-red-500 opacity-40 hover:bg-red-50 hover:opacity-100 group-hover:opacity-100"
+                className="shrink-0 rounded p-0.5 text-xs leading-none text-ops-danger opacity-40 hover:bg-ops-danger-soft hover:opacity-100 group-hover:opacity-100"
                 title="删除"
               >
                 ✕
@@ -254,19 +255,17 @@ function ItemForm<T extends VarItem>({
           if (e.key === 'Escape') onCancel();
         }}
       />
-      <select
+      <Select
         value={varType}
         onChange={(e) => setVarType(e.target.value)}
-        className={cn(
-          'w-full rounded border border-slate-300 bg-white px-2 py-1 text-xs',
-        )}
+        className="h-8 px-2 text-xs"
       >
         {TYPE_OPTIONS.map((t) => (
           <option key={t} value={t}>
             {t}
           </option>
         ))}
-      </select>
+      </Select>
       {showDefault && (
         <Input
           placeholder="默认值（可选）"

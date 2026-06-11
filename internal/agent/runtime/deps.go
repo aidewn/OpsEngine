@@ -35,6 +35,9 @@ type OpsDocSaver interface {
 	Save(doc core.OpsDoc) error
 }
 
+// ExecutionGetter 按 id 取执行记录，用于「AI 修复失败执行」时提取结构化失败上下文。
+type ExecutionGetter func(executionID string) (core.ExecutionRecord, error)
+
 // EnvironmentLookup 按 id 取环境定义，用于 SSH 上下文预取与校验。
 type EnvironmentLookup func(environmentID string) (core.EnvironmentDef, error)
 

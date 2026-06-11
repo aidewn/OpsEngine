@@ -22,6 +22,7 @@ import {
 import { WorkflowStatusIcon } from '@/features/execution/ExecutionStatus';
 import { ExecutionCallStack } from '@/features/execution/ExecutionCallStack';
 import { InspectionReportDialog } from '@/features/execution/InspectionReportDialog';
+import { AIAssistantDialog } from '@/features/ai/AIAssistantDialog';
 import { WorkflowCanvas } from '@/features/workflow/WorkflowCanvas';
 import { NodeDetailPanel } from '@/features/workflow/NodeDetailPanel';
 import { Button } from '@/components/ui/Button';
@@ -61,6 +62,7 @@ export function ExecutionDetailPage() {
   // 当前查看的 frame 路径（[] = 主流；["callA"] = 主流中调用 callA 后的子帧）
   const [framePath, setFramePath] = useState<string[]>([]);
   const [reportOpen, setReportOpen] = useState(false);
+  const [aiFixOpen, setAIFixOpen] = useState(false);
 
   // 切换 framePath 时清掉选中节点（不同 frame 的节点 id 可能相同）
   useEffect(() => {
@@ -164,7 +166,7 @@ export function ExecutionDetailPage() {
           <header className="flex h-12 items-center border-b border-slate-200 bg-white px-4">
             <Link
               to="/"
-              className="mr-3 text-sm text-slate-500 hover:text-slate-900"
+              className="mr-3 text-sm text-slate-500 hover:text-ops-primary"
             >
               ← 返回
             </Link>
@@ -193,6 +195,16 @@ export function ExecutionDetailPage() {
                   >
                     ↻ 重新运行
                   </Button>
+                  {/* AI 修复：失败/终止的执行可一键发起，后端读取执行记录提取失败上下文 */}
+                  {(exec.status === 'Failed' || exec.status === 'Terminated') && (
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => setAIFixOpen(true)}
+                    >
+                      ✦ AI 修复
+                    </Button>
+                  )}
                   {/* 巡检报告：基于执行结果生成，工作流非巡检形态时报告内容会自动退化为通用执行摘要 */}
                   <Button
                     size="sm"
@@ -220,7 +232,7 @@ export function ExecutionDetailPage() {
                       className={cn(
                         isLast
                           ? 'font-medium text-slate-900'
-                          : 'text-slate-500 hover:text-slate-700',
+                          : 'text-slate-500 hover:text-ops-primary',
                       )}
                       disabled={isLast}
                     >
@@ -261,6 +273,13 @@ export function ExecutionDetailPage() {
             open={reportOpen}
             executionID={id}
             onOpenChange={setReportOpen}
+          />
+          <AIAssistantDialog
+            open={aiFixOpen}
+            onOpenChange={setAIFixOpen}
+            fixExecutionID={exec.id}
+            initialMessage="请修复这次失败的执行"
+            focusInputOnOpen
           />
         </div>
       </FramePathContext.Provider>

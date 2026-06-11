@@ -117,6 +117,8 @@ type ChatContext struct {
 	// Inventory 是预渲染的环境资产清单文本（agentcontext.Inventory.RenderText 的产物）。
 	// 空字符串时不注入。
 	Inventory string
+	// Extra 是场景化追加的 system 段（如工作流编排任务引导），空字符串时不注入。
+	Extra string
 }
 
 // SystemPromptKind 用来在 BuildChatMessages 中切换 system 提示词的场景。
@@ -150,6 +152,9 @@ func BuildChatMessages(messages []core.AISessionMessage, ctx ChatContext) ([]cli
 	out := []clients.ChatMessage{{Role: "system", Content: systemPrompt}}
 	if strings.TrimSpace(ctx.Inventory) != "" {
 		out = append(out, clients.ChatMessage{Role: "system", Content: ctx.Inventory})
+	}
+	if strings.TrimSpace(ctx.Extra) != "" {
+		out = append(out, clients.ChatMessage{Role: "system", Content: ctx.Extra})
 	}
 	for _, m := range messages {
 		switch m.Role {

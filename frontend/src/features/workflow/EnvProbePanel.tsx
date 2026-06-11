@@ -11,6 +11,7 @@
 
 import { useMemo, useState } from 'react';
 import { Button } from '@/components/ui/Button';
+import { Select } from '@/components/ui/Select';
 import { useProbeEnvNode } from '@/api/probe';
 import type {
   ProbeItem,
@@ -217,7 +218,7 @@ export function EnvProbePanel({
                     type="button"
                     onClick={() => setPickedKey(it.key)}
                     className={cn(
-                      'w-full px-2 py-1.5 text-left text-xs hover:bg-slate-50',
+                      'w-full px-2 py-1.5 text-left text-xs hover:bg-ops-elevated',
                       pickedKey === it.key && 'bg-blue-50 text-blue-700',
                     )}
                   >
@@ -241,7 +242,7 @@ export function EnvProbePanel({
               type="checkbox"
               checked={syncVars}
               onChange={(e) => setSyncVars(e.target.checked)}
-              className="size-3.5 rounded border-slate-300 accent-blue-600"
+              className="size-3.5 rounded border-slate-300 accent-ops-accent"
             />
             同步快照到工作流变量
           </label>
@@ -254,12 +255,12 @@ export function EnvProbePanel({
               )}
               {bindings.map((b, idx) => (
                 <div key={idx} className="flex items-center gap-1">
-                  <select
+                  <Select
                     value={b.variable_name}
                     onChange={(e) =>
                       updateBinding(idx, { variable_name: e.target.value })
                     }
-                    className="flex-1 rounded border border-slate-300 bg-white px-1.5 py-1 text-[11px]"
+                    className="h-7 flex-1 px-1.5 text-[11px]"
                   >
                     <option value="">（变量）</option>
                     {variables.map((v) => (
@@ -267,14 +268,14 @@ export function EnvProbePanel({
                         {v.name}
                       </option>
                     ))}
-                  </select>
+                  </Select>
                   <span className="text-[11px] text-slate-400">←</span>
-                  <select
+                  <Select
                     value={b.output_port}
                     onChange={(e) =>
                       updateBinding(idx, { output_port: e.target.value })
                     }
-                    className="flex-1 rounded border border-slate-300 bg-white px-1.5 py-1 text-[11px]"
+                    className="h-7 flex-1 px-1.5 text-[11px]"
                   >
                     <option value="">（端口）</option>
                     {outputPorts.map((p) => (
@@ -282,7 +283,7 @@ export function EnvProbePanel({
                         {p.id}
                       </option>
                     ))}
-                  </select>
+                  </Select>
                   <Button
                     variant="ghost"
                     size="sm"

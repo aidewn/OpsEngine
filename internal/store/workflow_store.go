@@ -56,10 +56,14 @@ func (s *WorkflowStore) Get(id string) (core.WorkflowDef, error) {
 }
 
 // Save 保存工作流（JSON 格式，方便 API 创建）
+// 覆盖前把旧版本快照进 history 目录（保留最近 20 份），支持事后回滚。
 func (s *WorkflowStore) Save(wf core.WorkflowDef) error {
 	// 注意：API 创建的工作流保存为 JSON，
 	// 手动编写的工作流用 TOML 格式
 	// 这里简化为直接用 toml 编码
+	if err := snapshotBeforeSave(s.baseDir, wf.ID); err != nil {
+		return fmt.Errorf("快照旧版本失败: %w", err)
+	}
 	path := filepath.Join(s.baseDir, wf.ID+".toml")
 
 	f, err := os.Create(path)
@@ -69,6 +73,28 @@ func (s *WorkflowStore) Save(wf core.WorkflowDef) error {
 	defer f.Close()
 
 	return toml.NewEncoder(f).Encode(wf)
+}
+
+// ListVersions 列出工作流的历史版本（最新在前）。
+func (s *WorkflowStore) ListVersions(id string) ([]VersionInfo, error) {
+	return listVersions(s.baseDir, id)
+}
+
+// RestoreVersion 把指定历史版本恢复为当前版本。
+// 恢复前会先快照当前版本，因此恢复操作本身也可回退。
+func (s *WorkflowStore) RestoreVersion(id, version string) (core.WorkflowDef, error) {
+	data, err := readVersion(s.baseDir, id, version)
+	if err != nil {
+		return core.WorkflowDef{}, err
+	}
+	var wf core.WorkflowDef
+	if _, err := toml.Decode(resolveEnvVars(string(data)), &wf); err != nil {
+		return core.WorkflowDef{}, fmt.Errorf("历史版本解析失败: %w", err)
+	}
+	if err := s.Save(wf); err != nil {
+		return core.WorkflowDef{}, err
+	}
+	return wf, nil
 }
 
 // Delete 删除工作流

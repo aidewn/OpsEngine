@@ -15,8 +15,6 @@
 
 package architecture
 
-import "fmt"
-
 // NodeKind 是拓扑节点类型，决定 Mermaid 形状与渲染样式。
 type NodeKind string
 
@@ -115,10 +113,4 @@ func (g *TopologyGraph) CountByKind(kind NodeKind) int {
 		}
 	}
 	return n
-}
-
-// String 返回简短的人类可读摘要，主要用于日志。
-func (g *TopologyGraph) String() string {
-	return fmt.Sprintf("TopologyGraph(env=%s, nodes=%d, edges=%d, errors=%d)",
-		g.EnvironmentName, len(g.Nodes), len(g.Edges), len(g.CollectionErrors))
 }

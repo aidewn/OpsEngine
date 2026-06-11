@@ -57,7 +57,11 @@ func (s *AssembleStore) Get(id string) (core.AssembleDef, error) {
 }
 
 // Save 保存集合
+// 覆盖前把旧版本快照进 history 目录（保留最近 20 份），支持事后回滚。
 func (s *AssembleStore) Save(a core.AssembleDef) error {
+	if err := snapshotBeforeSave(s.baseDir, a.ID); err != nil {
+		return fmt.Errorf("快照旧版本失败: %w", err)
+	}
 	path := filepath.Join(s.baseDir, a.ID+".toml")
 
 	f, err := os.Create(path)
@@ -67,6 +71,27 @@ func (s *AssembleStore) Save(a core.AssembleDef) error {
 	defer f.Close()
 
 	return toml.NewEncoder(f).Encode(a)
+}
+
+// ListVersions 列出集合的历史版本（最新在前）。
+func (s *AssembleStore) ListVersions(id string) ([]VersionInfo, error) {
+	return listVersions(s.baseDir, id)
+}
+
+// RestoreVersion 把指定历史版本恢复为当前版本（恢复前快照当前版本）。
+func (s *AssembleStore) RestoreVersion(id, version string) (core.AssembleDef, error) {
+	data, err := readVersion(s.baseDir, id, version)
+	if err != nil {
+		return core.AssembleDef{}, err
+	}
+	var a core.AssembleDef
+	if _, err := toml.Decode(string(data), &a); err != nil {
+		return core.AssembleDef{}, fmt.Errorf("历史版本解析失败: %w", err)
+	}
+	if err := s.Save(a); err != nil {
+		return core.AssembleDef{}, err
+	}
+	return a, nil
 }
 
 // Delete 删除集合

@@ -67,6 +67,23 @@ type ToolContext struct {
 	AssembleGet  func(id string) (core.AssembleDef, error)
 	WorkflowList func() ([]core.WorkflowDef, error)
 	AssembleList func() ([]core.AssembleDef, error)
+	// ExecutionGet 按 ID 取执行记录，供 get_execution 工具查询执行状态与失败详情。
+	ExecutionGet func(id string) (core.ExecutionRecord, error)
+	// ProposeWorkflow / ProposeWorkflowUpdate 由 runtime 按回合注入（携带会话与请求上下文），
+	// 是仅有的两个写路径：草案经完整校验后落盘（或进入确认模式的待确认状态）。
+	// 为 nil 时对应工具返回"未启用"错误。
+	ProposeWorkflow       func(draftJSON string) (ProposalResult, error)
+	ProposeWorkflowUpdate func(workflowID, draftJSON string) (ProposalResult, error)
+}
+
+// ProposalResult 是 propose 类工具的落盘结果。
+type ProposalResult struct {
+	WorkflowID    string
+	WorkflowName  string
+	NodeCount     int
+	ChangeSummary string
+	// Pending 为 true 表示确认模式下生成了待用户确认的草案，尚未落盘。
+	Pending bool
 }
 
 // Tool 是工具的运行时接口。Execute 的 args 已由 LLM 的 function calling 协议解析为 map。

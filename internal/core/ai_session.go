@@ -78,7 +78,21 @@ type AISession struct {
 	ActiveArtifactType string `json:"active_artifact_type,omitempty" toml:"active_artifact_type,omitempty"`
 	ActiveArtifactID   string `json:"active_artifact_id,omitempty"   toml:"active_artifact_id,omitempty"`
 	ActiveArtifactName string `json:"active_artifact_name,omitempty" toml:"active_artifact_name,omitempty"`
-	Messages          []AISessionMessage `json:"messages"           toml:"messages"`
-	CreatedAt         time.Time          `json:"created_at"         toml:"created_at"`
-	UpdatedAt         time.Time          `json:"updated_at"         toml:"updated_at"`
+	// PendingDraft 是等待用户确认应用的 AI 修改草案（确认模式下 update/fix 路径产生）。
+	PendingDraft *AIPendingDraft    `json:"pending_draft,omitempty" toml:"pending_draft,omitempty"`
+	Messages     []AISessionMessage `json:"messages"   toml:"messages"`
+	CreatedAt    time.Time          `json:"created_at" toml:"created_at"`
+	UpdatedAt    time.Time          `json:"updated_at" toml:"updated_at"`
+}
+
+// AIPendingDraft 是 AI 产出但尚未落盘的资产修改草案。
+// 应用前会校验 BaseHash：基线工作流在生成后被手工修改过则拒绝应用，避免静默覆盖。
+type AIPendingDraft struct {
+	ArtifactType  string    `json:"artifact_type"  toml:"artifact_type"` // 目前仅 "workflow"
+	ArtifactID    string    `json:"artifact_id"    toml:"artifact_id"`
+	ArtifactName  string    `json:"artifact_name"  toml:"artifact_name"`
+	DraftJSON     string    `json:"draft_json"     toml:"draft_json"` // 落地校验后的完整资产 JSON
+	BaseHash      string    `json:"base_hash"      toml:"base_hash"`  // 生成时基线资产的 SHA-256
+	ChangeSummary string    `json:"change_summary" toml:"change_summary"`
+	CreatedAt     time.Time `json:"created_at"     toml:"created_at"`
 }

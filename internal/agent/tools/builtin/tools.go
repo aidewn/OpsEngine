@@ -31,6 +31,10 @@ func Register(reg *tools.Registry, deps RegisterDeps) error {
 		GetWorkflow{},
 		ListAssembles{},
 		GetAssemble{},
+		GetExecution{},
+		// 写工具（low_write）：草案提交，落盘前经完整校验
+		ProposeWorkflow{},
+		ProposeUpdateWorkflow{},
 		// SSH 主机
 		SSHInspect{},
 		SSHListDir{},

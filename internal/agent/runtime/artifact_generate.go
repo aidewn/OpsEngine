@@ -13,39 +13,6 @@ import (
 // defaultArtifactGenRetries 是 artifact JSON 生成默认最大尝试次数（含首次）。
 const defaultArtifactGenRetries = 3
 
-// isExecutionFailureReport 判断用户消息是否为工作流/集合执行失败日志。
-func isExecutionFailureReport(message string) bool {
-	text := strings.ToLower(strings.TrimSpace(message))
-	if text == "" {
-		return false
-	}
-	signals := []string{
-		"exit_code", "stderr", "stdout",
-		"执行失败", "脚本执行失败", "命令执行失败",
-		"execution failed", "failed with exit",
-	}
-	for _, s := range signals {
-		if strings.Contains(text, s) {
-			return true
-		}
-	}
-	return false
-}
-
-// buildExecutionFixUserPrompt 构造「根据执行日志修复 artifact」的用户提示。
-func buildExecutionFixUserPrompt(message string) string {
-	return fmt.Sprintf(`集合/工作流执行失败，请根据以下日志修复脚本或节点配置（重点检查 sed/awk 转义、变量引用、shell 语法），输出完整修正后的 JSON。
-
-失败日志：
-%s
-
-修复要求：
-- 先定位 stderr/exit_code 根因，再改脚本，不要只改注释
-- sed 表达式含特殊字符时，改用 heredoc、python 或更稳妥写法
-- 保持 params/returns 接口不变，除非日志表明必须调整
-- 只输出 JSON，禁止 Markdown 与解释文字`, message)
-}
-
 // requestArtifactDraft 向 LLM 请求 artifact 草案；解析或校验失败时自动反馈并重试。
 func (r *Runtime) requestArtifactDraft(
 	req Request,

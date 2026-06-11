@@ -340,23 +340,6 @@ export function useExecution(executionID: string | undefined): ExecutionState | 
   return executions[executionID] ?? null;
 }
 
-export function useExecutionsByWorkflow(
-  workflowID: string | undefined,
-): ExecutionState[] {
-  const { executions } = useStore();
-  if (!workflowID) return [];
-  return Object.values(executions)
-    .filter((e) => e.workflowID === workflowID)
-    .sort((a, b) => (a.startedAt < b.startedAt ? 1 : -1));
-}
-
-export function useAllExecutions(): ExecutionState[] {
-  const { executions } = useStore();
-  return Object.values(executions).sort((a, b) =>
-    a.startedAt < b.startedAt ? 1 : -1,
-  );
-}
-
 export function useExecutionHydrator(): {
   hydrate: (record: ExecutionRecord) => void;
   remove: (executionID: string) => void;

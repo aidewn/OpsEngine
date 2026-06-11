@@ -131,12 +131,17 @@ func ensureUniqueDraftNodeID(id string, used map[string]struct{}) string {
 // Materialize 把草案转成 core.WorkflowDef：临时 id 重写、节点类型校验、边重映射，最后跑整体校验。
 // checker 为 nil 时跳过节点类型校验（仅供单元测试使用，生产路径必须传入）。
 func Materialize(draft Draft, checker NodeTypeChecker) (core.WorkflowDef, error) {
-	return materializeWorkflow(draft, "", checker)
+	return materializeWorkflow(draft, "", nil, checker)
 }
 
 // MaterializeWorkflowUpdate 把草案落成指定 ID 的工作流，用于 AI 直接更新已有工作流。
+// 模型回显的已有 instance_id 会保留原值：节点身份跨更新稳定，diff 与画布选中状态才有意义。
 func MaterializeWorkflowUpdate(draft Draft, existing core.WorkflowDef, checker NodeTypeChecker) (core.WorkflowDef, error) {
-	wf, err := materializeWorkflow(draft, existing.ID, checker)
+	keep := make(map[string]bool, len(existing.Nodes))
+	for _, n := range existing.Nodes {
+		keep[n.InstanceID] = true
+	}
+	wf, err := materializeWorkflow(draft, existing.ID, keep, checker)
 	if err != nil {
 		return core.WorkflowDef{}, err
 	}
@@ -146,7 +151,8 @@ func MaterializeWorkflowUpdate(draft Draft, existing core.WorkflowDef, checker N
 	return wf, nil
 }
 
-func materializeWorkflow(draft Draft, fixedID string, checker NodeTypeChecker) (core.WorkflowDef, error) {
+// materializeWorkflow 落地工作流草案。keepIDs 中出现的临时 id 视为已有节点，保留原 instance_id。
+func materializeWorkflow(draft Draft, fixedID string, keepIDs map[string]bool, checker NodeTypeChecker) (core.WorkflowDef, error) {
 	normalizeDraft(&draft)
 	idMap := make(map[string]string, len(draft.Nodes))
 	nodes := make([]core.NodeInstance, 0, len(draft.Nodes))
@@ -164,6 +170,9 @@ func materializeWorkflow(draft Draft, fixedID string, checker NodeTypeChecker) (
 			}
 		}
 		instanceID := uuid.New().String()
+		if keepIDs[tempID] {
+			instanceID = tempID
+		}
 		idMap[tempID] = instanceID
 		cfg := n.Config
 		if cfg == nil {
@@ -212,11 +221,29 @@ func materializeWorkflow(draft Draft, fixedID string, checker NodeTypeChecker) (
 	if err := engine.ValidateWorkflow(wf); err != nil {
 		return core.WorkflowDef{}, fmt.Errorf("AI 生成工作流校验失败: %w", err)
 	}
+	if err := engine.ValidateNodeConfigs(wf.Nodes); err != nil {
+		return core.WorkflowDef{}, fmt.Errorf("AI 生成工作流配置校验失败: %w", err)
+	}
 	return wf, nil
 }
 
 // MaterializeAssemble 把草案转成集合定义，并执行集合专用校验。
 func MaterializeAssemble(draft Draft, fixedID string, checker NodeTypeChecker) (core.AssembleDef, error) {
+	return materializeAssemble(draft, fixedID, nil, checker)
+}
+
+// MaterializeAssembleUpdate 把草案落成指定集合的更新版本。
+// 与 MaterializeWorkflowUpdate 同理：模型回显的已有 instance_id 保留原值，保证 diff 可对齐。
+func MaterializeAssembleUpdate(draft Draft, existing core.AssembleDef, checker NodeTypeChecker) (core.AssembleDef, error) {
+	keep := make(map[string]bool, len(existing.Nodes))
+	for _, n := range existing.Nodes {
+		keep[n.InstanceID] = true
+	}
+	return materializeAssemble(draft, existing.ID, keep, checker)
+}
+
+// materializeAssemble 落地集合草案。keepIDs 中出现的临时 id 保留原 instance_id。
+func materializeAssemble(draft Draft, fixedID string, keepIDs map[string]bool, checker NodeTypeChecker) (core.AssembleDef, error) {
 	normalizeDraft(&draft)
 	idMap := make(map[string]string, len(draft.Nodes))
 	nodes := make([]core.NodeInstance, 0, len(draft.Nodes))
@@ -238,6 +265,9 @@ func MaterializeAssemble(draft Draft, fixedID string, checker NodeTypeChecker) (
 			}
 		}
 		instanceID := uuid.New().String()
+		if keepIDs[tempID] {
+			instanceID = tempID
+		}
 		idMap[tempID] = instanceID
 		cfg := n.Config
 		if cfg == nil {
@@ -283,6 +313,9 @@ func MaterializeAssemble(draft Draft, fixedID string, checker NodeTypeChecker) (
 	}
 	if err := engine.ValidateAssemble(asm); err != nil {
 		return core.AssembleDef{}, fmt.Errorf("AI 生成集合校验失败: %w", err)
+	}
+	if err := engine.ValidateNodeConfigs(asm.Nodes); err != nil {
+		return core.AssembleDef{}, fmt.Errorf("AI 生成集合配置校验失败: %w", err)
 	}
 	return asm, nil
 }

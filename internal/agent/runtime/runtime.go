@@ -38,6 +38,8 @@ type Request struct {
 	// ArtifactType / ArtifactID 指向用户正在迭代的资产。
 	ArtifactType string
 	ArtifactID   string
+	// ExecutionID 指向要修复的失败执行，仅 operation=fix_execution 时有效。
+	ExecutionID string
 }
 
 // Runtime 持有完成一轮所需的全部依赖。
@@ -51,6 +53,7 @@ type Runtime struct {
 	EnvList      EnvironmentLister
 	Nodes        NodeCatalog
 	NodeChecker  NodeTypeChecker
+	Executions   ExecutionGetter
 	LLM          LLMProvider
 	Emit         Emitter
 	// Tools 是只读 Agent 工具注册表。可为 nil（chat 路径退化为不带工具的单轮调用）。
@@ -62,6 +65,9 @@ type Runtime struct {
 	MaxTurns int
 	// MaxToolRounds 限制 chat 工具循环最多迭代多少轮，<=0 时用默认 5。
 	MaxToolRounds int
+	// ApplyMode 控制 AI 修改已有工作流的落盘策略：
+	// "confirm" 先暂存草案待用户确认；其余值（含空）直接保存。
+	ApplyMode string
 }
 
 // Run 执行一轮 AI 助手调用。
@@ -74,6 +80,7 @@ func (r *Runtime) Run(req Request) error {
 	req.TargetConfigID = strings.TrimSpace(req.TargetConfigID)
 	req.ArtifactType = strings.TrimSpace(req.ArtifactType)
 	req.ArtifactID = strings.TrimSpace(req.ArtifactID)
+	req.ExecutionID = strings.TrimSpace(req.ExecutionID)
 
 	if req.RequestID == "" {
 		return errors.New("request_id 不能为空")
@@ -136,6 +143,8 @@ func (r *Runtime) Run(req Request) error {
 		r.handleAssemble(req, session, true)
 	case intent.KindUpdateWorkflow:
 		r.handleWorkflowUpdate(req, session)
+	case intent.KindFixExecution:
+		r.handleExecutionFix(req, session)
 	case intent.KindGenerateWorkflow:
 		r.handleWorkflow(req, session)
 	case intent.KindTroubleshoot:

@@ -3,7 +3,6 @@
 package runtime
 
 import (
-	"fmt"
 	"strings"
 
 	"OpsEngine/internal/agent/intent"
@@ -79,10 +78,3 @@ func (r *Runtime) clearSessionActiveArtifact(session *core.AISession) error {
 	return r.Sessions.Save(*session)
 }
 
-// workflowChangeSummary 生成工作流更新摘要。
-func workflowChangeSummary(before, after int) string {
-	if before == after {
-		return fmt.Sprintf("节点数 %d（结构微调）", after)
-	}
-	return fmt.Sprintf("节点 %d → %d", before, after)
-}

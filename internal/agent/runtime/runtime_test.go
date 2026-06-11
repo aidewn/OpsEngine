@@ -296,7 +296,7 @@ func TestRunCreateAssembleGeneralSession(t *testing.T) {
 		}`},
 		Emit: emit,
 	}
-	if err := rt.Run(Request{RequestID: "req-1", SessionID: "sess-1", Message: "生成安装 Docker 和 Docker Compose 的集合"}); err != nil {
+	if err := rt.Run(Request{RequestID: "req-1", SessionID: "sess-1", Operation: "create_assemble", Message: "生成安装 Docker 和 Docker Compose 的集合"}); err != nil {
 		t.Fatalf("Run error: %v", err)
 	}
 	if asmStore.saved == nil || asmStore.saved.Name != "安装 Docker" {

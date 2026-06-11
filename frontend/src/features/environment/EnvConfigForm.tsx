@@ -4,6 +4,7 @@
 // k8s/jenkins 仍占位，待 Phase 4-5 上线
 
 import { cn } from '@/lib/cn';
+import { Select } from '@/components/ui/Select';
 import { ConfigForm } from '@/features/workflow/ConfigForm';
 import type { FieldSchema } from '@/types/nodeType';
 import type {
@@ -278,13 +279,10 @@ function SiblingConfigSelect({
   return (
     <div className="space-y-1">
       <label className="text-xs font-medium text-slate-600">{label}</label>
-      <select
+      <Select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className={cn(
-          'w-full rounded border bg-white px-2 py-1.5 text-xs',
-          isOrphan ? 'border-red-400' : 'border-slate-300',
-        )}
+        className={cn('h-8 px-2 text-xs', isOrphan && 'border-ops-danger')}
       >
         <option value="">（请选择 SSH 配置）</option>
         {isOrphan && <option value={value}>未定义：{value}</option>}
@@ -293,7 +291,7 @@ function SiblingConfigSelect({
             {c.name}
           </option>
         ))}
-      </select>
+      </Select>
       {isOrphan && (
         <div className="text-[11px] text-red-600">
           引用的 SSH 配置已不存在，保存前请重新选择

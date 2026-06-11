@@ -219,7 +219,7 @@ function AssembleCanvasInner({ assembleId: id }: { assembleId: string | undefine
         <header className="flex h-12 items-center border-b border-slate-200 bg-white px-4">
           <Link
             to="/"
-            className="mr-3 text-sm text-slate-500 hover:text-slate-900"
+            className="mr-3 text-sm text-slate-500 hover:text-ops-primary"
           >
             ← 返回
           </Link>

@@ -38,6 +38,8 @@ type AISettings struct {
 	DeepSeekBaseURL string `json:"deepseek_base_url" toml:"deepseek_base_url"`
 	DeepSeekModel   string `json:"deepseek_model"    toml:"deepseek_model"`
 	TimeoutSeconds  int    `json:"timeout_seconds"   toml:"timeout_seconds"`
+	// ApplyMode 控制 AI 修改已有资产的落盘策略：confirm（默认，先确认）/ auto（直接保存）。
+	ApplyMode string `json:"apply_mode" toml:"apply_mode"`
 }
 
 // AIAssistantRequest 是统一 AI 助手请求（Wails 入口签名）。
@@ -49,6 +51,8 @@ type AIAssistantRequest struct {
 	TargetConfigID string `json:"target_config_id,omitempty"`
 	ArtifactType   string `json:"artifact_type,omitempty"`
 	ArtifactID     string `json:"artifact_id,omitempty"`
+	// ExecutionID 指向要修复的失败执行，operation=fix_execution 时必填。
+	ExecutionID string `json:"execution_id,omitempty"`
 }
 
 // AIAssistantEvent 是后端推送给前端的 AI 助手事件。
@@ -310,9 +314,11 @@ func (a *App) StartAIAssistant(req AIAssistantRequest) error {
 		EnvList:      a.listEnvironmentsForPrompt,
 		Nodes:        a.GetNodeTypes,
 		NodeChecker:  a.checkNodeTypeExists,
+		Executions:   a.getExecutionRecord,
 		LLM:          a.newLLMAdapter(settings),
 		Emit:         runtime.EmitterFunc(a.emitRuntimeEvent),
 		Tools:        a.toolRegistry,
+		ApplyMode:    settings.ApplyMode,
 	}
 	return rt.Run(runtime.Request{
 		RequestID:      requestID,
@@ -322,10 +328,36 @@ func (a *App) StartAIAssistant(req AIAssistantRequest) error {
 		TargetConfigID: targetConfigID,
 		ArtifactType:   req.ArtifactType,
 		ArtifactID:     req.ArtifactID,
+		ExecutionID:    req.ExecutionID,
 	})
 }
 
+// ApplyAIPendingDraft 应用会话中的待确认 AI 修改草案，返回保存后的工作流。
+// 基线漂移（草案生成后被手工修改）时返回错误并保留草案。
+func (a *App) ApplyAIPendingDraft(sessionID string) (core.WorkflowDef, error) {
+	rt := &runtime.Runtime{Sessions: a.aiSessionStore, Workflows: a.workflowStore}
+	return rt.ApplyPendingDraft(strings.TrimSpace(sessionID))
+}
+
+// DiscardAIPendingDraft 放弃会话中的待确认 AI 修改草案（幂等）。
+func (a *App) DiscardAIPendingDraft(sessionID string) error {
+	rt := &runtime.Runtime{Sessions: a.aiSessionStore, Workflows: a.workflowStore}
+	return rt.DiscardPendingDraft(strings.TrimSpace(sessionID))
+}
+
 // ── Runtime 依赖适配 ───────────────────────────────────────
+
+// getExecutionRecord 适配 runtime.ExecutionGetter 与工具 ExecutionGet：内存优先取执行记录。
+func (a *App) getExecutionRecord(executionID string) (core.ExecutionRecord, error) {
+	if a.engine == nil {
+		return core.ExecutionRecord{}, errors.New("执行引擎未初始化")
+	}
+	rec, ok := a.engine.GetRecord(executionID)
+	if !ok {
+		return core.ExecutionRecord{}, fmt.Errorf("执行 %s 不存在", executionID)
+	}
+	return rec, nil
+}
 
 // lookupEnvironment 适配 runtime.EnvironmentLookup。
 func (a *App) lookupEnvironment(environmentID string) (core.EnvironmentDef, error) {
@@ -535,6 +567,10 @@ func normalizeAISettings(settings AISettings) AISettings {
 	}
 	if settings.TimeoutSeconds <= 0 {
 		settings.TimeoutSeconds = 120
+	}
+	// 默认 confirm：AI 覆盖已有资产前需要用户确认（见 P3 计划）。
+	if settings.ApplyMode != "auto" {
+		settings.ApplyMode = runtime.ApplyModeConfirm
 	}
 	return settings
 }

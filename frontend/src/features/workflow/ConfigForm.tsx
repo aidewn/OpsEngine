@@ -9,6 +9,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { Input } from '@/components/ui/Input';
+import { Select } from '@/components/ui/Select';
 import { Textarea } from '@/components/ui/Textarea';
 import { Label } from '@/components/ui/Label';
 import { Button } from '@/components/ui/Button';
@@ -138,7 +139,7 @@ function FieldRow({
       <div className="space-y-1.5">
         <Label htmlFor={field.id} className="text-xs">
           {field.label}
-          {field.required && <span className="ml-0.5 text-red-500">*</span>}
+          {field.required && <span className="ml-0.5 text-ops-danger">*</span>}
         </Label>
         <label
           htmlFor={field.id}
@@ -149,7 +150,7 @@ function FieldRow({
             type="checkbox"
             checked={checked}
             onChange={(e) => onChange(e.target.checked)}
-            className="size-4 shrink-0 rounded border-slate-300 accent-blue-600"
+            className="size-4 shrink-0 rounded border-slate-300 accent-ops-accent"
           />
           <span className="text-xs leading-none text-slate-500">
             {checked ? '已启用' : '已禁用'}
@@ -163,7 +164,7 @@ function FieldRow({
     <div className="space-y-1">
       <Label htmlFor={field.id} className="text-xs">
         {field.label}
-        {field.required && <span className="ml-0.5 text-red-500">*</span>}
+        {field.required && <span className="ml-0.5 text-ops-danger">*</span>}
       </Label>
       <FieldControl
         field={field}
@@ -271,20 +272,18 @@ function FieldControl({
       );
     case 'select':
       return (
-        <select
+        <Select
           id={field.id}
           value={(value as string) ?? ''}
           onChange={(e) => onChange(e.target.value)}
-          className={cn(
-            'w-full rounded border border-slate-300 bg-white px-2 py-1.5 text-xs',
-          )}
+          className="h-8 px-2 text-xs"
         >
           {field.options?.map((opt) => (
             <option key={opt} value={opt}>
               {opt}
             </option>
           ))}
-        </select>
+        </Select>
       );
     case 'toggle':
       // 由 FieldRow 整行渲染；此处不应走到
@@ -355,6 +354,15 @@ function FieldControl({
           onChange={onChange}
         />
       );
+    case 'param_list':
+      return (
+        <ParamListField
+          id={field.id}
+          value={value}
+          placeholder={field.placeholder}
+          onChange={onChange}
+        />
+      );
     case 'text':
     default:
       return (
@@ -395,17 +403,14 @@ function VariableSelect({
 
   return (
     <div className="space-y-1">
-      <select
+      <Select
         id={id}
         value={value}
         onChange={(e) => {
           const picked = variables.find((v) => v.name === e.target.value);
           onPick(picked ?? null);
         }}
-        className={cn(
-          'w-full rounded border bg-white px-2 py-1.5 text-xs',
-          isOrphan ? 'border-red-400' : 'border-slate-300',
-        )}
+        className={cn('h-8 px-2 text-xs', isOrphan && 'border-ops-danger')}
       >
         <option value="">（请选择变量）</option>
         {isOrphan && (
@@ -416,7 +421,7 @@ function VariableSelect({
             {v.name} ({v.var_type})
           </option>
         ))}
-      </select>
+      </Select>
       {isOrphan && (
         <div className="text-[11px] text-red-600">
           引用的变量已不存在，保存前请重新选择
@@ -451,17 +456,14 @@ function ParamSelect({
 
   return (
     <div className="space-y-1">
-      <select
+      <Select
         id={id}
         value={value}
         onChange={(e) => {
           const picked = params.find((p) => p.name === e.target.value);
           onPick(picked ?? null);
         }}
-        className={cn(
-          'w-full rounded border bg-white px-2 py-1.5 text-xs',
-          isOrphan ? 'border-red-400' : 'border-slate-300',
-        )}
+        className={cn('h-8 px-2 text-xs', isOrphan && 'border-ops-danger')}
       >
         <option value="">（请选择参数）</option>
         {isOrphan && <option value={value}>未定义：{value}</option>}
@@ -470,7 +472,7 @@ function ParamSelect({
             {p.name} ({p.var_type})
           </option>
         ))}
-      </select>
+      </Select>
       {isOrphan && (
         <div className="text-[11px] text-red-600">
           引用的参数已不存在，保存前请重新选择
@@ -505,17 +507,14 @@ function ReturnSelect({
 
   return (
     <div className="space-y-1">
-      <select
+      <Select
         id={id}
         value={value}
         onChange={(e) => {
           const picked = returns.find((r) => r.name === e.target.value);
           onPick(picked ?? null);
         }}
-        className={cn(
-          'w-full rounded border bg-white px-2 py-1.5 text-xs',
-          isOrphan ? 'border-red-400' : 'border-slate-300',
-        )}
+        className={cn('h-8 px-2 text-xs', isOrphan && 'border-ops-danger')}
       >
         <option value="">（请选择返回值）</option>
         {isOrphan && <option value={value}>未定义：{value}</option>}
@@ -524,7 +523,7 @@ function ReturnSelect({
             {r.name} ({r.var_type})
           </option>
         ))}
-      </select>
+      </Select>
       {isOrphan && (
         <div className="text-[11px] text-red-600">
           引用的返回值已不存在，保存前请重新选择
@@ -569,14 +568,11 @@ function EnvSelect({
 
   return (
     <div className="space-y-1">
-      <select
+      <Select
         id={id}
         value={value}
         onChange={(e) => onPick(e.target.value)}
-        className={cn(
-          'w-full rounded border bg-white px-2 py-1.5 text-xs',
-          isOrphan ? 'border-red-400' : 'border-slate-300',
-        )}
+        className={cn('h-8 px-2 text-xs', isOrphan && 'border-ops-danger')}
       >
         <option value="">（请选择环境）</option>
         {isOrphan && <option value={value}>未定义：{value}</option>}
@@ -585,7 +581,7 @@ function EnvSelect({
             {e.name}
           </option>
         ))}
-      </select>
+      </Select>
       {isOrphan && (
         <div className="text-[11px] text-red-600">
           引用的环境已不存在，保存前请重新选择
@@ -648,14 +644,11 @@ function EnvConfigSelect({
 
   return (
     <div className="space-y-1">
-      <select
+      <Select
         id={id}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className={cn(
-          'w-full rounded border bg-white px-2 py-1.5 text-xs',
-          isOrphan ? 'border-red-400' : 'border-slate-300',
-        )}
+        className={cn('h-8 px-2 text-xs', isOrphan && 'border-ops-danger')}
       >
         <option value="">（请选择配置）</option>
         {isOrphan && <option value={value}>未定义：{value}</option>}
@@ -664,7 +657,7 @@ function EnvConfigSelect({
             {c.name}
           </option>
         ))}
-      </select>
+      </Select>
       {isOrphan && (
         <div className="text-[11px] text-red-600">
           引用的配置已不存在，保存前请重新选择
@@ -751,7 +744,7 @@ function FilePathField({
         className={cn(
           'flex items-center justify-between gap-2 rounded border-2 border-dashed px-3 py-3 text-xs transition-colors',
           hovering
-            ? 'border-blue-400 bg-blue-50 text-blue-700'
+            ? 'border-ops-accent bg-ops-accent-soft text-ops-accent'
             : 'border-slate-300 bg-slate-50 text-slate-500',
         )}
       >
@@ -776,6 +769,105 @@ function FilePathField({
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder ?? '或手动粘贴绝对路径'}
       />
+    </div>
+  );
+}
+
+// param_list 字段：用户维护一个参数名列表
+// 每个参数名驱动节点上动态生成一个 param_<name> input 端口（text_template 节点用）
+// 校验：仅允许 [A-Za-z_][A-Za-z0-9_]*；重名自动去重（保留首个）
+// 存储：string[]（空字符串过滤掉），与后端约定一致
+const PARAM_NAME_RE = /^[A-Za-z_][A-Za-z0-9_]*$/;
+
+function ParamListField({
+  id,
+  value,
+  placeholder,
+  onChange,
+}: {
+  id: string;
+  value: unknown;
+  placeholder?: string;
+  onChange: (v: unknown) => void;
+}) {
+  // 把 value 规范成 string[]（兼容旧的换行字符串）
+  const items: string[] = Array.isArray(value)
+    ? (value as unknown[]).filter((x): x is string => typeof x === 'string')
+    : typeof value === 'string'
+      ? value.split(/\r?\n/)
+      : [];
+
+  // 始终保留一个空行让用户能继续添加
+  const display = items.length === 0 ? [''] : items;
+
+  function commit(next: string[]) {
+    // 写回前裁剪 + 去掉末尾空行（但保留中间空行让用户编辑中状态稳定）
+    const trimmed = next.map((s) => s.trim());
+    while (trimmed.length > 0 && trimmed[trimmed.length - 1] === '') {
+      trimmed.pop();
+    }
+    onChange(trimmed);
+  }
+
+  function updateAt(idx: number, name: string) {
+    const next = [...display];
+    next[idx] = name;
+    commit(next);
+  }
+
+  function removeAt(idx: number) {
+    const next = display.filter((_, i) => i !== idx);
+    commit(next);
+  }
+
+  function addRow() {
+    commit([...display, '']);
+  }
+
+  // 重复 / 非法名标记：第一次出现合法，后续重复标红；空行不校验
+  const seen = new Set<string>();
+  return (
+    <div className="space-y-1.5">
+      {display.map((name, idx) => {
+        const trimmed = name.trim();
+        const invalid = trimmed !== '' && !PARAM_NAME_RE.test(trimmed);
+        const dup = !invalid && trimmed !== '' && seen.has(trimmed);
+        if (!invalid && trimmed !== '') seen.add(trimmed);
+        return (
+          <div key={idx} className="flex items-center gap-1.5">
+            <Input
+              id={idx === 0 ? id : undefined}
+              type="text"
+              value={name}
+              onChange={(e) => updateAt(idx, e.target.value)}
+              placeholder={placeholder ?? '参数名（字母/数字/下划线）'}
+              className={cn(
+                (invalid || dup) && 'border-ops-danger focus:border-ops-danger',
+              )}
+            />
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              onClick={() => removeAt(idx)}
+              title="删除"
+            >
+              ×
+            </Button>
+          </div>
+        );
+      })}
+      <Button type="button" size="sm" variant="secondary" onClick={addRow}>
+        + 添加参数
+      </Button>
+      {display.some((n) => {
+        const t = n.trim();
+        return t !== '' && !PARAM_NAME_RE.test(t);
+      }) && (
+        <div className="text-[11px] text-red-600">
+          参数名只能由字母 / 数字 / 下划线组成，且不能数字开头
+        </div>
+      )}
     </div>
   );
 }

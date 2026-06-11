@@ -2,6 +2,7 @@
 
 import { FormEvent, type ReactNode, useEffect, useState } from 'react';
 import { Button } from '@/components/ui/Button';
+import { Select } from '@/components/ui/Select';
 import {
   useAISettings,
   useTestAISettings,
@@ -15,6 +16,7 @@ const DEFAULT_SETTINGS: AISettings = {
   deepseek_base_url: 'https://api.deepseek.com',
   deepseek_model: 'deepseek-chat',
   timeout_seconds: 60,
+  apply_mode: 'confirm',
 };
 
 interface SettingsPageProps {
@@ -41,6 +43,7 @@ export function SettingsPage({ embedded = false }: SettingsPageProps) {
         deepseek_model: data.deepseek_model || DEFAULT_SETTINGS.deepseek_model,
         timeout_seconds:
           data.timeout_seconds || DEFAULT_SETTINGS.timeout_seconds,
+        apply_mode: data.apply_mode === 'auto' ? 'auto' : 'confirm',
       });
       // 已有 Key 时默认进入"已保存"态，避免明文回填；空 Key 必须进入编辑态让用户填。
       setEditingKey(!data.deepseek_api_key);
@@ -109,13 +112,13 @@ export function SettingsPage({ embedded = false }: SettingsPageProps) {
                   }))
                 }
                 placeholder="sk-..."
-                className="h-9 w-full rounded-md border border-slate-300 px-3 text-sm outline-none focus:border-slate-500 font-mono"
+                className="h-9 w-full rounded-md border border-slate-300 px-3 text-sm outline-none focus:border-ops-border-focus font-mono"
                 autoFocus
               />
               <button
                 type="button"
                 onClick={() => setRevealKey((v) => !v)}
-                className="rounded-md border border-slate-300 px-2 text-xs text-slate-600 hover:bg-slate-50"
+                className="rounded-md border border-slate-300 px-2 text-xs text-slate-600 hover:bg-ops-elevated"
                 title={revealKey ? '隐藏' : '显示明文'}
               >
                 {revealKey ? '隐藏' : '显示'}
@@ -131,7 +134,7 @@ export function SettingsPage({ embedded = false }: SettingsPageProps) {
                       deepseek_api_key: data.deepseek_api_key,
                     }));
                   }}
-                  className="rounded-md border border-slate-300 px-2 text-xs text-slate-600 hover:bg-slate-50"
+                  className="rounded-md border border-slate-300 px-2 text-xs text-slate-600 hover:bg-ops-elevated"
                 >
                   取消
                 </button>
@@ -145,7 +148,7 @@ export function SettingsPage({ embedded = false }: SettingsPageProps) {
               <button
                 type="button"
                 onClick={() => setEditingKey(true)}
-                className="rounded-md border border-slate-300 px-3 text-xs text-slate-700 hover:bg-slate-50"
+                className="rounded-md border border-slate-300 px-3 text-xs text-slate-700 hover:bg-ops-elevated"
               >
                 编辑
               </button>
@@ -163,7 +166,7 @@ export function SettingsPage({ embedded = false }: SettingsPageProps) {
                 deepseek_base_url: event.target.value,
               }))
             }
-            className="h-9 w-full rounded-md border border-slate-300 px-3 text-sm outline-none focus:border-slate-500"
+            className="h-9 w-full rounded-md border border-slate-300 px-3 text-sm outline-none focus:border-ops-border-focus"
           />
         </Field>
 
@@ -177,7 +180,7 @@ export function SettingsPage({ embedded = false }: SettingsPageProps) {
                 deepseek_model: event.target.value,
               }))
             }
-            className="h-9 w-full rounded-md border border-slate-300 px-3 text-sm outline-none focus:border-slate-500"
+            className="h-9 w-full rounded-md border border-slate-300 px-3 text-sm outline-none focus:border-ops-border-focus"
           />
         </Field>
 
@@ -193,8 +196,24 @@ export function SettingsPage({ embedded = false }: SettingsPageProps) {
                 timeout_seconds: Number(event.target.value),
               }))
             }
-            className="h-9 w-32 rounded-md border border-slate-300 px-3 text-sm outline-none focus:border-slate-500"
+            className="h-9 w-32 rounded-md border border-slate-300 px-3 text-sm outline-none focus:border-ops-border-focus"
           />
+        </Field>
+
+        <Field label="AI 修改落盘策略">
+          <Select
+            className="w-64"
+            value={form.apply_mode}
+            onChange={(event) =>
+              setForm((prev) => ({
+                ...prev,
+                apply_mode: event.target.value === 'auto' ? 'auto' : 'confirm',
+              }))
+            }
+          >
+            <option value="confirm">先确认（生成草案，对话中点应用）</option>
+            <option value="auto">直接保存（保存前仍会自动快照）</option>
+          </Select>
         </Field>
 
         {message && (

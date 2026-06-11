@@ -8,9 +8,11 @@ import {
   type UseQueryResult,
 } from '@tanstack/react-query';
 import {
+  ApplyAIPendingDraft,
   CreateAISession,
   ClearAISessionActiveArtifact,
   DeleteAISession,
+  DiscardAIPendingDraft,
   GetAISession,
   GetAISettings,
   ListAISessions,
@@ -25,6 +27,7 @@ import type {
   AISession,
   AISettings,
 } from '@/types/ai';
+import type { WorkflowDef } from '@/types/workflow';
 
 // KEY 统一管理 AI 缓存键。
 const KEY = {
@@ -168,6 +171,39 @@ export function useStartAIAssistant(): UseMutationResult<
       qc.invalidateQueries({ queryKey: ['assembles'] });
       qc.invalidateQueries({ queryKey: KEY.sessions });
       qc.invalidateQueries({ queryKey: KEY.session(vars.session_id) });
+    },
+  });
+}
+
+// useApplyAIPendingDraft 应用会话中的待确认修改草案；成功后刷新工作流与会话。
+export function useApplyAIPendingDraft(): UseMutationResult<
+  WorkflowDef,
+  Error,
+  string
+> {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (sessionID) =>
+      ApplyAIPendingDraft(sessionID) as Promise<WorkflowDef>,
+    onSuccess: (wf, sessionID) => {
+      qc.setQueryData(['workflows', wf.id], wf);
+      qc.invalidateQueries({ queryKey: ['workflows'] });
+      qc.invalidateQueries({ queryKey: KEY.session(sessionID) });
+    },
+  });
+}
+
+// useDiscardAIPendingDraft 放弃会话中的待确认修改草案（幂等）。
+export function useDiscardAIPendingDraft(): UseMutationResult<
+  void,
+  Error,
+  string
+> {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (sessionID) => DiscardAIPendingDraft(sessionID),
+    onSuccess: (_data, sessionID) => {
+      qc.invalidateQueries({ queryKey: KEY.session(sessionID) });
     },
   });
 }

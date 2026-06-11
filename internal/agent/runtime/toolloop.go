@@ -30,11 +30,16 @@ const llmHeartbeatInterval = 2 * time.Second
 // 50 轮够覆盖"看清单 → 看进程 → 看日志 → 总结"这种典型链路，又能拦住模型卡死的循环调用。
 const defaultMaxToolRounds = 50
 
+// maxLoopContextChars 是工具循环 messages 的总字符预算。
+// 超出后从最旧的 tool 消息开始替换为占位符，避免大量工具输出撑爆模型上下文。
+const maxLoopContextChars = 24_000
+
 // runChatToolLoop 执行带工具的 chat 多轮调用，返回最终文本回复。
 // 在循环里通过 emitProgress 把工具调用过程以 🔧 前缀写入进度，让前端无需新事件类型即可展示。
+// session 传指针：propose 类工具会修改会话状态（active artifact / pending draft），回合末尾统一落盘。
 func (r *Runtime) runChatToolLoop(
 	req Request,
-	session core.AISession,
+	session *core.AISession,
 	messages []clients.ChatMessage,
 	progress *[]string,
 ) (string, error) {
@@ -43,7 +48,7 @@ func (r *Runtime) runChatToolLoop(
 		maxRounds = defaultMaxToolRounds
 	}
 	specs := buildToolSpecs(r.Tools)
-	toolCtx := buildToolContext(r, session)
+	toolCtx := buildToolContext(r, req, session)
 
 	for round := 0; round < maxRounds; round++ {
 		// 每轮调用前推一条心跳进度，避免长时间无反馈让用户以为卡住
@@ -119,8 +124,32 @@ func (r *Runtime) runChatToolLoop(
 			toolMsg := r.executeToolCall(req, session.ID, toolCtx, call, progress)
 			messages = append(messages, toolMsg)
 		}
+		// 上下文预算：超出后把最旧的工具输出替换为占位符
+		pruneToolMessages(messages, maxLoopContextChars)
 	}
 	return "", fmt.Errorf("Agent 工具循环超过 %d 轮仍未给出最终回复", maxRounds)
+}
+
+// prunedPlaceholder 是被裁剪的工具输出占位文本。
+const prunedPlaceholder = "(早期工具输出已省略以控制上下文长度)"
+
+// pruneToolMessages 在 messages 总字符数超预算时，从最旧的 tool 消息开始原地替换为占位符。
+// 不动 system / user / assistant 消息——它们承载任务定义与推理链。
+func pruneToolMessages(messages []clients.ChatMessage, budget int) {
+	total := 0
+	for _, m := range messages {
+		total += len(m.Content)
+	}
+	for i := range messages {
+		if total <= budget {
+			return
+		}
+		if messages[i].Role != "tool" || messages[i].Content == prunedPlaceholder {
+			continue
+		}
+		total -= len(messages[i].Content) - len(prunedPlaceholder)
+		messages[i].Content = prunedPlaceholder
+	}
 }
 
 // executeToolCall 执行单个工具调用并返回要追加到 messages 的 role="tool" 消息。
@@ -243,12 +272,16 @@ func summarizeArgs(args map[string]any) string {
 }
 
 // buildToolContext 组装工具执行上下文，合并 Registry 注入与 Runtime 回调。
-func buildToolContext(r *Runtime, session core.AISession) tools.ToolContext {
+// propose 闭包捕获本轮 req 与会话指针，是工具循环里仅有的写路径。
+func buildToolContext(r *Runtime, req Request, session *core.AISession) tools.ToolContext {
+	st := &proposalState{}
 	ctx := tools.ToolContext{
-		SessionID:         session.ID,
-		EnvironmentID:     session.EnvironmentID,
-		PreferredConfigID: session.ConfigID,
-		EnvLookup:         r.Environments,
+		SessionID:             session.ID,
+		EnvironmentID:         session.EnvironmentID,
+		PreferredConfigID:     session.ConfigID,
+		EnvLookup:             r.Environments,
+		ProposeWorkflow:       r.buildProposeWorkflow(req, session, st),
+		ProposeWorkflowUpdate: r.buildProposeWorkflowUpdate(req, session, st),
 	}
 	if r.Tools != nil {
 		deps := r.Tools.Deps()
@@ -257,6 +290,10 @@ func buildToolContext(r *Runtime, session core.AISession) tools.ToolContext {
 		ctx.AssembleGet = deps.AssembleGet
 		ctx.WorkflowList = deps.WorkflowList
 		ctx.AssembleList = deps.AssembleList
+		ctx.ExecutionGet = deps.ExecutionGet
+	}
+	if ctx.ExecutionGet == nil && r.Executions != nil {
+		ctx.ExecutionGet = r.Executions
 	}
 	if ctx.NodeCatalog == nil && r.Nodes != nil {
 		ctx.NodeCatalog = r.Nodes

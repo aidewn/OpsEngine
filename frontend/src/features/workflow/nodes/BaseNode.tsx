@@ -34,7 +34,7 @@ const toneClass: Record<
   },
   neutral: {
     border: 'border-slate-300',
-    selectedBorder: 'border-slate-600',
+    selectedBorder: 'border-ops-tertiary',
     headerBg: 'bg-slate-100',
     headerText: 'text-slate-800',
   },
@@ -66,11 +66,11 @@ export function BaseNode({
   // 执行中/失败状态覆盖默认边框
   const stateBorder =
     execState === 'Executing'
-      ? 'border-blue-500'
+      ? 'border-ops-info'
       : execState === 'Failed'
-        ? 'border-red-500'
+        ? 'border-ops-danger'
         : execState === 'Success'
-          ? 'border-green-500'
+          ? 'border-ops-success'
           : null;
   return (
     <div

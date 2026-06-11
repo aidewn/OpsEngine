@@ -84,7 +84,7 @@ export function CommandPalette() {
         onOpenChange={setOpen}
         label="命令面板"
         className="fixed left-1/2 top-24 z-[80] w-[min(720px,calc(100vw-32px))] -translate-x-1/2 overflow-hidden rounded-lg border border-ops-border-subtle bg-ops-elevated text-ops-primary shadow-2xl"
-        overlayClassName="fixed inset-0 z-[70] bg-black/50"
+        overlayClassName="fixed inset-0 z-[70] bg-ops-overlay"
       >
         <DialogTitle className="sr-only">命令面板</DialogTitle>
         <Command.Input

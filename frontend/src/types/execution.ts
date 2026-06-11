@@ -1,6 +1,6 @@
 // 执行记录相关类型，与后端 core.ExecutionRecord 对齐
 
-import type { WorkflowDef, NodeInstance, EdgeConfig } from './workflow';
+import type { WorkflowDef } from './workflow';
 import type { AssembleDef } from './assemble';
 
 // 工作流执行状态
@@ -69,15 +69,4 @@ export interface ExecutionSummary {
   started_at: string;
   finished_at?: string;
   error?: string;
-}
-
-// 便利：从节点快照提取 nodes / edges（执行详情页画布渲染用）
-export function snapshotGraph(snapshot: ExecutionSnapshot): {
-  nodes: NodeInstance[];
-  edges: EdgeConfig[];
-} {
-  return {
-    nodes: snapshot.workflow.nodes,
-    edges: snapshot.workflow.edges,
-  };
 }

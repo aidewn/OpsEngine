@@ -1,6 +1,7 @@
-// Intent Router：把用户消息解析成结构化意图，替代 ai.go 里基于关键词的二分判断。
-// 当前为规则版（P3 第一阶段），后续可扩展为"规则 + LLM 兜底"双层。
-// 设计原则：先识别用户的"否定意图"（不要生成工作流 / 只想问问），再识别强信号关键词。
+// Intent Router：只做"显式 operation 透传 + 少量高置信关键词"的轻路由（计划书 P5）。
+// 工作流的生成/修改不再靠关键词猜测——所有非高置信输入统一进带 propose 工具的
+// chat 循环，由模型在对话内自主决定是答疑还是提交草案。
+// 保留独立路由的只有两类：inspect_server（两阶段生成链路）与 analyze_architecture（拓扑采集链路）。
 
 package intent
 
@@ -20,6 +21,9 @@ const (
 	KindUpdateAssemble Kind = "update_assemble"
 	// KindUpdateWorkflow 用户要求修改当前或指定工作流。
 	KindUpdateWorkflow Kind = "update_workflow"
+	// KindFixExecution 根据一次失败执行的结构化记录修复工作流。
+	// 只由前端显式 operation 触发，不做关键词推断——误判会真实改写资产。
+	KindFixExecution Kind = "fix_execution"
 	// KindInspectServer 用户要求做服务器巡检：走两阶段生成（LLM 出 Plan，后端拼工作流）。
 	// 比 KindGenerateWorkflow 更具体、更稳定，所以路由时应优先命中。
 	KindInspectServer Kind = "inspect_server"
@@ -57,28 +61,10 @@ var troubleshootKeywords = []string{
 	"troubleshoot", "diagnose", "investigate", "high cpu", "out of memory", "disk full",
 }
 
-// workflowKeywords 是触发 generate_workflow 的强信号词。
-// 注意：扩展时优先添加"动作 + 对象"的组合，避免单字误命中（例如只写"流"会误判）。
-var workflowKeywords = []string{
-	"工作流", "流程",
-	"workflow", "pipeline",
-}
-
-// assembleKeywords 触发 create_assemble。集合是可复用资产，优先于工作流判定。
-var assembleKeywords = []string{
-	"集合", "可复用节点", "复用模块", "assemble", "module",
-}
-
-// updateKeywords 触发当前资产迭代，需结合 operation 或前端传入的上下文使用。
-var updateKeywords = []string{
-	"修改", "调整", "更新", "改成", "再加", "加一个", "删除", "移除",
-	"update", "modify", "change", "add", "remove",
-}
-
-// negativeKeywords 命中其一时强制回退到 chat，覆盖"解释一下"/"不要生成"等场景。
-// 注意：这些词只用来抑制"生成"类操作（workflow / inspection）；
-// "怎么排查 / 为什么挂"这类原本被当作否定的词已经迁移到 troubleshootKeywords，
-// 因为它们实际上是排障信号而非"不要做任何事"。
+// negativeKeywords 命中其一时强制回退到 chat。
+// 现在唯一的作用是抑制 inspection / architecture 的误命中
+// （如"解释一下这个巡检报告"不应触发真实巡检）；生成类关键词路由已整体移除，
+// 模型在 chat 工具循环内通过 propose_workflow 自主决定是否产资产。
 var negativeKeywords = []string{
 	"不要生成", "不用生成", "别生成", "不需要工作流",
 	"解释", "说明",
@@ -126,33 +112,6 @@ func Resolve(operation, message string) Result {
 			return Result{Kind: KindAnalyzeArchitecture, Reason: "命中架构关键词：" + kw}
 		}
 	}
-	for _, kw := range assembleKeywords {
-		if strings.Contains(text, kw) {
-			if containsAny(text, updateKeywords) {
-				return Result{Kind: KindUpdateAssemble, Reason: "命中集合修改关键词：" + kw}
-			}
-			return Result{Kind: KindCreateAssemble, Reason: "命中集合关键词：" + kw}
-		}
-	}
-	for _, kw := range workflowKeywords {
-		if strings.Contains(text, kw) {
-			if containsAny(text, updateKeywords) {
-				return Result{Kind: KindUpdateWorkflow, Reason: "命中工作流修改关键词：" + kw}
-			}
-			return Result{Kind: KindGenerateWorkflow, Reason: "命中工作流关键词：" + kw}
-		}
-	}
-	return Result{Kind: KindChat, Reason: "未命中关键词，按普通问答处理"}
-}
-
-// String 让 Kind 可直接拼接到日志/事件文本中。
-func (k Kind) String() string { return string(k) }
-
-func containsAny(text string, keywords []string) bool {
-	for _, kw := range keywords {
-		if strings.Contains(text, kw) {
-			return true
-		}
-	}
-	return false
+	// 其余全部进 chat 工具循环：模型可用 propose_workflow / propose_update_workflow 自主产资产。
+	return Result{Kind: KindChat, Reason: "未命中高置信关键词，进入工具循环对话"}
 }

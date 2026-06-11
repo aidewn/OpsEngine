@@ -118,7 +118,7 @@ function FrameRow({
           type="button"
           onClick={() => setExpanded((v) => !v)}
           className={cn(
-            'flex h-4 w-4 shrink-0 items-center justify-center text-slate-400 hover:text-slate-600',
+            'flex h-4 w-4 shrink-0 items-center justify-center text-slate-400 hover:text-ops-primary',
             !hasContent && 'invisible',
           )}
           aria-label={expanded ? '折叠' : '展开'}
@@ -135,7 +135,7 @@ function FrameRow({
             'flex min-w-0 flex-1 items-center gap-1.5 truncate rounded px-1 py-0.5 text-left',
             isActive
               ? 'font-medium text-slate-900'
-              : 'text-slate-700 hover:bg-slate-100',
+              : 'text-slate-700 hover:bg-ops-elevated',
           )}
           title={node.label}
         >
@@ -218,7 +218,7 @@ function NodeEntryRow({
           'flex min-w-0 flex-1 items-center gap-1.5 truncate rounded px-1 py-0.5 text-left',
           isSelected
             ? 'font-medium text-slate-900'
-            : 'text-slate-600 hover:bg-slate-100',
+            : 'text-slate-600 hover:bg-ops-elevated',
         )}
         title={`${entry.label} (${entry.state})`}
       >

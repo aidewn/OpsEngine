@@ -14,7 +14,6 @@ import {
   ListExecutions,
   ListExecutionsByWorkflow,
   GetExecution,
-  DeleteExecution,
 } from '@wails/go/main/App';
 import type { ExecutionRecord, ExecutionSummary } from '@/types/execution';
 
@@ -87,13 +86,3 @@ export function useStopExecution(): UseMutationResult<void, Error, string> {
   });
 }
 
-// useDeleteExecution 从内存移除执行记录
-export function useDeleteExecution(): UseMutationResult<void, Error, string> {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (executionID) => DeleteExecution(executionID),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: KEY.list });
-    },
-  });
-}
