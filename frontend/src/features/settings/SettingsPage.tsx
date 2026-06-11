@@ -2,6 +2,7 @@
 
 import { FormEvent, type ReactNode, useEffect, useState } from 'react';
 import { Button } from '@/components/ui/Button';
+import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import {
   useAISettings,
@@ -102,7 +103,7 @@ export function SettingsPage({ embedded = false }: SettingsPageProps) {
         <Field label="DeepSeek API Key">
           {editingKey ? (
             <div className="flex items-stretch gap-2">
-              <input
+              <Input
                 type={revealKey ? 'text' : 'password'}
                 value={form.deepseek_api_key}
                 onChange={(event) =>
@@ -112,7 +113,7 @@ export function SettingsPage({ embedded = false }: SettingsPageProps) {
                   }))
                 }
                 placeholder="sk-..."
-                className="h-9 w-full rounded-md border border-slate-300 px-3 text-sm outline-none focus:border-ops-border-focus font-mono"
+                className="font-mono"
                 autoFocus
               />
               <button
@@ -142,7 +143,7 @@ export function SettingsPage({ embedded = false }: SettingsPageProps) {
             </div>
           ) : (
             <div className="flex items-center gap-2">
-              <code className="h-9 flex-1 rounded-md border border-slate-200 bg-slate-50 px-3 text-sm leading-9 text-slate-700 font-mono">
+              <code className="h-9 flex-1 rounded-md border border-ops-border-subtle bg-ops-input px-3 text-sm leading-9 text-slate-600 font-mono">
                 {maskApiKey(form.deepseek_api_key)}
               </code>
               <button
@@ -157,7 +158,7 @@ export function SettingsPage({ embedded = false }: SettingsPageProps) {
         </Field>
 
         <Field label="Base URL">
-          <input
+          <Input
             type="text"
             value={form.deepseek_base_url}
             onChange={(event) =>
@@ -166,12 +167,11 @@ export function SettingsPage({ embedded = false }: SettingsPageProps) {
                 deepseek_base_url: event.target.value,
               }))
             }
-            className="h-9 w-full rounded-md border border-slate-300 px-3 text-sm outline-none focus:border-ops-border-focus"
           />
         </Field>
 
         <Field label="模型">
-          <input
+          <Input
             type="text"
             value={form.deepseek_model}
             onChange={(event) =>
@@ -180,12 +180,11 @@ export function SettingsPage({ embedded = false }: SettingsPageProps) {
                 deepseek_model: event.target.value,
               }))
             }
-            className="h-9 w-full rounded-md border border-slate-300 px-3 text-sm outline-none focus:border-ops-border-focus"
           />
         </Field>
 
         <Field label="超时时间（秒）">
-          <input
+          <Input
             type="number"
             min={1}
             max={300}
@@ -196,7 +195,7 @@ export function SettingsPage({ embedded = false }: SettingsPageProps) {
                 timeout_seconds: Number(event.target.value),
               }))
             }
-            className="h-9 w-32 rounded-md border border-slate-300 px-3 text-sm outline-none focus:border-ops-border-focus"
+            className="w-32"
           />
         </Field>
 
