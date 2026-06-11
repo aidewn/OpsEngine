@@ -4,6 +4,7 @@ package runtime
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -18,6 +19,7 @@ type scriptedToolLLM struct {
 	script      []clients.ChatCompletion
 	idx         int
 	gotMessages [][]clients.ChatMessage
+	gotTools    [][]clients.ToolSpec
 }
 
 func (s *scriptedToolLLM) Chat(_ []clients.ChatMessage) (string, error) {
@@ -28,23 +30,26 @@ func (s *scriptedToolLLM) ChatStream(_ []clients.ChatMessage, _ func(string)) (s
 	return "", errors.New("scriptedToolLLM 只支持工具循环")
 }
 
-func (s *scriptedToolLLM) ChatWithTools(messages []clients.ChatMessage, _ []clients.ToolSpec) (clients.ChatCompletion, error) {
-	return s.next(messages)
+func (s *scriptedToolLLM) ChatWithTools(messages []clients.ChatMessage, specs []clients.ToolSpec) (clients.ChatCompletion, error) {
+	return s.next(messages, specs)
 }
 
-func (s *scriptedToolLLM) ChatWithToolsStream(messages []clients.ChatMessage, _ []clients.ToolSpec, onContent func(string)) (clients.ChatCompletion, error) {
-	c, err := s.next(messages)
+func (s *scriptedToolLLM) ChatWithToolsStream(messages []clients.ChatMessage, specs []clients.ToolSpec, onContent func(string)) (clients.ChatCompletion, error) {
+	c, err := s.next(messages, specs)
 	if err == nil && c.Content != "" && onContent != nil {
 		onContent(c.Content)
 	}
 	return c, err
 }
 
-func (s *scriptedToolLLM) next(messages []clients.ChatMessage) (clients.ChatCompletion, error) {
+func (s *scriptedToolLLM) next(messages []clients.ChatMessage, specs []clients.ToolSpec) (clients.ChatCompletion, error) {
 	// 拷贝 messages 供断言（循环内会原地裁剪）
 	snapshot := make([]clients.ChatMessage, len(messages))
 	copy(snapshot, messages)
 	s.gotMessages = append(s.gotMessages, snapshot)
+	toolSnapshot := make([]clients.ToolSpec, len(specs))
+	copy(toolSnapshot, specs)
+	s.gotTools = append(s.gotTools, toolSnapshot)
 	if s.idx >= len(s.script) {
 		return clients.ChatCompletion{}, errors.New("脚本耗尽")
 	}
@@ -138,6 +143,101 @@ func TestGenerateWorkflowViaToolLoop(t *testing.T) {
 	if last.Intent != "generate_workflow" || !strings.Contains(last.Content, "重启服务") {
 		t.Fatalf("assistant 消息异常: %#v", last)
 	}
+	if last.WorkflowID != wf.saved.ID || last.WorkflowName != wf.saved.Name || last.ActionType != "create" || last.NodeCount != len(wf.saved.Nodes) {
+		t.Fatalf("assistant 消息应持久化工作流卡片元数据: %#v", last)
+	}
+}
+
+// TestGenerateWorkflowUsesSmallToolSet 验证简单工作流生成只暴露核心编排工具。
+func TestGenerateWorkflowUsesSmallToolSet(t *testing.T) {
+	llm := &scriptedToolLLM{script: []clients.ChatCompletion{
+		{ToolCalls: []clients.ToolCall{proposeCall("propose_workflow", map[string]any{"draft_json": validDraftJSON})}},
+		{Content: "已创建。"},
+	}}
+	wf := &memWorkflows{}
+	rt, _, _ := newToolLoopRuntime(t, llm, wf)
+
+	if err := rt.Run(Request{
+		RequestID: "req-1", SessionID: "sess-1",
+		Operation: "generate_workflow", Message: "生成一个 Docker Compose 部署 Nginx 的工作流",
+	}); err != nil {
+		t.Fatalf("Run error: %v", err)
+	}
+
+	names := toolNames(llm.gotTools[0])
+	want := map[string]bool{
+		"node_catalog": true, "env_inventory": true,
+		"propose_workflow": true, "propose_update_workflow": true,
+	}
+	if len(names) != len(want) {
+		t.Fatalf("简单生成只应暴露核心工具，got=%v", names)
+	}
+	for name := range want {
+		if !names[name] {
+			t.Fatalf("缺少核心工具 %s，got=%v", name, names)
+		}
+	}
+	if names["docker_list_containers"] || names["k8s_list_pods"] || names["jenkins_list_jobs"] {
+		t.Fatalf("简单生成不应暴露环境探测工具，got=%v", names)
+	}
+}
+
+// TestGenerateWorkflowOpensProbeToolsWhenFactsRequested 验证明确基于现状生成时开放只读探测工具。
+func TestGenerateWorkflowOpensProbeToolsWhenFactsRequested(t *testing.T) {
+	llm := &scriptedToolLLM{script: []clients.ChatCompletion{
+		{ToolCalls: []clients.ToolCall{proposeCall("propose_workflow", map[string]any{"draft_json": validDraftJSON})}},
+		{Content: "已创建。"},
+	}}
+	wf := &memWorkflows{}
+	rt, _, _ := newToolLoopRuntime(t, llm, wf)
+
+	if err := rt.Run(Request{
+		RequestID: "req-1", SessionID: "sess-1",
+		Operation: "generate_workflow", Message: "基于当前容器现状生成一个 Docker 运维工作流",
+	}); err != nil {
+		t.Fatalf("Run error: %v", err)
+	}
+
+	names := toolNames(llm.gotTools[0])
+	for _, name := range []string{"docker_list_containers", "ssh_inspect", "run_probe"} {
+		if !names[name] {
+			t.Fatalf("明确要求现状时应开放 %s，got=%v", name, names)
+		}
+	}
+}
+
+// TestGenerateWorkflowMaxRounds 验证生成场景的工具循环轮数上限（workflowMaxToolRounds）。
+func TestGenerateWorkflowMaxRounds(t *testing.T) {
+	llm := &scriptedToolLLM{script: []clients.ChatCompletion{}}
+	for i := 0; i < workflowMaxToolRounds+1; i++ {
+		llm.script = append(llm.script, clients.ChatCompletion{
+			ToolCalls: []clients.ToolCall{proposeCall("env_inventory", map[string]any{})},
+		})
+	}
+	wf := &memWorkflows{}
+	rt, _, emit := newToolLoopRuntime(t, llm, wf)
+	rt.Environments = func(string) (core.EnvironmentDef, error) {
+		return core.EnvironmentDef{ID: "env-1"}, nil
+	}
+
+	if err := rt.Run(Request{
+		RequestID: "req-1", SessionID: "sess-1",
+		Operation: "generate_workflow", Message: "生成工作流",
+	}); err != nil {
+		t.Fatalf("Run error: %v", err)
+	}
+	if llm.idx != workflowMaxToolRounds {
+		t.Fatalf("生成场景应在 %d 轮后停止，got=%d", workflowMaxToolRounds, llm.idx)
+	}
+	var sawError bool
+	for _, e := range emit.events {
+		if e.Type == EventError && strings.Contains(e.Text, fmt.Sprintf("超过 %d 轮", workflowMaxToolRounds)) {
+			sawError = true
+		}
+	}
+	if !sawError {
+		t.Fatalf("超过生成轮数上限应返回明确错误: %#v", emit.events)
+	}
 }
 
 // TestProposeValidationFeedback 验证校验失败的错误经 tool 消息反馈，模型修正后成功。
@@ -178,12 +278,22 @@ func TestProposeValidationFeedback(t *testing.T) {
 	}
 }
 
+func toolNames(specs []clients.ToolSpec) map[string]bool {
+	out := map[string]bool{}
+	for _, spec := range specs {
+		out[spec.Function.Name] = true
+	}
+	return out
+}
+
 // TestProposeUpdateConfirmMode 验证更新意图在确认模式下经工具循环进入待确认草案。
 func TestProposeUpdateConfirmMode(t *testing.T) {
 	existing := core.WorkflowDef{ID: "wf-1", Name: "部署", Nodes: []core.NodeInstance{
 		{InstanceID: "keep-1", TypeID: "system_ready", Config: map[string]any{}},
+		{InstanceID: "update-1", TypeID: "system_update", Config: map[string]any{"delta_type": "interval", "delta_seconds": 60}},
+		{InstanceID: "over-1", TypeID: "system_over", Config: map[string]any{}},
 	}}
-	updateDraft := `{"name":"部署","nodes":[{"id":"keep-1","type_id":"system_ready","config":{},"position":{"x":0,"y":0}},{"id":"n2","type_id":"print","config":{"message":"done"},"position":{"x":0,"y":0}}],"edges":[]}`
+	updateDraft := `{"name":"部署","nodes":[{"id":"keep-1","type_id":"system_ready","config":{},"position":{"x":0,"y":0}},{"id":"n2","type_id":"print","config":{"message":"done"},"position":{"x":0,"y":0}}],"edges":[{"from":{"node":"keep-1","port":"exec_out"},"to":{"node":"n2","port":"exec_in"}}]}`
 	llm := &scriptedToolLLM{script: []clients.ChatCompletion{
 		{ToolCalls: []clients.ToolCall{proposeCall("propose_update_workflow", map[string]any{
 			"workflow_id": "wf-1", "draft_json": updateDraft,
@@ -201,7 +311,7 @@ func TestProposeUpdateConfirmMode(t *testing.T) {
 		t.Fatalf("Run error: %v", err)
 	}
 	// 不落盘，草案在会话上，节点身份保留
-	if len(wf.saved.Nodes) != 1 {
+	if len(wf.saved.Nodes) != 3 {
 		t.Fatalf("确认模式不应直接落盘: %#v", wf.saved)
 	}
 	pending := sessions.data["sess-1"].PendingDraft
@@ -225,7 +335,7 @@ func TestProposeUpdateConfirmMode(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Apply error: %v", err)
 	}
-	if len(applied.Nodes) != 2 || applied.Nodes[0].InstanceID != "keep-1" {
+	if len(applied.Nodes) != 4 || applied.Nodes[0].InstanceID != "keep-1" {
 		t.Fatalf("应用结果异常: %#v", applied.Nodes)
 	}
 }

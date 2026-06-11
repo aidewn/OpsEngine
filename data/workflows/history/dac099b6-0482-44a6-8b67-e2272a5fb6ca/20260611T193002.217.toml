@@ -1,0 +1,119 @@
+id = "dac099b6-0482-44a6-8b67-e2272a5fb6ca"
+name = "Docker Compose 部署 Nginx"
+description = "在目标服务器上通过 Docker Compose 部署 Nginx（端口 8080，避免与现网 80 冲突）"
+variables = []
+
+[[nodes]]
+  id = "37287a44-4949-40f6-8561-0173b091759a"
+  type = "env_connect_ssh"
+  [nodes.config]
+    config_id = "cc951b78-46bc-4777-ac8f-41b7f560bec9"
+    environment_id = "1638a7ba-e778-4267-b296-1afba582fea6"
+  [nodes.position]
+    x = 100.0
+    y = 150.0
+
+[[nodes]]
+  id = "e6edde81-8e90-4206-be61-98f714cf02dd"
+  type = "linux_exec_command"
+  [nodes.config]
+    command = "mkdir -p /root/nginx"
+    fail_on_error = true
+    timeout_seconds = 30.0
+  [nodes.position]
+    x = 300.0
+    y = 150.0
+
+[[nodes]]
+  id = "3133ee9d-a3af-4c55-9520-75f916993b18"
+  type = "linux_open_file"
+  [nodes.config]
+    create_if_missing = true
+    path = "/root/nginx/docker-compose.yml"
+  [nodes.position]
+    x = 500.0
+    y = 150.0
+
+[[nodes]]
+  id = "b5fc3608-ecd5-41fb-80d7-4cfd9a237772"
+  type = "linux_file_write"
+  [nodes.config]
+    content = "version: \"3.8\"\nservices:\n  nginx:\n    image: nginx:alpine\n    container_name: nginx\n    ports:\n      - \"8080:80\"\n    restart: unless-stopped\n"
+  [nodes.position]
+    x = 700.0
+    y = 150.0
+
+[[nodes]]
+  id = "51d64c7b-2503-4f4a-b3bd-2dff70395851"
+  type = "linux_exec_command"
+  [nodes.config]
+    command = "cd /root/nginx && docker compose up -d"
+    fail_on_error = true
+    timeout_seconds = 120.0
+  [nodes.position]
+    x = 900.0
+    y = 150.0
+
+[[edges]]
+  [edges.from]
+    node = "37287a44-4949-40f6-8561-0173b091759a"
+    port = "exec_out"
+  [edges.to]
+    node = "e6edde81-8e90-4206-be61-98f714cf02dd"
+    port = "exec_in"
+
+[[edges]]
+  [edges.from]
+    node = "37287a44-4949-40f6-8561-0173b091759a"
+    port = "client"
+  [edges.to]
+    node = "e6edde81-8e90-4206-be61-98f714cf02dd"
+    port = "client"
+
+[[edges]]
+  [edges.from]
+    node = "e6edde81-8e90-4206-be61-98f714cf02dd"
+    port = "exec_out"
+  [edges.to]
+    node = "3133ee9d-a3af-4c55-9520-75f916993b18"
+    port = "exec_in"
+
+[[edges]]
+  [edges.from]
+    node = "37287a44-4949-40f6-8561-0173b091759a"
+    port = "client"
+  [edges.to]
+    node = "3133ee9d-a3af-4c55-9520-75f916993b18"
+    port = "client"
+
+[[edges]]
+  [edges.from]
+    node = "3133ee9d-a3af-4c55-9520-75f916993b18"
+    port = "exec_out"
+  [edges.to]
+    node = "b5fc3608-ecd5-41fb-80d7-4cfd9a237772"
+    port = "exec_in"
+
+[[edges]]
+  [edges.from]
+    node = "3133ee9d-a3af-4c55-9520-75f916993b18"
+    port = "handle"
+  [edges.to]
+    node = "b5fc3608-ecd5-41fb-80d7-4cfd9a237772"
+    port = "handle"
+
+[[edges]]
+  [edges.from]
+    node = "b5fc3608-ecd5-41fb-80d7-4cfd9a237772"
+    port = "exec_out"
+  [edges.to]
+    node = "51d64c7b-2503-4f4a-b3bd-2dff70395851"
+    port = "exec_in"
+
+[[edges]]
+  [edges.from]
+    node = "37287a44-4949-40f6-8561-0173b091759a"
+    port = "client"
+  [edges.to]
+    node = "51d64c7b-2503-4f4a-b3bd-2dff70395851"
+    port = "client"

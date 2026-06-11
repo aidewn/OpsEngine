@@ -9,6 +9,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"strings"
 	"time"
 
@@ -17,6 +18,7 @@ import (
 	"OpsEngine/internal/core"
 	"OpsEngine/internal/probe"
 
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -202,14 +204,14 @@ func (K8sDescribePod) Execute(ctx tools.ToolContext, args map[string]any) (tools
 		Message      string `json:"message,omitempty"`
 	}
 	type podSummary struct {
-		Name             string            `json:"name"`
-		Namespace        string            `json:"namespace"`
-		Node             string            `json:"node"`
-		Phase            string            `json:"phase"`
-		PodIP            string            `json:"pod_ip"`
-		StartTime        string            `json:"start_time,omitempty"`
-		Conditions       map[string]string `json:"conditions"`
-		ContainerStatus  []containerStatus `json:"container_status"`
+		Name            string            `json:"name"`
+		Namespace       string            `json:"namespace"`
+		Node            string            `json:"node"`
+		Phase           string            `json:"phase"`
+		PodIP           string            `json:"pod_ip"`
+		StartTime       string            `json:"start_time,omitempty"`
+		Conditions      map[string]string `json:"conditions"`
+		ContainerStatus []containerStatus `json:"container_status"`
 	}
 	conditions := map[string]string{}
 	for _, c := range pod.Status.Conditions {
@@ -247,5 +249,76 @@ func (K8sDescribePod) Execute(ctx tools.ToolContext, args map[string]any) (tools
 	return tools.Result{
 		Output:         tools.TruncateOutput(string(data)),
 		DisplaySummary: fmt.Sprintf("k8s_describe_pod %s/%s", ns, name),
+	}, nil
+}
+
+// ── k8s_pod_logs ───────────────────────────────────────────────
+
+// K8sPodLogs 读取指定 Pod 容器的日志尾部，排障刚需。
+type K8sPodLogs struct{}
+
+func (K8sPodLogs) Spec() tools.Spec {
+	return tools.Spec{
+		Name: "k8s_pod_logs",
+		Description: "读取指定 Pod 的日志尾部（默认 100 行）。多容器 Pod 需传 container；" +
+			"previous=true 读取上一次崩溃前的日志（排查 CrashLoopBackOff 必备）。",
+		Tier: tools.TierRead,
+		Params: map[string]tools.ParamSpec{
+			"name":      {Type: "string", Description: "Pod 名字。", Required: true},
+			"namespace": {Type: "string", Description: "namespace（留空使用配置默认值）。"},
+			"container": {Type: "string", Description: "容器名（单容器 Pod 可省略）。"},
+			"tail":      {Type: "integer", Description: "日志尾部行数，默认 100，上限 500。", Default: 100},
+			"previous":  {Type: "boolean", Description: "读取上一次重启前的日志，默认 false。", Default: false},
+		},
+	}
+}
+
+func (K8sPodLogs) Execute(ctx tools.ToolContext, args map[string]any) (tools.Result, error) {
+	name, err := argString(args, "name")
+	if err != nil {
+		return tools.Result{}, err
+	}
+	cfg, _, err := pickEnvConfig(ctx, core.EnvConfigKindK8s)
+	if err != nil {
+		return tools.Result{}, err
+	}
+	k8sClient, err := dialK8sForTool(cfg)
+	if err != nil {
+		return tools.Result{}, err
+	}
+	apiCtx, cancel := context.WithTimeout(context.Background(), k8sToolTimeout)
+	defer cancel()
+
+	ns := argStringOptional(args, "namespace")
+	if ns == "" {
+		ns = k8sClient.Namespace
+	}
+	tail := int64(argInt(args, "tail", 100))
+	if tail < 1 {
+		tail = 100
+	}
+	if tail > 500 {
+		tail = 500
+	}
+	opts := &corev1.PodLogOptions{TailLines: &tail}
+	if c := strings.TrimSpace(argStringOptional(args, "container")); c != "" {
+		opts.Container = c
+	}
+	if prev, ok := args["previous"].(bool); ok {
+		opts.Previous = prev
+	}
+	stream, err := k8sClient.Clientset().CoreV1().Pods(ns).GetLogs(strings.TrimSpace(name), opts).Stream(apiCtx)
+	if err != nil {
+		return tools.Result{}, fmt.Errorf("读取 Pod 日志失败: %w", err)
+	}
+	defer stream.Close()
+	raw, err := io.ReadAll(io.LimitReader(stream, 64*1024)) // 双保险：行数 + 字节数都有上限
+	if err != nil {
+		return tools.Result{}, fmt.Errorf("读取日志流失败: %w", err)
+	}
+	header := fmt.Sprintf("Pod %s/%s 日志（尾部 %d 行）:\n", ns, name, tail)
+	return tools.Result{
+		Output:         tools.TruncateOutput(header + string(raw)),
+		DisplaySummary: fmt.Sprintf("k8s_pod_logs %s", name),
 	}, nil
 }

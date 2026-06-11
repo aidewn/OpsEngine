@@ -81,7 +81,8 @@ const QUICK_PROMPTS = [
   '排查 Docker 容器启动失败的问题',
 ];
 
-// PendingTurn 是当前正在进行中的一轮对话的临时本地状态，done/error 后归零。
+// PendingTurn 是当前正在进行中的一轮对话的临时本地状态。
+// 生成资产成功后会短暂保留，直到持久化消息接管操作卡片。
 interface PendingTurn {
   sessionID: string;
   requestID: string;
@@ -104,6 +105,7 @@ interface PendingTurn {
   targetText?: string;
   selectingTargetID?: string;
   errorText?: string;
+  completed?: boolean;
 }
 
 interface EditingArtifact {
@@ -163,6 +165,7 @@ export function AIAssistantPanel({
   const startAssistant = useStartAIAssistant();
   const setActiveArtifact = useSetAISessionActiveArtifact();
   const clearActiveArtifact = useClearAISessionActiveArtifact();
+  const { openTab } = useTabs();
 
   const [internalSelectedID, setInternalSelectedID] = useState<string | null>(null);
   const selectedID = selectedSessionID !== undefined ? selectedSessionID : internalSelectedID;
@@ -191,6 +194,7 @@ export function AIAssistantPanel({
         if (!prev) return prev;
         if (prev.errorText) return prev;
         if (prev.targetOptions?.length) return prev;
+        if (hasPendingArtifact(prev)) return { ...prev, completed: true, assistantHeartbeat: undefined };
         return null;
       });
       void queryClient.invalidateQueries({ queryKey: ['ai', 'session', sessionID] });
@@ -198,7 +202,7 @@ export function AIAssistantPanel({
     [queryClient],
   );
 
-  const busy = pending !== null && !pending.errorText;
+  const busy = pending !== null && !pending.errorText && !pending.completed;
   const waitingForTarget =
     !!pending?.targetOptions?.length && !pending.errorText && !pending.selectingTargetID;
 
@@ -280,6 +284,14 @@ export function AIAssistantPanel({
     if (!stickToBottom) return;
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [session?.messages, pending?.assistantContent, pending?.assistantProgress, pending?.assistantHeartbeat, stickToBottom]);
+
+  // 生成成功后 pending 卡片先保留；等会话消息刷新回来，再交给持久化消息展示。
+  useEffect(() => {
+    if (!pending?.completed || !hasPendingArtifact(pending) || !session?.messages) return;
+    if (sessionHasPendingArtifact(session.messages, pending)) {
+      setPending(null);
+    }
+  }, [pending, session?.messages]);
 
   function handleScrollMessages() {
     const el = scrollContainerRef.current;
@@ -389,7 +401,11 @@ export function AIAssistantPanel({
             : prev,
         );
       } else if (event.type === 'done') {
-        setPending(null);
+        setPending((prev) =>
+          prev && hasPendingArtifact(prev)
+            ? { ...prev, completed: true, assistantHeartbeat: undefined }
+            : null,
+        );
         if (current.sessionID) {
           void queryClient.invalidateQueries({
             queryKey: ['ai', 'session', current.sessionID],
@@ -546,11 +562,21 @@ export function AIAssistantPanel({
   }
 
   function handleOpenWorkflow(workflowID: string) {
+    openTab({
+      kind: 'workflow',
+      id: workflowID,
+      name: findWorkflowName(session?.messages, pending, workflowID),
+    });
     onNavigateAway?.();
     navigate(`/workflows/${workflowID}`);
   }
 
   function handleOpenAssemble(assembleID: string) {
+    openTab({
+      kind: 'assemble',
+      id: assembleID,
+      name: findAssembleName(session?.messages, pending, assembleID),
+    });
     onNavigateAway?.();
     navigate(`/assembles/${assembleID}`);
   }
@@ -1055,7 +1081,7 @@ function MessageList({
               isError: !!pending.errorText,
               created_at: new Date().toISOString(),
             }}
-            streaming={!pending.errorText && !pending.assistantContent}
+            streaming={!pending.errorText && !pending.completed && !pending.assistantContent}
             onOpenWorkflow={onOpenWorkflow}
             onOpenAssemble={onOpenAssemble}
             onContinueArtifact={onContinueArtifact}
@@ -1383,6 +1409,43 @@ function artifactCardDescription(
   if (changeSummary) parts.push(changeSummary);
   if (parts.length > 0) return parts.join(' · ');
   return fallback;
+}
+
+// hasPendingArtifact 判断 pending 中是否已有可操作产物，需要在 done 后保留卡片。
+function hasPendingArtifact(pending: PendingTurn) {
+  return !!(pending.workflowID || pending.assembleID || pending.docID);
+}
+
+// sessionHasPendingArtifact 判断持久化消息是否已经接管同一个产物卡片。
+function sessionHasPendingArtifact(messages: AISessionMessage[], pending: PendingTurn) {
+  return messages.some((message) => {
+    if (pending.workflowID && message.workflow_id === pending.workflowID) return true;
+    if (pending.assembleID && message.assemble_id === pending.assembleID) return true;
+    if (pending.docID && message.doc_id === pending.docID) return true;
+    return false;
+  });
+}
+
+// findWorkflowName 为打开 tab 提供稳定标题；找不到时回退到 ID。
+function findWorkflowName(
+  messages: AISessionMessage[] | undefined,
+  pending: PendingTurn | null,
+  workflowID: string,
+) {
+  if (pending?.workflowID === workflowID && pending.workflowName) return pending.workflowName;
+  const message = messages?.find((item) => item.workflow_id === workflowID && item.workflow_name);
+  return message?.workflow_name || workflowID;
+}
+
+// findAssembleName 为打开 tab 提供稳定标题；找不到时回退到 ID。
+function findAssembleName(
+  messages: AISessionMessage[] | undefined,
+  pending: PendingTurn | null,
+  assembleID: string,
+) {
+  if (pending?.assembleID === assembleID && pending.assembleName) return pending.assembleName;
+  const message = messages?.find((item) => item.assemble_id === assembleID && item.assemble_name);
+  return message?.assemble_name || assembleID;
 }
 
 // PendingDraftCard 展示待确认的 AI 修改草案：diff 摘要 + 应用/放弃。

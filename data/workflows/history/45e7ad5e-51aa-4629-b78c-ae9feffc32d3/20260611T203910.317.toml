@@ -1,0 +1,140 @@
+id = "45e7ad5e-51aa-4629-b78c-ae9feffc32d3"
+name = "部署 Nginx"
+description = "配置国内镜像源后拉取 nginx 镜像并启动容器，映射 80 端口"
+variables = []
+
+[[nodes]]
+  id = "aac4673c-8680-4791-a518-4619b26a1025"
+  type = "system_ready"
+  [nodes.config]
+  [nodes.position]
+    x = 100.0
+    y = 200.0
+
+[[nodes]]
+  id = "63512c17-1cbd-4c53-8100-4cde4911c4be"
+  type = "env_connect_ssh"
+  [nodes.config]
+    config_id = "cc951b78-46bc-4777-ac8f-41b7f560bec9"
+    environment_id = "1638a7ba-e778-4267-b296-1afba582fea6"
+  [nodes.position]
+    x = 300.0
+    y = 200.0
+
+[[nodes]]
+  id = "0af72e2d-467e-4db1-97ec-e26539c67732"
+  type = "linux_exec_script"
+  [nodes.config]
+    default_script = "mkdir -p /etc/docker\ncat > /etc/docker/daemon.json << 'EOF'\n{\n  \"registry-mirrors\": [\n    \"https://docker.m.daocloud.io\",\n    \"https://dockerpull.com\",\n    \"https://hub-mirror.c.163.com\",\n    \"https://mirror.ccs.tencentyun.com\"\n  ]\n}\nEOF\nsystemctl reload docker 2>/dev/null || service docker restart 2>/dev/null || true\necho \"镜像源已配置（DaoCloud / dockerpull / 网易 / 腾讯云）\""
+    fail_on_error = false
+    interpreter = "bash"
+    timeout_seconds = 30.0
+  [nodes.position]
+    x = 500.0
+    y = 200.0
+
+[[nodes]]
+  id = "fd6bf890-2b83-4083-a8b6-826c404bb4e5"
+  type = "linux_exec_script"
+  [nodes.config]
+    default_script = "# 第 1 层：走 daemon.json 里配的 registry-mirrors\ndocker pull nginx:latest && exit 0\n\n# 第 2 层：逐个从国内代理直拉，成功后 tag 回 nginx:latest\nfor repo in docker.m.daocloud.io dockerpull.com docker.1ms.run; do\n  echo \"尝试 $repo ...\"\n  if docker pull \"$repo/library/nginx:latest\"; then\n    docker tag \"$repo/library/nginx:latest\" nginx:latest\n    exit 0\n  fi\ndone\n\necho \"所有镜像源均失败\"\nexit 1"
+    fail_on_error = true
+    interpreter = "bash"
+    timeout_seconds = 300.0
+  [nodes.position]
+    x = 700.0
+    y = 200.0
+
+[[nodes]]
+  id = "87899d55-c04d-4f16-a8c5-96c94b9ac21c"
+  type = "linux_exec_script"
+  [nodes.config]
+    default_script = "docker run -d --name nginx --restart unless-stopped -p 80:80 nginx:latest"
+    fail_on_error = true
+    interpreter = "bash"
+    timeout_seconds = 60.0
+  [nodes.position]
+    x = 900.0
+    y = 200.0
+
+[[nodes]]
+  id = "edf04d02-279d-4f07-af34-cec56e40d154"
+  type = "system_over"
+  [nodes.config]
+  [nodes.position]
+    x = 130.0
+    y = 430.0
+
+[[nodes]]
+  id = "6432b5c7-2a19-40b4-b922-33647fafc7e0"
+  type = "system_update"
+  [nodes.config]
+    delta_seconds = 60.0
+    delta_type = "interval"
+  [nodes.position]
+    x = 80.0
+    y = 280.0
+
+[[edges]]
+  [edges.from]
+    node = "aac4673c-8680-4791-a518-4619b26a1025"
+    port = "exec_out"
+  [edges.to]
+    node = "63512c17-1cbd-4c53-8100-4cde4911c4be"
+    port = "exec_in"
+
+[[edges]]
+  [edges.from]
+    node = "63512c17-1cbd-4c53-8100-4cde4911c4be"
+    port = "exec_out"
+  [edges.to]
+    node = "0af72e2d-467e-4db1-97ec-e26539c67732"
+    port = "exec_in"
+
+[[edges]]
+  [edges.from]
+    node = "63512c17-1cbd-4c53-8100-4cde4911c4be"
+    port = "client"
+  [edges.to]
+    node = "0af72e2d-467e-4db1-97ec-e26539c67732"
+    port = "client"
+
+[[edges]]
+  [edges.from]
+    node = "0af72e2d-467e-4db1-97ec-e26539c67732"
+    port = "exec_out"
+  [edges.to]
+    node = "fd6bf890-2b83-4083-a8b6-826c404bb4e5"
+    port = "exec_in"
+
+[[edges]]
+  [edges.from]
+    node = "63512c17-1cbd-4c53-8100-4cde4911c4be"
+    port = "client"
+  [edges.to]
+    node = "fd6bf890-2b83-4083-a8b6-826c404bb4e5"
+    port = "client"
+
+[[edges]]
+  [edges.from]
+    node = "fd6bf890-2b83-4083-a8b6-826c404bb4e5"
+    port = "exec_out"
+  [edges.to]
+    node = "87899d55-c04d-4f16-a8c5-96c94b9ac21c"
+    port = "exec_in"
+
+[[edges]]
+  [edges.from]
+    node = "63512c17-1cbd-4c53-8100-4cde4911c4be"
+    port = "client"
+  [edges.to]
+    node = "87899d55-c04d-4f16-a8c5-96c94b9ac21c"
+    port = "client"
+
+[[edges]]
+  [edges.from]
+    node = "87899d55-c04d-4f16-a8c5-96c94b9ac21c"
+    port = "exec_out"
+  [edges.to]
+    node = "edf04d02-279d-4f07-af34-cec56e40d154"
+    port = "exec_in"

@@ -1,12 +1,12 @@
-// ProgressTimeline 组件：展示 Agent 思考/工具调用进度；进行中默认展开，完成后可折叠。
+// ProgressTimeline 组件：展示 Agent 思考/工具调用进度；默认折叠，用户可手动展开查看完整过程。
 import { useEffect, useMemo, useState } from 'react';
 import { cn } from '@/lib/cn';
 
 interface ProgressTimelineProps {
   items: string[];
-  /** 流式进行中：始终展开并高亮最后一步 */
+  /** 流式进行中：高亮最后一步，但不强制展开 */
   live?: boolean;
-  /** 非 live 时是否默认展开（历史消息） */
+  /** 是否默认展开 */
   defaultOpen?: boolean;
 }
 
@@ -15,7 +15,7 @@ export function ProgressTimeline({
   live = false,
   defaultOpen = false,
 }: ProgressTimelineProps) {
-  const [open, setOpen] = useState(defaultOpen || live);
+  const [open, setOpen] = useState(defaultOpen);
   const summary = useMemo(() => {
     const toolCount = items.filter((item) => isToolLine(item)).length;
     return `${items.length} 步 · ${toolCount} 个工具调用`;
@@ -23,8 +23,8 @@ export function ProgressTimeline({
   const latest = items[items.length - 1];
 
   useEffect(() => {
-    if (live) setOpen(true);
-  }, [live]);
+    setOpen(defaultOpen);
+  }, [defaultOpen]);
 
   if (items.length === 0) return null;
 
@@ -36,21 +36,17 @@ export function ProgressTimeline({
           Agent 思考过程
         </div>
       ) : null}
-      {!live && !open && latest ? (
+      {!open && latest ? (
         <div className="mb-1 truncate px-2 text-[11px] text-ops-secondary">{latest}</div>
       ) : null}
-      {!live ? (
-        <button
-          type="button"
-          className="flex w-full items-center justify-between rounded px-2 py-1 text-left text-ops-secondary hover:bg-ops-surface hover:text-ops-primary"
-          onClick={() => setOpen((value) => !value)}
-        >
-          <span>{summary}</span>
-          <span>{open ? '收起' : '展开'}</span>
-        </button>
-      ) : (
-        <div className="px-2 py-0.5 text-ops-secondary">{summary}</div>
-      )}
+      <button
+        type="button"
+        className="flex w-full items-center justify-between rounded px-2 py-1 text-left text-ops-secondary hover:bg-ops-surface hover:text-ops-primary"
+        onClick={() => setOpen((value) => !value)}
+      >
+        <span>{summary}</span>
+        <span>{open ? '收起' : '展开'}</span>
+      </button>
       {open ? (
         <ol className="mt-2 space-y-1">
           {items.map((item, index) => {

@@ -55,7 +55,7 @@ func TestHandleExecutionFix(t *testing.T) {
 		{InstanceID: "n1", TypeID: "linux_exec_command", Config: map[string]any{"command": "deploy.sh"}},
 	}}
 	wf := &memWorkflows{saved: &existing}
-	llm := &stubLLM{reply: `{"name":"部署","nodes":[{"id":"n1","type_id":"linux_exec_command","config":{"command":"/opt/app/deploy.sh"},"position":{"x":0,"y":0}}],"edges":[]}`}
+	llm := &stubLLM{reply: `{"name":"部署","nodes":[{"id":"r1","type_id":"system_ready","config":{},"position":{"x":0,"y":0}},{"id":"n1","type_id":"linux_exec_command","config":{"command":"/opt/app/deploy.sh"},"position":{"x":0,"y":0}}],"edges":[{"from":{"node":"r1","port":"exec_out"},"to":{"node":"n1","port":"exec_in"}}]}`}
 	rt, sessions, emit := fixRuntime(llm, wf, failedRecord(core.WorkflowStatusFailed))
 
 	err := rt.Run(Request{
@@ -80,7 +80,7 @@ func TestHandleExecutionFix(t *testing.T) {
 	}
 
 	// 工作流被更新保存，事件序列含 workflow(update) + done。
-	if wf.saved == nil || wf.saved.Nodes[0].Config["command"] != "/opt/app/deploy.sh" {
+	if wf.saved == nil || findNodeCommand(wf.saved.Nodes) != "/opt/app/deploy.sh" {
 		t.Fatalf("工作流未按草案更新: %#v", wf.saved)
 	}
 	var seenUpdate, seenDone bool
@@ -138,4 +138,14 @@ func TestHandleExecutionFixMissingID(t *testing.T) {
 	if last.Type != EventError || !strings.Contains(last.Text, "execution_id") {
 		t.Fatalf("应推送缺参错误，got %#v", last)
 	}
+}
+
+// findNodeCommand 按类型取第一个 linux_exec_command 节点的 command 配置。
+func findNodeCommand(nodes []core.NodeInstance) any {
+	for _, n := range nodes {
+		if n.TypeID == "linux_exec_command" {
+			return n.Config["command"]
+		}
+	}
+	return nil
 }

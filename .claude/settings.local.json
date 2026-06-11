@@ -137,7 +137,22 @@
       "Bash(gofmt -w internal/agent/runtime/pending.go internal/agent/runtime/pending_test.go internal/store/history.go)",
       "Bash(echo \"GO:$?\")",
       "Bash(gofmt -w internal/agent/runtime/proposal.go internal/agent/runtime/proposal_test.go internal/agent/tools/builtin/propose.go)",
-      "Bash(gofmt -w internal/agent/intent/intent.go internal/agent/intent/intent_test.go)"
+      "Bash(gofmt -w internal/agent/intent/intent.go internal/agent/intent/intent_test.go)",
+      "Bash(sed -n '/func \\(c \\\\*execContext\\) Info/,/^}/p' internal/engine/exec_context.go)",
+      "Bash(sed -n '/func \\(c \\\\*execContext\\) log/,/^}/p' internal/engine/exec_context.go)",
+      "Bash(sed -n '70,100p' internal/nodes/env_connect_docker/node.go)",
+      "Bash(sed -n '/func env_probe.*docker\\\\|local/p' internal/probe/registry.go)",
+      "Bash(sed -n '35,55p' internal/agent/tools/builtin/docker.go)",
+      "Bash(sed -n '238,258p' internal/nodes/env_probe_docker_containers/node.go)",
+      "Bash(grep -n \"K8sDescribePod{},\" internal/agent/tools/builtin/tools.go)",
+      "Bash(gofmt -w internal/agent/tools/builtin/k8s.go internal/agent/tools/builtin/tools.go)",
+      "Bash(gofmt -w internal/agent/tools/builtin/k8s.go)",
+      "Bash(gofmt -w internal/agent/runtime/proposal_test.go)",
+      "Bash(gofmt -w internal/agent/runtime/proposal.go internal/agent/tools/builtin/propose.go)",
+      "Bash(sed -n '78,92p' internal/agent/runtime/execfix_test.go)",
+      "Bash(sed -n '60,80p' internal/agent/runtime/pending_test.go)",
+      "Bash(gofmt -w internal/agent/runtime/execfix_test.go internal/agent/runtime/pending_test.go)",
+      "Bash(grep -E \"--- |FAIL|ok\")"
     ]
   }
 }

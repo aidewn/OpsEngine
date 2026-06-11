@@ -16,12 +16,14 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"io"
 	"strings"
 	"time"
 
 	"OpsEngine/internal/clients"
 	"OpsEngine/internal/core"
 	"OpsEngine/internal/engine"
+	"OpsEngine/internal/nodes/streamlog"
 
 	"golang.org/x/crypto/ssh"
 )
@@ -102,14 +104,20 @@ func (Node) Execute(ctx engine.ExecContext) (engine.Outputs, error) {
 	}
 	defer session.Close()
 
+	// 实时日志：输出边产生边按批推送（streamlog 负责切行/清洗/限流），
+	// 完整输出仍进 buffer 供 outputs 透出
 	var stdout, stderr bytes.Buffer
-	session.Stdout = &stdout
-	session.Stderr = &stderr
+	outStream := streamlog.New(func(chunk string) { ctx.Info("%s", chunk) })
+	errStream := streamlog.New(func(chunk string) { ctx.Warn("%s", chunk) })
+	session.Stdout = io.MultiWriter(&stdout, outStream)
+	session.Stderr = io.MultiWriter(&stderr, errStream)
 	session.Stdin = strings.NewReader(finalScript)
 
 	command := interpreter + " -s"
 	ctx.Info("执行远程脚本（%s, %d 字节）", interpreter, len(finalScript))
 	runErr := runWithTimeout(ctx, session, command, time.Duration(timeoutSeconds)*time.Second)
+	outStream.Flush()
+	errStream.Flush()
 
 	stdoutText := stdout.String()
 	stderrText := stderr.String()
@@ -124,24 +132,12 @@ func (Node) Execute(ctx engine.ExecContext) (engine.Outputs, error) {
 		"combined_output": combined,
 	}
 
+	// 输出过程已实时推送，结束时只打结果摘要，不再整段重复
 	if runErr != nil {
 		ctx.Error("脚本执行失败 exit_code=%d", exitCode)
-		if trimmed := strings.TrimSpace(stderrText); trimmed != "" {
-			ctx.Error("stderr: %s", trimmed)
-		}
-		if trimmed := strings.TrimSpace(stdoutText); trimmed != "" {
-			ctx.Info("stdout: %s", trimmed)
-		}
 		return outputs, fmt.Errorf("脚本执行失败 exit_code=%d: %w", exitCode, runErr)
 	}
-
 	ctx.Info("脚本执行成功")
-	if trimmed := strings.TrimSpace(stdoutText); trimmed != "" {
-		ctx.Info("stdout: %s", trimmed)
-	}
-	if trimmed := strings.TrimSpace(stderrText); trimmed != "" {
-		ctx.Warn("stderr: %s", trimmed)
-	}
 	return outputs, nil
 }
 

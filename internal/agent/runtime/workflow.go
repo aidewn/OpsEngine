@@ -34,6 +34,7 @@ func (r *Runtime) handleWorkflow(req Request, session core.AISession) {
 		SystemKind:  prompt.SystemPromptChat,
 		IntentTag:   "generate_workflow",
 		ExtraSystem: buildGenerationGuidance(""),
+		ToolProfile: toolProfileWorkflow,
 	})
 }
 
@@ -62,6 +63,7 @@ func (r *Runtime) handleWorkflowUpdate(req Request, session core.AISession) {
 		SystemKind:  prompt.SystemPromptChat,
 		IntentTag:   "update_workflow",
 		ExtraSystem: buildGenerationGuidance(string(currentJSON)),
+		ToolProfile: toolProfileWorkflow,
 	})
 }
 

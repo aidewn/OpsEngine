@@ -19,6 +19,35 @@ import (
 	"github.com/google/uuid"
 )
 
+// 工作流生命周期节点类型。AI 生成时必须保留这些默认入口/钩子节点。
+const (
+	workflowReadyType  = "system_ready"
+	workflowUpdateType = "system_update"
+	workflowOverType   = "system_over"
+)
+
+// workflowLifecycleDefaults 定义 AI 新建工作流缺失生命周期节点时的后端兜底配置。
+var workflowLifecycleDefaults = []core.NodeInstance{
+	{
+		TypeID:   workflowReadyType,
+		Config:   map[string]any{},
+		Position: core.Position{X: 80, Y: 80},
+	},
+	{
+		TypeID: workflowUpdateType,
+		Config: map[string]any{
+			"delta_type":    "interval",
+			"delta_seconds": 60,
+		},
+		Position: core.Position{X: 80, Y: 280},
+	},
+	{
+		TypeID:   workflowOverType,
+		Config:   map[string]any{},
+		Position: core.Position{X: 80, Y: 480},
+	},
+}
+
 // Draft 是模型输出的工作流草案（结构与历史 ai.go 的 aiGeneratedWorkflow 一致）。
 type Draft struct {
 	Name        string             `json:"name"`
@@ -131,7 +160,7 @@ func ensureUniqueDraftNodeID(id string, used map[string]struct{}) string {
 // Materialize 把草案转成 core.WorkflowDef：临时 id 重写、节点类型校验、边重映射，最后跑整体校验。
 // checker 为 nil 时跳过节点类型校验（仅供单元测试使用，生产路径必须传入）。
 func Materialize(draft Draft, checker NodeTypeChecker) (core.WorkflowDef, error) {
-	return materializeWorkflow(draft, "", nil, checker)
+	return materializeWorkflow(draft, "", nil, nil, checker)
 }
 
 // MaterializeWorkflowUpdate 把草案落成指定 ID 的工作流，用于 AI 直接更新已有工作流。
@@ -141,7 +170,7 @@ func MaterializeWorkflowUpdate(draft Draft, existing core.WorkflowDef, checker N
 	for _, n := range existing.Nodes {
 		keep[n.InstanceID] = true
 	}
-	wf, err := materializeWorkflow(draft, existing.ID, keep, checker)
+	wf, err := materializeWorkflow(draft, existing.ID, keep, existing.Nodes, checker)
 	if err != nil {
 		return core.WorkflowDef{}, err
 	}
@@ -152,7 +181,7 @@ func MaterializeWorkflowUpdate(draft Draft, existing core.WorkflowDef, checker N
 }
 
 // materializeWorkflow 落地工作流草案。keepIDs 中出现的临时 id 视为已有节点，保留原 instance_id。
-func materializeWorkflow(draft Draft, fixedID string, keepIDs map[string]bool, checker NodeTypeChecker) (core.WorkflowDef, error) {
+func materializeWorkflow(draft Draft, fixedID string, keepIDs map[string]bool, existingNodes []core.NodeInstance, checker NodeTypeChecker) (core.WorkflowDef, error) {
 	normalizeDraft(&draft)
 	idMap := make(map[string]string, len(draft.Nodes))
 	nodes := make([]core.NodeInstance, 0, len(draft.Nodes))
@@ -184,6 +213,11 @@ func materializeWorkflow(draft Draft, fixedID string, keepIDs map[string]bool, c
 			Config:     cfg,
 			Position:   core.Position{X: n.Position.X, Y: n.Position.Y},
 		})
+	}
+	var err error
+	nodes, err = ensureWorkflowLifecycleNodes(nodes, existingNodes, checker)
+	if err != nil {
+		return core.WorkflowDef{}, err
 	}
 
 	edges := make([]core.EdgeConfig, 0, len(draft.Edges))
@@ -224,7 +258,53 @@ func materializeWorkflow(draft Draft, fixedID string, keepIDs map[string]bool, c
 	if err := engine.ValidateNodeConfigs(wf.Nodes); err != nil {
 		return core.WorkflowDef{}, fmt.Errorf("AI 生成工作流配置校验失败: %w", err)
 	}
+	// 连通性与端口存在性只拦 AI 草案（手工画布允许保存未连完的图）
+	if err := engine.ValidateEdgePorts(wf.Nodes, wf.Edges); err != nil {
+		return core.WorkflowDef{}, fmt.Errorf("AI 生成工作流边校验失败: %w", err)
+	}
+	// system_update / system_over 是调度器触发的独立流入口，合法地不连主链，故作为根参与连通性判定
+	if err := engine.ValidateGraphConnectivity(wf.Nodes, wf.Edges, []string{workflowReadyType, workflowUpdateType, workflowOverType}); err != nil {
+		return core.WorkflowDef{}, fmt.Errorf("AI 生成工作流连通性校验失败: %w", err)
+	}
 	return wf, nil
+}
+
+// ensureWorkflowLifecycleNodes 补齐工作流默认生命周期节点，避免 AI 草案误删入口/周期/结束钩子。
+func ensureWorkflowLifecycleNodes(nodes []core.NodeInstance, existingNodes []core.NodeInstance, checker NodeTypeChecker) ([]core.NodeInstance, error) {
+	out := append([]core.NodeInstance{}, nodes...)
+	present := make(map[string]bool, len(out))
+	for _, node := range out {
+		present[node.TypeID] = true
+	}
+	existingByType := map[string]core.NodeInstance{}
+	for _, node := range existingNodes {
+		if isWorkflowLifecycleType(node.TypeID) {
+			existingByType[node.TypeID] = node
+		}
+	}
+	for _, fallback := range workflowLifecycleDefaults {
+		if present[fallback.TypeID] {
+			continue
+		}
+		node, ok := existingByType[fallback.TypeID]
+		if !ok {
+			node = fallback
+			node.InstanceID = uuid.New().String()
+		}
+		if checker != nil {
+			if err := checker(node.TypeID); err != nil {
+				return nil, err
+			}
+		}
+		node.Config = cloneConfig(node.Config)
+		out = append(out, node)
+	}
+	return out, nil
+}
+
+// isWorkflowLifecycleType 判断节点是否属于工作流默认生命周期节点。
+func isWorkflowLifecycleType(typeID string) bool {
+	return typeID == workflowReadyType || typeID == workflowUpdateType || typeID == workflowOverType
 }
 
 // MaterializeAssemble 把草案转成集合定义，并执行集合专用校验。
@@ -317,6 +397,13 @@ func materializeAssemble(draft Draft, fixedID string, keepIDs map[string]bool, c
 	if err := engine.ValidateNodeConfigs(asm.Nodes); err != nil {
 		return core.AssembleDef{}, fmt.Errorf("AI 生成集合配置校验失败: %w", err)
 	}
+	// 连通性与端口存在性只拦 AI 草案（手工画布允许保存未连完的图）
+	if err := engine.ValidateEdgePorts(asm.Nodes, asm.Edges); err != nil {
+		return core.AssembleDef{}, fmt.Errorf("AI 生成集合边校验失败: %w", err)
+	}
+	if err := engine.ValidateGraphConnectivity(asm.Nodes, asm.Edges, []string{"assemble_start"}); err != nil {
+		return core.AssembleDef{}, fmt.Errorf("AI 生成集合连通性校验失败: %w", err)
+	}
 	return asm, nil
 }
 
@@ -339,4 +426,16 @@ func safeVariables(variables []core.VariableDef) []core.VariableDef {
 		return []core.VariableDef{}
 	}
 	return variables
+}
+
+// cloneConfig 复制节点配置，避免默认生命周期配置 map 被后续修改污染。
+func cloneConfig(config map[string]any) map[string]any {
+	if config == nil {
+		return map[string]any{}
+	}
+	out := make(map[string]any, len(config))
+	for key, value := range config {
+		out[key] = value
+	}
+	return out
 }

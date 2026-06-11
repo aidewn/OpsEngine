@@ -195,3 +195,109 @@ func validateReturnRefs(nodes []core.NodeInstance, returns []core.ParamDef) erro
 	}
 	return nil
 }
+
+// ── AI 草案专用校验（不挂手工保存路径：画布编辑中途保存未连完的图是正常操作） ──
+
+// ValidateGraphConnectivity 校验图连通性：每个节点必须（沿无向边）连通到某个根节点。
+// rootTypeIDs 是各独立流的入口类型——工作流为 system_ready/system_update/system_over
+// （update/over 是调度器触发的独立流，合法地不连主链），集合为 assemble_start。
+// 找不到任何根时从第一个节点起算，仍能拦住"散落多块"的草案。
+// 仅供 AI 草案落地路径调用（手工画布允许保存未连完的图）——错误信息面向模型自我修正。
+func ValidateGraphConnectivity(nodes []core.NodeInstance, edges []core.EdgeConfig, rootTypeIDs []string) error {
+	if len(nodes) <= 1 {
+		return nil
+	}
+	rootTypes := make(map[string]bool, len(rootTypeIDs))
+	for _, t := range rootTypeIDs {
+		rootTypes[t] = true
+	}
+	// 无向邻接表
+	adj := make(map[string][]string, len(nodes))
+	for _, e := range edges {
+		adj[e.From.Node] = append(adj[e.From.Node], e.To.Node)
+		adj[e.To.Node] = append(adj[e.To.Node], e.From.Node)
+	}
+	// 多根 BFS：从所有根类型节点同时出发
+	visited := map[string]bool{}
+	queue := []string{}
+	for _, n := range nodes {
+		if rootTypes[n.TypeID] {
+			visited[n.InstanceID] = true
+			queue = append(queue, n.InstanceID)
+		}
+	}
+	if len(queue) == 0 {
+		visited[nodes[0].InstanceID] = true
+		queue = append(queue, nodes[0].InstanceID)
+	}
+	for len(queue) > 0 {
+		cur := queue[0]
+		queue = queue[1:]
+		for _, next := range adj[cur] {
+			if !visited[next] {
+				visited[next] = true
+				queue = append(queue, next)
+			}
+		}
+	}
+	var orphans []string
+	for _, n := range nodes {
+		if !visited[n.InstanceID] {
+			orphans = append(orphans, fmt.Sprintf("%s(%s)", n.InstanceID, n.TypeID))
+		}
+	}
+	if len(orphans) > 0 {
+		return fmt.Errorf("以下节点未通过任何边连接到执行流，请补充 edges（exec 链从入口节点逐个连到每个动作节点，数据端口如 client 也需要连线）: %s",
+			strings.Join(orphans, ", "))
+	}
+	return nil
+}
+
+// ValidateEdgePorts 校验每条边引用的端口在节点类型定义中真实存在。
+// assemble:* 引用节点的端口由 params/returns 动态生成，跳过校验。
+// 仅供 AI 草案落地路径调用——错误信息附可用端口列表，便于模型修正。
+func ValidateEdgePorts(nodes []core.NodeInstance, edges []core.EdgeConfig) error {
+	byID := make(map[string]core.NodeInstance, len(nodes))
+	for _, n := range nodes {
+		byID[n.InstanceID] = n
+	}
+	for _, e := range edges {
+		if err := checkPort(byID, e.From.Node, e.From.Port, false); err != nil {
+			return err
+		}
+		if err := checkPort(byID, e.To.Node, e.To.Port, true); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// checkPort 校验单端的端口存在性。input=true 查 InputPorts，否则查 OutputPorts。
+func checkPort(byID map[string]core.NodeInstance, nodeID, port string, input bool) error {
+	n, ok := byID[nodeID]
+	if !ok {
+		return fmt.Errorf("边引用了不存在的节点: %s", nodeID)
+	}
+	if strings.HasPrefix(n.TypeID, "assemble:") {
+		return nil
+	}
+	def, ok := Lookup(n.TypeID)
+	if !ok {
+		return nil // 类型存在性由 NodeTypeChecker 负责，这里不重复报
+	}
+	ports := def.TypeDef().OutputPorts
+	side := "输出"
+	if input {
+		ports = def.TypeDef().InputPorts
+		side = "输入"
+	}
+	available := make([]string, 0, len(ports))
+	for _, p := range ports {
+		if p.ID == port {
+			return nil
+		}
+		available = append(available, p.ID)
+	}
+	return fmt.Errorf("节点 %s(%s) 没有%s端口 %q，可用%s端口: [%s]",
+		nodeID, n.TypeID, side, port, side, strings.Join(available, ", "))
+}

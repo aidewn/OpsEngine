@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"OpsEngine/internal/core"
 	"OpsEngine/internal/engine"
 	_ "OpsEngine/internal/nodes" // 触发节点注册，让 engine.Lookup 在测试中可用
 )
@@ -62,7 +63,7 @@ func TestMaterialize(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Materialize() error = %v", err)
 	}
-	if len(wf.Nodes) != 2 || len(wf.Edges) != 1 {
+	if len(wf.Nodes) != 4 || len(wf.Edges) != 1 {
 		t.Fatalf("nodes/edges = %d/%d", len(wf.Nodes), len(wf.Edges))
 	}
 	for _, node := range wf.Nodes {
@@ -73,6 +74,55 @@ func TestMaterialize(t *testing.T) {
 	edge := wf.Edges[0]
 	if edge.From.Node == "n1" || edge.To.Node == "n2" {
 		t.Fatalf("边未跟随 id 重写: %#v", edge)
+	}
+}
+
+// TestMaterializeAddsMissingLifecycleNodes 验证 AI 新建工作流时会补齐默认生命周期节点。
+func TestMaterializeAddsMissingLifecycleNodes(t *testing.T) {
+	wf, err := Materialize(Draft{
+		Name:  "只给入口",
+		Nodes: []DraftNode{{ID: "n1", TypeID: "system_ready"}},
+	}, realChecker)
+	if err != nil {
+		t.Fatalf("Materialize() error = %v", err)
+	}
+	for _, typeID := range []string{"system_ready", "system_update", "system_over"} {
+		if countNodesByType(wf.Nodes, typeID) != 1 {
+			t.Fatalf("生命周期节点 %s 应该存在且仅存在 1 个: %#v", typeID, wf.Nodes)
+		}
+	}
+	update := findNodeByType(wf.Nodes, "system_update")
+	if update.Config["delta_type"] != "interval" || update.Config["delta_seconds"] != 60 {
+		t.Fatalf("system_update 默认配置异常: %#v", update.Config)
+	}
+}
+
+// TestMaterializeWorkflowUpdatePreservesExistingLifecycleNodes 验证 AI 更新不会误删已有生命周期节点。
+func TestMaterializeWorkflowUpdatePreservesExistingLifecycleNodes(t *testing.T) {
+	existing := core.WorkflowDef{
+		ID:   "wf-1",
+		Name: "已有工作流",
+		Nodes: []core.NodeInstance{
+			{InstanceID: "ready-1", TypeID: "system_ready", Config: map[string]any{}, Position: core.Position{X: 10, Y: 20}},
+			{InstanceID: "update-1", TypeID: "system_update", Config: map[string]any{"delta_type": "manual"}, Position: core.Position{X: 30, Y: 40}},
+			{InstanceID: "over-1", TypeID: "system_over", Config: map[string]any{}, Position: core.Position{X: 50, Y: 60}},
+		},
+	}
+	wf, err := MaterializeWorkflowUpdate(Draft{
+		Name:  "已有工作流",
+		Nodes: []DraftNode{{ID: "ready-1", TypeID: "system_ready"}},
+	}, existing, realChecker)
+	if err != nil {
+		t.Fatalf("MaterializeWorkflowUpdate() error = %v", err)
+	}
+	if findNodeByType(wf.Nodes, "system_update").InstanceID != "update-1" {
+		t.Fatalf("system_update 应保留已有节点: %#v", wf.Nodes)
+	}
+	if findNodeByType(wf.Nodes, "system_update").Config["delta_type"] != "manual" {
+		t.Fatalf("system_update 配置应保留: %#v", findNodeByType(wf.Nodes, "system_update").Config)
+	}
+	if findNodeByType(wf.Nodes, "system_over").InstanceID != "over-1" {
+		t.Fatalf("system_over 应保留已有节点: %#v", wf.Nodes)
 	}
 }
 
@@ -132,4 +182,25 @@ func TestParseDraftAutoAssignsMissingID(t *testing.T) {
 	if draft.Nodes[0].ID != "n1" || draft.Nodes[1].ID != "n2" {
 		t.Fatalf("auto ids = %q, %q", draft.Nodes[0].ID, draft.Nodes[1].ID)
 	}
+}
+
+// countNodesByType 统计指定类型节点数量。
+func countNodesByType(nodes []core.NodeInstance, typeID string) int {
+	count := 0
+	for _, node := range nodes {
+		if node.TypeID == typeID {
+			count++
+		}
+	}
+	return count
+}
+
+// findNodeByType 查找指定类型节点；测试失败时返回零值让断言给出完整上下文。
+func findNodeByType(nodes []core.NodeInstance, typeID string) core.NodeInstance {
+	for _, node := range nodes {
+		if node.TypeID == typeID {
+			return node
+		}
+	}
+	return core.NodeInstance{}
 }

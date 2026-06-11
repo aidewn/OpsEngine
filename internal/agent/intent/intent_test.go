@@ -26,8 +26,8 @@ func TestResolveRules(t *testing.T) {
 		{"架构分析触发", "auto", "帮我分析下生产环境的架构", KindAnalyzeArchitecture},
 		{"英文 architecture", "auto", "show me the architecture of this env", KindAnalyzeArchitecture},
 		{"排查优先于架构", "auto", "排查架构里的问题", KindTroubleshoot},
-		// P5 回归用例表：生成/修改类输入不再被关键词路由，统一进工具循环对话
-		{"生成请求进工具循环", "auto", "create a deploy workflow", KindChat},
+		// 高置信生成请求进入工作流生成路径；解释/修改等低置信输入仍保持对话。
+		{"生成请求触发工作流生成", "auto", "create a deploy workflow", KindGenerateWorkflow},
 		{"解释工作流不误路由", "auto", "解释一下这个工作流是干什么的", KindChat},
 		{"先解释再生成进工具循环", "auto", "先解释这个报错，再帮我生成一个修复工作流", KindChat},
 		{"排查沉淀进工具循环", "auto", "把刚才的结论固化成一个标准操作", KindChat},

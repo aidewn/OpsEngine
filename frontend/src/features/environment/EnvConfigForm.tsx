@@ -1,7 +1,7 @@
 // 环境配置的 kind 动态表单
 // 复用 features/workflow/ConfigForm.tsx：按 kind 选 FieldSchema
-// Phase 1 仅 ssh；Phase 3 增加 docker（mode=over_ssh + sibling ssh 选择）
-// k8s/jenkins 仍占位，待 Phase 4-5 上线
+// 六种 kind（ssh/docker/k8s/jenkins/localhost/registry）均已实现；
+// 字段 id 必须与 app.go 各 test*Config 及对应 env_connect_* 节点读取的键一致
 
 import { cn } from '@/lib/cn';
 import { Select } from '@/components/ui/Select';
@@ -159,8 +159,7 @@ const DOCKER_SCHEMA: FieldSchema[] = [
     type: 'text',
     id: 'socket_path',
     label: 'Docker socket 路径',
-    placeholder: '/var/run/docker.sock',
-    default: '/var/run/docker.sock',
+    placeholder: 'local 模式留空自动探测；over_ssh 默认 /var/run/docker.sock',
   },
 ];
 
@@ -224,10 +223,11 @@ export function EnvConfigForm({
       )}
       {kind === 'docker' && (value['mode'] ?? 'local') === 'local' && (
         <div className="rounded border border-slate-200 bg-white px-3 py-2 text-xs text-slate-600">
-          local 模式直连本机 docker.sock；
-          macOS Docker Desktop 默认 <code>/var/run/docker.sock</code> 是软链，
-          Colima 用 <code>~/.colima/default/docker.sock</code>，
-          可按机器实际路径填写。
+          local 模式直连本机 Docker，socket 路径<strong>留空即自动探测</strong>（优先
+          DOCKER_HOST 环境变量；Windows 默认 <code>npipe:////./pipe/docker_engine</code>，
+          Linux/macOS 默认 <code>/var/run/docker.sock</code>）。 也可显式填写：支持
+          <code>npipe://</code> / <code>tcp://</code> / <code>unix://</code> 前缀或纯路径（按
+          unix socket 处理）。
         </div>
       )}
     </div>

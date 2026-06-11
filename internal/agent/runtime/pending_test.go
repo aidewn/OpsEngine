@@ -15,7 +15,7 @@ func stagedRuntime(t *testing.T) (*Runtime, *memSessions, *memWorkflows, *bufEmi
 		{InstanceID: "n1", TypeID: "linux_exec_command", Config: map[string]any{"command": "deploy.sh"}},
 	}}
 	wf := &memWorkflows{saved: &existing}
-	llm := &stubLLM{reply: `{"name":"部署","nodes":[{"id":"n1","type_id":"linux_exec_command","config":{"command":"/opt/app/deploy.sh"},"position":{"x":0,"y":0}}],"edges":[]}`}
+	llm := &stubLLM{reply: `{"name":"部署","nodes":[{"id":"r1","type_id":"system_ready","config":{},"position":{"x":0,"y":0}},{"id":"n1","type_id":"linux_exec_command","config":{"command":"/opt/app/deploy.sh"},"position":{"x":0,"y":0}}],"edges":[{"from":{"node":"r1","port":"exec_out"},"to":{"node":"n1","port":"exec_in"}}]}`}
 	rt, sessions, emit := fixRuntime(llm, wf, failedRecord(core.WorkflowStatusFailed))
 	rt.ApplyMode = ApplyModeConfirm
 
@@ -67,10 +67,10 @@ func TestApplyPendingDraft(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Apply error: %v", err)
 	}
-	if applied.Nodes[0].Config["command"] != "/opt/app/deploy.sh" {
+	if findNodeCommand(applied.Nodes) != "/opt/app/deploy.sh" {
 		t.Fatalf("应用结果异常: %#v", applied)
 	}
-	if wf.saved.Nodes[0].Config["command"] != "/opt/app/deploy.sh" {
+	if findNodeCommand(wf.saved.Nodes) != "/opt/app/deploy.sh" {
 		t.Fatalf("草案未落盘: %#v", wf.saved)
 	}
 	final := sessions.data["sess-1"]

@@ -77,6 +77,8 @@ func TestMaterializeUpdatePreservesIDs(t *testing.T) {
 		Name: "旧",
 		Nodes: []core.NodeInstance{
 			node("keep-1", "system_ready", nil),
+			node("update-1", "system_update", map[string]any{"delta_type": "interval", "delta_seconds": 60}),
+			node("over-1", "system_over", nil),
 		},
 	}
 	draft := Draft{
@@ -84,6 +86,9 @@ func TestMaterializeUpdatePreservesIDs(t *testing.T) {
 		Nodes: []DraftNode{
 			{ID: "keep-1", TypeID: "system_ready"},                // 回显已有节点
 			{ID: "n2", TypeID: "print", Config: map[string]any{}}, // 新增节点
+		},
+		Edges: []DraftEdge{
+			{From: DraftPortRef{Node: "keep-1", Port: "exec_out"}, To: DraftPortRef{Node: "n2", Port: "exec_in"}},
 		},
 	}
 	wf, err := MaterializeWorkflowUpdate(draft, existing, nil)

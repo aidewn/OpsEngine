@@ -28,7 +28,11 @@ type turnOpts struct {
 	IntentTag string
 	// ExtraSystem 场景化追加的 system 段（如工作流编排任务引导），空时不注入。
 	ExtraSystem string
+	// ToolProfile 控制本轮暴露给模型的工具集合，空值表示普通对话全量工具。
+	ToolProfile string
 }
+
+const toolProfileWorkflow = "workflow"
 
 // handleChat 处理 intent.KindChat。
 func (r *Runtime) handleChat(req Request, session core.AISession) {
@@ -75,15 +79,17 @@ func (r *Runtime) runConversationTurn(req Request, session core.AISession, opts 
 	}
 
 	assistant := strings.Builder{}
+	var artifact *proposalArtifact
 	if r.Tools != nil && !r.Tools.IsEmpty() {
 		// 启用工具时走流式工具循环：runChatToolLoop 内部对每轮 LLM 调用
 		// 走 ChatWithToolsStream 并把 content delta 直接 Emit，所以这里
 		// 拿到的 text 已经被前端渲染过；只需累积进 assistant 用于落库。
-		text, err := r.runChatToolLoop(req, &session, messages, &progress)
+		text, proposed, err := r.runChatToolLoop(req, &session, messages, &progress, opts.ToolProfile)
 		if err != nil {
 			r.emitTurnError(req, &session, err.Error(), progress, opts.IntentTag)
 			return
 		}
+		artifact = proposed
 		assistant.WriteString(text)
 	} else {
 		_, err = r.LLM.ChatStream(messages, func(delta string) {
@@ -99,20 +105,35 @@ func (r *Runtime) runConversationTurn(req Request, session core.AISession, opts 
 		}
 	}
 
-	session.Messages = append(session.Messages, core.AISessionMessage{
+	message := core.AISessionMessage{
 		ID:        uuid.New().String(),
 		Role:      core.AIMessageRoleAssistant,
 		Content:   assistant.String(),
 		Progress:  progress,
 		Intent:    opts.IntentTag,
 		CreatedAt: time.Now(),
-	})
+	}
+	applyProposalArtifactToMessage(&message, artifact)
+	session.Messages = append(session.Messages, message)
 	session.UpdatedAt = time.Now()
 	if err := r.Sessions.Save(session); err != nil {
 		r.emitError(req.RequestID, session.ID, err.Error())
 		return
 	}
 	r.emitDone(req.RequestID, session.ID)
+}
+
+// applyProposalArtifactToMessage 把工具提交产物写入持久化消息，供重新打开 Chat 时恢复操作卡片。
+func applyProposalArtifactToMessage(message *core.AISessionMessage, artifact *proposalArtifact) {
+	if message == nil || artifact == nil {
+		return
+	}
+	message.WorkflowID = artifact.WorkflowID
+	message.WorkflowName = artifact.WorkflowName
+	message.ArtifactType = artifact.ArtifactType
+	message.ActionType = artifact.ActionType
+	message.NodeCount = artifact.NodeCount
+	message.ChangeSummary = artifact.ChangeSummary
 }
 
 // buildInventory 加载环境定义并构造资产清单。

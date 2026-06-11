@@ -21,8 +21,21 @@ import (
 // maxProposalsPerTurn 单轮会话允许成功提交草案的次数上限。
 const maxProposalsPerTurn = 2
 
-// proposalState 跟踪单轮内的提交次数，闭包间共享。
-type proposalState struct{ accepted int }
+// proposalState 跟踪单轮内的提交次数与最后一次产物，闭包间共享。
+type proposalState struct {
+	accepted int
+	last     *proposalArtifact
+}
+
+// proposalArtifact 是 propose 工具成功后需要落到 assistant 消息里的产物元数据。
+type proposalArtifact struct {
+	WorkflowID    string
+	WorkflowName  string
+	ArtifactType  string
+	ActionType    string
+	NodeCount     int
+	ChangeSummary string
+}
 
 // buildProposeWorkflow 返回 propose_workflow 工具的执行闭包（创建新工作流，始终直接保存）。
 func (r *Runtime) buildProposeWorkflow(req Request, session *core.AISession, st *proposalState) func(string) (tools.ProposalResult, error) {
@@ -61,6 +74,13 @@ func (r *Runtime) buildProposeWorkflow(req Request, session *core.AISession, st 
 			ActionType:   "create",
 			NodeCount:    len(wf.Nodes),
 		})
+		st.last = &proposalArtifact{
+			WorkflowID:   wf.ID,
+			WorkflowName: wf.Name,
+			ArtifactType: "workflow",
+			ActionType:   "create",
+			NodeCount:    len(wf.Nodes),
+		}
 		return tools.ProposalResult{
 			WorkflowID:   wf.ID,
 			WorkflowName: wf.Name,
@@ -123,6 +143,14 @@ func (r *Runtime) buildProposeWorkflowUpdate(req Request, session *core.AISessio
 				NodeCount:     len(wf.Nodes),
 				ChangeSummary: changeSummary,
 			})
+			st.last = &proposalArtifact{
+				WorkflowID:    wf.ID,
+				WorkflowName:  wf.Name,
+				ArtifactType:  "workflow",
+				ActionType:    "pending",
+				NodeCount:     len(wf.Nodes),
+				ChangeSummary: changeSummary,
+			}
 			return tools.ProposalResult{
 				WorkflowID:    wf.ID,
 				WorkflowName:  wf.Name,
@@ -148,6 +176,14 @@ func (r *Runtime) buildProposeWorkflowUpdate(req Request, session *core.AISessio
 			NodeCount:     len(wf.Nodes),
 			ChangeSummary: changeSummary,
 		})
+		st.last = &proposalArtifact{
+			WorkflowID:    wf.ID,
+			WorkflowName:  wf.Name,
+			ArtifactType:  "workflow",
+			ActionType:    "update",
+			NodeCount:     len(wf.Nodes),
+			ChangeSummary: changeSummary,
+		}
 		return tools.ProposalResult{
 			WorkflowID:    wf.ID,
 			WorkflowName:  wf.Name,
@@ -170,11 +206,18 @@ func (r *Runtime) checkProposalQuota(st *proposalState) error {
 func buildGenerationGuidance(currentWorkflowJSON string) string {
 	guidance := `【工作流编排任务】
 用户本轮要求生成或修改工作流。执行要求：
-1. 先用 node_catalog 查询节点 type_id 与 config schema（必填字段不可省略）；不确定的服务器路径/服务名/容器名，先用只读工具（ssh_list_dir、docker_list_containers 等）核实，禁止凭空编造
-2. 设计完成后调用 propose_workflow（新建）或 propose_update_workflow（修改已有），draft_json 传完整草案 JSON
-3. 工作流必须以 system_ready 节点为入口；更新时未修改的节点原样回显其 instance_id
-4. 提交失败会返回具体校验错误（含节点与字段 ID），修正后重试，不要原样重发
-5. 成功后用中文向用户简要总结（节点构成、关键配置、注意事项），不要把 JSON 原文贴给用户`
+0. 需求澄清优先：存在多种合理实现路径（部署方式选本机/Docker/K8s、目标机器、版本、端口等）且用户未指明时，
+   先以普通文本提出 1-2 个最关键的问题并结束本轮，等用户回答后再设计；可先用 env_inventory 看环境里有什么，
+   让提问有依据（如"环境里有 Docker 配置和两台 SSH，部署到哪个？"）。
+   用户已说清、或只有一种合理做法时直接做，不要为提问而提问
+1. 简单明确的需求优先生成最小可执行工作流，不主动探测服务器，不加入无关检查/日志/分支节点
+2. 用 node_catalog 查询必要节点的 type_id 与 config schema（必填字段不可省略），只查询本次会用到的节点
+3. 只有用户明确要求基于当前服务器/容器/K8s 现状时，才使用只读探测工具核实事实；否则不要为了"确认"而调用环境工具
+4. 设计完成后调用 propose_workflow（新建）或 propose_update_workflow（修改已有），draft_json 传完整草案 JSON
+5. 工作流必须以 system_ready 节点为入口，且 edges 必填：exec 链从 system_ready 的 exec_out 逐个连到每个动作节点，
+   数据端口（如 env_connect_* 的 client 输出）也必须连到使用方；孤立节点会被校验拒绝。更新时未修改的节点原样回显其 instance_id
+6. 提交失败会返回具体校验错误（含节点与字段 ID），修正后重试，不要原样重发
+7. 成功后用中文向用户简要总结（节点构成、关键配置、注意事项），不要把 JSON 原文贴给用户`
 	if currentWorkflowJSON != "" {
 		guidance += "\n\n【当前工作流 JSON】（更新基线，未修改节点请回显 instance_id）\n" + currentWorkflowJSON
 	}

@@ -51,6 +51,7 @@ func Register(reg *tools.Registry, deps RegisterDeps) error {
 		K8sListPods{},
 		K8sListWorkloads{},
 		K8sDescribePod{},
+		K8sPodLogs{},
 		// Jenkins
 		JenkinsListJobs{},
 		// Local（OpsEngine 主机）

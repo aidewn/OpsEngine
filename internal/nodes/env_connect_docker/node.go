@@ -80,22 +80,20 @@ func (Node) Execute(ctx engine.ExecContext) (engine.Outputs, error) {
 	}
 
 	socketPath := strings.TrimSpace(stringField(dockerCfg.Fields, "socket_path"))
-	if socketPath == "" {
-		socketPath = defaultSocketPath
-	}
 
-	// local 模式：直连本机 docker.sock，不走 SSH
+	// local 模式：直连本机 Docker，不走 SSH。
+	// 空 socket_path 透传给 NewDockerClientLocal 自动探测（DOCKER_HOST / 平台默认，Windows 为 npipe）
 	if mode == "local" {
-		ctx.Info("直连本机 Docker socket %s", socketPath)
+		ctx.Info("直连本机 Docker（socket=%s）", displaySocket(socketPath))
 		dockerClient, err := clients.NewDockerClientLocal(socketPath)
 		if err != nil {
 			return nil, err
 		}
 		if err := dockerClient.Ping(ctx.Context()); err != nil {
 			_ = dockerClient.Close()
-			return nil, fmt.Errorf("本机 Docker daemon 不可达（socket=%s）: %w", socketPath, err)
+			return nil, fmt.Errorf("本机 Docker daemon 不可达（socket=%s）: %w", displaySocket(socketPath), err)
 		}
-		ctx.Info("本机 Docker 连接成功 (socket=%s)", socketPath)
+		ctx.Info("本机 Docker 连接成功 (socket=%s)", displaySocket(socketPath))
 		return engine.Outputs{
 			"client": dockerClient,
 		}, nil
@@ -120,6 +118,9 @@ func (Node) Execute(ctx engine.ExecContext) (engine.Outputs, error) {
 	}
 
 	addr := net.JoinHostPort(sshDial.Host, strconv.Itoa(sshDial.Port))
+	if socketPath == "" {
+		socketPath = defaultSocketPath
+	}
 	ctx.Info("正在通过 SSH %s@%s 拨号到 Docker socket %s", sshDial.User, addr, socketPath)
 
 	linuxClient, err := sshDial.Dial()
@@ -187,4 +188,12 @@ func stringField(fields map[string]any, key string) string {
 		}
 	}
 	return ""
+}
+
+// displaySocket 空 socket 显示为自动探测提示，避免日志出现空字符串。
+func displaySocket(s string) string {
+	if s == "" {
+		return "(自动探测)"
+	}
+	return s
 }

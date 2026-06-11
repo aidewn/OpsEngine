@@ -473,10 +473,8 @@ func (a *App) ProbeEnvNode(req ProbeEnvNodeRequest) (ProbeEnvNodeResult, error) 
 // testDockerConfigLocal 直连本机 unix socket → Ping
 // 不需要 ssh_config_id；socket_path 默认 /var/run/docker.sock
 func testDockerConfigLocal(fields map[string]any) error {
+	// 空 socket_path 透传：NewDockerClientLocal 自动探测（DOCKER_HOST / 平台默认，Windows 为 npipe）
 	socketPath := strings.TrimSpace(envFieldString(fields, "socket_path"))
-	if socketPath == "" {
-		socketPath = "/var/run/docker.sock"
-	}
 	dockerClient, err := clients.NewDockerClientLocal(socketPath)
 	if err != nil {
 		return err

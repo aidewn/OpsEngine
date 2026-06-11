@@ -24,7 +24,7 @@ func TestRegisterAllBuiltinTools(t *testing.T) {
 		"propose_workflow", "propose_update_workflow",
 		"ssh_inspect", "ssh_list_dir", "ssh_read_log", "ssh_read_file", "ssh_find_files", "ssh_process_list",
 		"docker_list_containers", "docker_container_logs", "docker_container_inspect", "docker_list_images",
-		"k8s_list_pods", "k8s_list_workloads", "k8s_describe_pod",
+		"k8s_list_pods", "k8s_list_workloads", "k8s_describe_pod", "k8s_pod_logs",
 		"jenkins_list_jobs",
 		"local_list_dir", "local_find_files",
 	}

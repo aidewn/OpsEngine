@@ -191,10 +191,21 @@ func (r *Runtime) setNodeState(frame *Frame, nodeID string, state core.NodeState
 
 // ── 日志推送 ──────────────────────────────────────────────
 
+// maxNodeLogEntries 单节点保留的日志条数上限。
+// 流式输出的长任务（安装/编译）可能产生海量日志，超出后丢最旧只留尾部，
+// 防止 ExecutionRecord 持久化文件无限膨胀；前端实时事件不受影响。
+const maxNodeLogEntries = 2000
+
 func (r *Runtime) appendLog(frame *Frame, nodeID, level, msg string) {
 	entry := core.LogEntry{Time: time.Now(), Level: level, Message: msg}
 	r.mu.Lock()
-	frame.NodeLogs[nodeID] = append(frame.NodeLogs[nodeID], entry)
+	logs := append(frame.NodeLogs[nodeID], entry)
+	if len(logs) > maxNodeLogEntries+128 { // 滞回 128 条，摊薄拷贝成本
+		trimmed := make([]core.LogEntry, maxNodeLogEntries)
+		copy(trimmed, logs[len(logs)-maxNodeLogEntries:])
+		logs = trimmed
+	}
+	frame.NodeLogs[nodeID] = logs
 	r.mu.Unlock()
 
 	r.emitter.Emit(EventLog, map[string]any{

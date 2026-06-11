@@ -12,7 +12,8 @@ import (
 
 // draftJSONDesc 是两个工具共用的 draft_json 参数说明。
 const draftJSONDesc = "完整工作流草案 JSON：{name, description, variables, nodes:[{id, type_id, config, position:{x,y}}], edges:[{from:{node,port}, to:{node,port}}]}。" +
-	"节点 id 用 n1/n2 等占位；type_id 与 config 必须符合 node_catalog 返回的 schema。"
+	"节点 id 用 n1/n2 等占位；type_id 与 config 必须符合 node_catalog 返回的 schema。" +
+	"edges 必填：exec 链从 system_ready 连到每个动作节点，数据端口（如 client）也要连线，孤立节点会被校验拒绝。"
 
 // ── propose_workflow ──────────────────────────────────────────
 

@@ -1,0 +1,43 @@
+id = "5fb9459f-2dc9-4e26-9b5c-97b99f8ef36c"
+name = "部署 nginx 8088"
+description = "禁用冲突配置，写新站点监听8088，测试并启动nginx"
+variables = []
+edges = []
+
+[[nodes]]
+  id = "66b44def-2461-41f1-8bcc-6f19a004faa7"
+  type = "linux_exec_script"
+  [nodes.config]
+    default_script = "# 1. 禁用冲突的旧配置\nmv /etc/nginx/conf.d/test.conf /etc/nginx/conf.d/test.conf.bak 2>/dev/null\nrm -f /etc/nginx/sites-enabled/default\n\n# 2. 写入新站点配置（监听 8088）\ncat > /etc/nginx/conf.d/opsengine.conf << 'NGINXEOF'\nserver {\n    listen 8088;\n    server_name _;\n    root /var/www/html;\n    index index.html index.htm index.nginx-debian.html;\n\n    location / {\n        try_files $uri $uri/ =404;\n    }\n}\nNGINXEOF\n\necho \"=== 新配置 ===\"\ncat /etc/nginx/conf.d/opsengine.conf\n\necho \"\"\necho \"=== nginx -t ===\"\nnginx -t\n\necho \"\"\necho \"=== 启动 nginx ===\"\nsystemctl start nginx 2>&1 || nginx 2>&1\nsleep 1\n\necho \"\"\necho \"=== 8088 端口监听 ===\"\nss -tlnp | grep 8088\n\necho \"\"\necho \"=== nginx 进程 ===\"\npgrep -a nginx"
+    fail_on_error = false
+    interpreter = "bash"
+    timeout_seconds = 60.0
+  [nodes.position]
+    x = 349.0
+    y = 68.0
+
+[[nodes]]
+  id = "19b325be-57af-442c-9c4d-875519dbf872"
+  type = "system_ready"
+  [nodes.config]
+  [nodes.position]
+    x = 80.0
+    y = 80.0
+
+[[nodes]]
+  id = "8be3599f-7084-41ca-ac42-bb8da6461709"
+  type = "system_update"
+  [nodes.config]
+    delta_seconds = 60.0
+    delta_type = "interval"
+  [nodes.position]
+    x = 80.0
+    y = 280.0
+
+[[nodes]]
+  id = "1fd5f974-9199-45b7-86f6-ef6030e52ee3"
+  type = "system_over"
+  [nodes.config]
+  [nodes.position]
+    x = 80.0
+    y = 480.0

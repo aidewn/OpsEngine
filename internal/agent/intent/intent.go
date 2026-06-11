@@ -1,5 +1,5 @@
 // Intent Router：只做"显式 operation 透传 + 少量高置信关键词"的轻路由（计划书 P5）。
-// 工作流的生成/修改不再靠关键词猜测——所有非高置信输入统一进带 propose 工具的
+// 工作流的生成只接受高置信关键词组合；其余非高置信输入统一进带 propose 工具的
 // chat 循环，由模型在对话内自主决定是答疑还是提交草案。
 // 保留独立路由的只有两类：inspect_server（两阶段生成链路）与 analyze_architecture（拓扑采集链路）。
 
@@ -61,6 +61,13 @@ var troubleshootKeywords = []string{
 	"troubleshoot", "diagnose", "investigate", "high cpu", "out of memory", "disk full",
 }
 
+// workflowGenerateKeywords 触发工作流生成。要求同时出现"工作流/流程"与生成类动作词，
+// 避免用户只是询问"工作流是什么"时误创建资产。
+var workflowGenerateKeywords = []string{
+	"生成", "创建", "新建", "做一个", "编排", "部署",
+	"generate", "create", "build",
+}
+
 // negativeKeywords 命中其一时强制回退到 chat。
 // 现在唯一的作用是抑制 inspection / architecture 的误命中
 // （如"解释一下这个巡检报告"不应触发真实巡检）；生成类关键词路由已整体移除，
@@ -110,6 +117,13 @@ func Resolve(operation, message string) Result {
 	for _, kw := range architectureKeywords {
 		if strings.Contains(text, kw) {
 			return Result{Kind: KindAnalyzeArchitecture, Reason: "命中架构关键词：" + kw}
+		}
+	}
+	if strings.Contains(text, "工作流") || strings.Contains(text, "workflow") || strings.Contains(text, "流程") {
+		for _, kw := range workflowGenerateKeywords {
+			if strings.Contains(text, kw) {
+				return Result{Kind: KindGenerateWorkflow, Reason: "命中工作流生成关键词：" + kw}
+			}
 		}
 	}
 	// 其余全部进 chat 工具循环：模型可用 propose_workflow / propose_update_workflow 自主产资产。

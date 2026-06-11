@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -33,19 +34,30 @@ type DockerClient struct {
 	closed  bool
 }
 
-// NewDockerClientLocal 直连本机 Docker daemon 的 unix socket，不开 SSH 隧道
+// NewDockerClientLocal 直连本机 Docker daemon，不开 SSH 隧道
 // 适用于「桌面运行 OpsEngine + 本机已装 Docker」的场景
-// socketPath 必填（典型值：/var/run/docker.sock；Docker Desktop macOS 可填 ~/.docker/run/docker.sock）
-//   - Host / User 字段填本机标识，仅用于 MarshalJSON 元数据，不参与拨号
-//   - 返回的 DockerClient.Close 是幂等的；本地模式下 sshClient 为 nil，Close 只关 API
+// socketPath 三种取值：
+//   - 空：自动探测——优先 DOCKER_HOST 环境变量，否则平台默认
+//     （Windows 为 npipe:////./pipe/docker_engine，Linux/macOS 为 unix:///var/run/docker.sock）
+//   - 带 scheme（npipe:// / tcp:// / unix://）：原样使用
+//   - 纯路径（/var/run/docker.sock）：按 unix socket 处理（兼容旧配置）
+//
+// Host / User 字段填本机标识，仅用于 MarshalJSON 元数据，不参与拨号；
+// 返回的 DockerClient.Close 是幂等的；本地模式下 sshClient 为 nil，Close 只关 API
 func NewDockerClientLocal(socketPath string) (*DockerClient, error) {
-	if socketPath == "" {
-		return nil, fmt.Errorf("socket_path 不能为空")
+	opts := []dockerclient.Opt{dockerclient.WithAPIVersionNegotiation()}
+	display := socketPath
+	switch {
+	case socketPath == "":
+		// FromEnv 读取 DOCKER_HOST 等环境变量；未设置时 docker client 自带平台默认值
+		opts = append(opts, dockerclient.FromEnv)
+		display = "(自动探测)"
+	case strings.Contains(socketPath, "://"):
+		opts = append(opts, dockerclient.WithHost(socketPath))
+	default:
+		opts = append(opts, dockerclient.WithHost("unix://"+socketPath))
 	}
-	api, err := dockerclient.NewClientWithOpts(
-		dockerclient.WithHost("unix://"+socketPath),
-		dockerclient.WithAPIVersionNegotiation(),
-	)
+	api, err := dockerclient.NewClientWithOpts(opts...)
 	if err != nil {
 		return nil, fmt.Errorf("构造本地 Docker 客户端失败: %w", err)
 	}
@@ -55,7 +67,7 @@ func NewDockerClientLocal(socketPath string) (*DockerClient, error) {
 		Host:        "localhost",
 		Port:        0,
 		User:        "local",
-		SocketPath:  socketPath,
+		SocketPath:  display,
 		ConnectedAt: time.Now(),
 	}, nil
 }

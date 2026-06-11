@@ -14,6 +14,7 @@ package runtime
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 	"sync/atomic"
 	"time"
 
@@ -30,9 +31,62 @@ const llmHeartbeatInterval = 2 * time.Second
 // 50 轮够覆盖"看清单 → 看进程 → 看日志 → 总结"这种典型链路，又能拦住模型卡死的循环调用。
 const defaultMaxToolRounds = 50
 
+// workflowMaxToolRounds 是工作流生成/修改场景的工具循环上限。
+// 生成链路应尽快收敛到 propose 工具，避免模型围绕无关环境探测反复调用。
+const workflowMaxToolRounds = 30
+
 // maxLoopContextChars 是工具循环 messages 的总字符预算。
 // 超出后从最旧的 tool 消息开始替换为占位符，避免大量工具输出撑爆模型上下文。
 const maxLoopContextChars = 24_000
+
+// toolPolicy 描述本轮工具循环的可用工具与轮数上限。
+type toolPolicy struct {
+	Allowed   map[string]bool
+	MaxRounds int
+}
+
+// buildToolPolicy 根据场景收敛工具面。普通对话不限制；工作流生成优先使用最小工具集。
+func buildToolPolicy(req Request, profile string) toolPolicy {
+	if profile != toolProfileWorkflow {
+		return toolPolicy{}
+	}
+	allowed := map[string]bool{
+		"node_catalog":            true,
+		"env_inventory":           true,
+		"propose_workflow":        true,
+		"propose_update_workflow": true,
+	}
+	if workflowRequestNeedsEnvironmentFacts(req.Message) {
+		for _, name := range []string{
+			"ssh_inspect", "ssh_list_dir", "ssh_read_log", "ssh_read_file", "ssh_find_files", "ssh_process_list",
+			"docker_list_containers", "docker_container_logs", "docker_container_inspect", "docker_list_images",
+			"k8s_list_pods", "k8s_list_workloads", "k8s_describe_pod", "k8s_pod_logs",
+			"probe_catalog", "run_probe",
+		} {
+			allowed[name] = true
+		}
+	}
+	return toolPolicy{Allowed: allowed, MaxRounds: workflowMaxToolRounds}
+}
+
+// workflowRequestNeedsEnvironmentFacts 判断用户是否明确要求基于真实环境现状编排工作流。
+func workflowRequestNeedsEnvironmentFacts(message string) bool {
+	text := strings.ToLower(strings.TrimSpace(message))
+	if text == "" {
+		return false
+	}
+	factHints := []string{
+		"当前", "现状", "已有", "实际", "真实", "正在运行", "服务器上", "机器上", "主机上",
+		"基于服务器", "基于机器", "基于主机", "基于容器", "当前容器",
+		"current", "existing", "running", "actual", "based on server", "based on container",
+	}
+	for _, hint := range factHints {
+		if strings.Contains(text, hint) {
+			return true
+		}
+	}
+	return false
+}
 
 // runChatToolLoop 执行带工具的 chat 多轮调用，返回最终文本回复。
 // 在循环里通过 emitProgress 把工具调用过程以 🔧 前缀写入进度，让前端无需新事件类型即可展示。
@@ -42,13 +96,19 @@ func (r *Runtime) runChatToolLoop(
 	session *core.AISession,
 	messages []clients.ChatMessage,
 	progress *[]string,
-) (string, error) {
-	maxRounds := r.MaxToolRounds
+	toolProfile string,
+) (string, *proposalArtifact, error) {
+	policy := buildToolPolicy(req, toolProfile)
+	maxRounds := policy.MaxRounds
+	if r.MaxToolRounds > 0 && (maxRounds <= 0 || r.MaxToolRounds < maxRounds) {
+		maxRounds = r.MaxToolRounds
+	}
 	if maxRounds <= 0 {
 		maxRounds = defaultMaxToolRounds
 	}
-	specs := buildToolSpecs(r.Tools)
-	toolCtx := buildToolContext(r, req, session)
+	specs := buildToolSpecs(r.Tools, policy.Allowed)
+	proposals := &proposalState{}
+	toolCtx := buildToolContext(r, req, session, proposals)
 
 	for round := 0; round < maxRounds; round++ {
 		// 每轮调用前推一条心跳进度，避免长时间无反馈让用户以为卡住
@@ -107,11 +167,11 @@ func (r *Runtime) runChatToolLoop(
 		}
 		close(stopHeartbeat)
 		if err != nil {
-			return "", err
+			return "", proposals.last, err
 		}
 		// 没有工具调用 → 当前轮就是最终回复（content 已经流式推完）
 		if len(completion.ToolCalls) == 0 {
-			return completion.Content, nil
+			return completion.Content, proposals.last, nil
 		}
 		// 把 assistant 的"工具调用消息"追加，方便下一轮模型回看自己说过什么
 		messages = append(messages, clients.ChatMessage{
@@ -121,13 +181,13 @@ func (r *Runtime) runChatToolLoop(
 		})
 		// 顺序执行所有工具调用并把结果追加为 role="tool" 消息
 		for _, call := range completion.ToolCalls {
-			toolMsg := r.executeToolCall(req, session.ID, toolCtx, call, progress)
+			toolMsg := r.executeToolCall(req, session.ID, toolCtx, call, policy.Allowed, progress)
 			messages = append(messages, toolMsg)
 		}
 		// 上下文预算：超出后把最旧的工具输出替换为占位符
 		pruneToolMessages(messages, maxLoopContextChars)
 	}
-	return "", fmt.Errorf("Agent 工具循环超过 %d 轮仍未给出最终回复", maxRounds)
+	return "", proposals.last, fmt.Errorf("Agent 工具循环超过 %d 轮仍未给出最终回复", maxRounds)
 }
 
 // prunedPlaceholder 是被裁剪的工具输出占位文本。
@@ -160,6 +220,7 @@ func (r *Runtime) executeToolCall(
 	sessionID string,
 	toolCtx tools.ToolContext,
 	call clients.ToolCall,
+	allowed map[string]bool,
 	progress *[]string,
 ) clients.ChatMessage {
 	name := call.Function.Name
@@ -167,6 +228,12 @@ func (r *Runtime) executeToolCall(
 
 	// 入参摘要：把 args 拼成一行短描述，便于在 progress 中肉眼读
 	r.emitProgress(req.RequestID, sessionID, fmt.Sprintf("🔧 调用 %s%s", name, summarizeArgs(args)), progress)
+
+	if len(allowed) > 0 && !allowed[name] {
+		text := fmt.Sprintf("当前场景未启用工具: %s", name)
+		r.emitProgress(req.RequestID, sessionID, "✗ "+text, progress)
+		return clients.ChatMessage{Role: "tool", ToolCallID: call.ID, Content: text}
+	}
 
 	tool, ok := r.Tools.Lookup(name)
 	if !ok {
@@ -190,9 +257,9 @@ func (r *Runtime) executeToolCall(
 	return clients.ChatMessage{Role: "tool", ToolCallID: call.ID, Content: result.Output}
 }
 
-// buildToolSpecs 把 Registry 转成 OpenAI tools 数组。
+// buildToolSpecs 把 Registry 转成 OpenAI tools 数组；allowed 非空时只暴露白名单工具。
 // 每个工具的 Params 合成 JSON Schema 的 properties + required。
-func buildToolSpecs(reg *tools.Registry) []clients.ToolSpec {
+func buildToolSpecs(reg *tools.Registry, allowed map[string]bool) []clients.ToolSpec {
 	if reg == nil || reg.IsEmpty() {
 		return nil
 	}
@@ -200,6 +267,9 @@ func buildToolSpecs(reg *tools.Registry) []clients.ToolSpec {
 	out := make([]clients.ToolSpec, 0, len(all))
 	for _, t := range all {
 		spec := t.Spec()
+		if len(allowed) > 0 && !allowed[spec.Name] {
+			continue
+		}
 		props := map[string]any{}
 		required := []string{}
 		for pname, p := range spec.Params {
@@ -273,8 +343,10 @@ func summarizeArgs(args map[string]any) string {
 
 // buildToolContext 组装工具执行上下文，合并 Registry 注入与 Runtime 回调。
 // propose 闭包捕获本轮 req 与会话指针，是工具循环里仅有的写路径。
-func buildToolContext(r *Runtime, req Request, session *core.AISession) tools.ToolContext {
-	st := &proposalState{}
+func buildToolContext(r *Runtime, req Request, session *core.AISession, st *proposalState) tools.ToolContext {
+	if st == nil {
+		st = &proposalState{}
+	}
 	ctx := tools.ToolContext{
 		SessionID:             session.ID,
 		EnvironmentID:         session.EnvironmentID,

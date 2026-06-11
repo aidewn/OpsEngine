@@ -37,13 +37,14 @@ func dialDockerForTool(env core.EnvironmentDef, cfg core.EnvConfigItem) (*client
 		mode = "over_ssh"
 	}
 	socketPath := stringFieldDocker(cfg.Fields, "socket_path")
-	if socketPath == "" {
-		socketPath = dockerDefaultSocket
-	}
 	switch mode {
 	case "local":
+		// 空 socket_path 由 NewDockerClientLocal 自动探测（Windows npipe / Linux unix socket）
 		return clients.NewDockerClientLocal(socketPath)
 	case "over_ssh":
+		if socketPath == "" {
+			socketPath = dockerDefaultSocket
+		}
 		sshConfigID := stringFieldDocker(cfg.Fields, "ssh_config_id")
 		if sshConfigID == "" {
 			return nil, fmt.Errorf("Docker 配置缺少 ssh_config_id")

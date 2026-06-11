@@ -1,0 +1,109 @@
+id = "45e7ad5e-51aa-4629-b78c-ae9feffc32d3"
+name = "部署 Nginx"
+description = "通过 Docker 在远端服务器上拉取 nginx 镜像并启动容器，映射 80 端口"
+
+[[variables]]
+  name = "ssh_password"
+  var_type = ""
+  default = ""
+
+[[nodes]]
+  id = "aac4673c-8680-4791-a518-4619b26a1025"
+  type = "system_ready"
+  [nodes.config]
+  [nodes.position]
+    x = 100.0
+    y = 200.0
+
+[[nodes]]
+  id = "4ec8e1eb-eeb7-4400-932e-2a867fca318c"
+  type = "docker_connect"
+  [nodes.config]
+    host = "192.168.112.128"
+    password = "{{ssh_password}}"
+    port = 22.0
+    socket_path = "/var/run/docker.sock"
+    timeout_seconds = 10.0
+    user = "root"
+  [nodes.position]
+    x = 300.0
+    y = 200.0
+
+[[nodes]]
+  id = "db695612-8c77-49aa-b3bd-8fb183def23b"
+  type = "docker_pull"
+  [nodes.config]
+    image = "nginx:latest"
+  [nodes.position]
+    x = 500.0
+    y = 200.0
+
+[[nodes]]
+  id = "09888f34-d130-40ac-bf21-f949552f990c"
+  type = "docker_run"
+  [nodes.config]
+    image = "nginx:latest"
+    name = "nginx"
+    ports = "80:80"
+    restart_policy = "unless-stopped"
+  [nodes.position]
+    x = 700.0
+    y = 200.0
+
+[[nodes]]
+  id = "6432b5c7-2a19-40b4-b922-33647fafc7e0"
+  type = "system_update"
+  [nodes.config]
+    delta_seconds = 60
+    delta_type = "interval"
+  [nodes.position]
+    x = 80.0
+    y = 280.0
+
+[[nodes]]
+  id = "edf04d02-279d-4f07-af34-cec56e40d154"
+  type = "system_over"
+  [nodes.config]
+  [nodes.position]
+    x = 80.0
+    y = 480.0
+
+[[edges]]
+  [edges.from]
+    node = "aac4673c-8680-4791-a518-4619b26a1025"
+    port = "exec_out"
+  [edges.to]
+    node = "4ec8e1eb-eeb7-4400-932e-2a867fca318c"
+    port = "exec_in"
+
+[[edges]]
+  [edges.from]
+    node = "4ec8e1eb-eeb7-4400-932e-2a867fca318c"
+    port = "exec_out"
+  [edges.to]
+    node = "db695612-8c77-49aa-b3bd-8fb183def23b"
+    port = "exec_in"
+
+[[edges]]
+  [edges.from]
+    node = "4ec8e1eb-eeb7-4400-932e-2a867fca318c"
+    port = "client"
+  [edges.to]
+    node = "db695612-8c77-49aa-b3bd-8fb183def23b"
+    port = "client"
+
+[[edges]]
+  [edges.from]
+    node = "db695612-8c77-49aa-b3bd-8fb183def23b"
+    port = "exec_out"
+  [edges.to]
+    node = "09888f34-d130-40ac-bf21-f949552f990c"
+    port = "exec_in"
+
+[[edges]]
+  [edges.from]
+    node = "4ec8e1eb-eeb7-4400-932e-2a867fca318c"
+    port = "client"
+  [edges.to]
+    node = "09888f34-d130-40ac-bf21-f949552f990c"
+    port = "client"

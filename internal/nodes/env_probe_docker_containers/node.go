@@ -189,9 +189,6 @@ func Probe(env core.EnvironmentDef, configID string, nodeConfig map[string]any) 
 		mode = "over_ssh"
 	}
 	socketPath := strings.TrimSpace(stringField(dockerCfg.Fields, "socket_path"))
-	if socketPath == "" {
-		socketPath = defaultSocketPath
-	}
 
 	// 拨号：local / over_ssh 两条路径共同产出一个可用的 *DockerClient
 	dockerClient, err := dialDocker(mode, dockerCfg, env, socketPath)
@@ -245,8 +242,12 @@ func Probe(env core.EnvironmentDef, configID string, nodeConfig map[string]any) 
 func dialDocker(mode string, dockerCfg *core.EnvConfigItem, env core.EnvironmentDef, socketPath string) (*clients.DockerClient, error) {
 	switch mode {
 	case "local":
+		// 空 socket_path 由 NewDockerClientLocal 自动探测（Windows npipe / Linux unix socket）
 		return clients.NewDockerClientLocal(socketPath)
 	case "over_ssh":
+		if socketPath == "" {
+			socketPath = defaultSocketPath
+		}
 		sshConfigID := strings.TrimSpace(stringField(dockerCfg.Fields, "ssh_config_id"))
 		if sshConfigID == "" {
 			return nil, fmt.Errorf("Docker 配置缺少 ssh_config_id")

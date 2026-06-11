@@ -6,12 +6,14 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"io"
 	"strings"
 	"time"
 
 	"OpsEngine/internal/clients"
 	"OpsEngine/internal/core"
 	"OpsEngine/internal/engine"
+	"OpsEngine/internal/nodes/streamlog"
 
 	"golang.org/x/crypto/ssh"
 )
@@ -83,12 +85,18 @@ func (Node) Execute(ctx engine.ExecContext) (engine.Outputs, error) {
 	}
 	defer session.Close()
 
+	// 实时日志：输出边产生边按批推送（streamlog 负责切行/清洗/限流），
+	// 完整输出仍进 buffer 供 outputs 透出
 	var stdout, stderr bytes.Buffer
-	session.Stdout = &stdout
-	session.Stderr = &stderr
+	outStream := streamlog.New(func(chunk string) { ctx.Info("%s", chunk) })
+	errStream := streamlog.New(func(chunk string) { ctx.Warn("%s", chunk) })
+	session.Stdout = io.MultiWriter(&stdout, outStream)
+	session.Stderr = io.MultiWriter(&stderr, errStream)
 
 	ctx.Info("执行远程命令: %s", command)
 	runErr := runWithTimeout(ctx, session, command, time.Duration(timeoutSeconds)*time.Second)
+	outStream.Flush()
+	errStream.Flush()
 
 	stdoutText := stdout.String()
 	stderrText := stderr.String()
@@ -102,22 +110,16 @@ func (Node) Execute(ctx engine.ExecContext) (engine.Outputs, error) {
 		"combined_output": combined,
 	}
 
+	// 输出过程已实时推送，结束时只打结果摘要，不再整段重复
 	if runErr != nil {
-		logCommandFailure(ctx, exitCode, stdoutText, stderrText)
+		ctx.Error("命令执行失败，exit_code=%d", exitCode)
 		if failOnError(ctx) {
 			return outputs, fmt.Errorf("命令执行失败，exit_code=%d: %w", exitCode, runErr)
 		}
 		ctx.Warn("命令未成功（exit_code=%d），已配置为不中断工作流，继续执行", exitCode)
 		return outputs, nil
 	}
-
 	ctx.Info("命令执行成功")
-	if stdoutText != "" {
-		ctx.Info("stdout: %s", strings.TrimSpace(stdoutText))
-	}
-	if stderrText != "" {
-		ctx.Warn("stderr: %s", strings.TrimSpace(stderrText))
-	}
 	return outputs, nil
 }
 
@@ -130,16 +132,6 @@ func failOnError(ctx engine.ExecContext) bool {
 }
 
 // logCommandFailure 记录命令非零退出或超时等执行失败
-func logCommandFailure(ctx engine.ExecContext, exitCode int, stdoutText, stderrText string) {
-	ctx.Error("命令执行失败，exit_code=%d", exitCode)
-	if stderrText != "" {
-		ctx.Error("stderr: %s", strings.TrimSpace(stderrText))
-	}
-	if stdoutText != "" {
-		ctx.Info("stdout: %s", strings.TrimSpace(stdoutText))
-	}
-}
-
 // inputClient 从 client 输入端口读取 Linux SSH 连接句柄
 func inputClient(ctx engine.ExecContext) (*clients.LinuxSshClient, error) {
 	value, ok := ctx.Input("client")
