@@ -1,0 +1,45 @@
+id = "2a53f5e7-02ab-4be3-ab90-7312e859631c"
+name = "1"
+description = ""
+variables = []
+edges = []
+
+[[nodes]]
+  id = "eb09bd09-cdaf-4fdd-93a2-66e2475fb9dd"
+  type = "system_ready"
+  [nodes.config]
+  [nodes.position]
+    x = 80.0
+    y = 80.0
+
+[[nodes]]
+  id = "ed86b176-2a03-4f4c-92b3-c77d2264dfd2"
+  type = "system_update"
+  [nodes.config]
+    delta_seconds = 60.0
+    delta_type = "interval"
+  [nodes.position]
+    x = 80.0
+    y = 280.0
+
+[[nodes]]
+  id = "d425ddb8-a3bf-4e26-9ee6-10d539cf05d3"
+  type = "system_over"
+  [nodes.config]
+  [nodes.position]
+    x = 80.0
+    y = 480.0
+
+[[nodes]]
+  id = "0e24b133-38a0-4dbe-ab5e-8a65288bb844"
+  type = "env_probe_localhost_find_files"
+  [nodes.config]
+    case_sensitive = true
+    config_id = ""
+    environment_id = ""
+    max_depth = 5.0
+    resolve_mode = "static"
+    start_dir = "/"
+  [nodes.position]
+    x = 423.3333333333333
+    y = 215.99999999999997

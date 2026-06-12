@@ -1,0 +1,84 @@
+id = "3537bf54-0de8-4891-b8e3-4a6493f747f7"
+name = "Docker Compose 安装 Nginx"
+description = "通过 Docker（docker_connect + docker_run）在目标服务器上部署 Nginx 容器，效果等同 docker compose 单服务部署"
+
+[[variables]]
+  name = ""
+  var_type = ""
+
+[[nodes]]
+  id = "96678ba8-5505-40ba-9a9a-90ff32643a2d"
+  type = "system_ready"
+  [nodes.config]
+  [nodes.position]
+    x = 100.0
+    y = 150.0
+
+[[nodes]]
+  id = "ffb8ae79-5c38-4e77-ba01-53c3d39642db"
+  type = "docker_connect"
+  [nodes.config]
+    host = "192.168.112.128"
+    password = "{{v1}}"
+    port = 22.0
+    socket_path = "/var/run/docker.sock"
+    timeout_seconds = 10.0
+    user = "root"
+  [nodes.position]
+    x = 300.0
+    y = 150.0
+
+[[nodes]]
+  id = "a8a274e4-1c1a-439b-ad91-84d1165c2884"
+  type = "docker_run"
+  [nodes.config]
+    auto_remove = false
+    image = "nginx:latest"
+    name = "nginx"
+    ports = "80:80"
+    restart_policy = "unless-stopped"
+  [nodes.position]
+    x = 500.0
+    y = 150.0
+
+[[nodes]]
+  id = "bc98dc4c-9274-448f-be88-56ee07d19f13"
+  type = "system_update"
+  [nodes.config]
+    delta_seconds = 60
+    delta_type = "interval"
+  [nodes.position]
+    x = 80.0
+    y = 280.0
+
+[[nodes]]
+  id = "63337bc2-0d10-40a3-aaba-7416fb95801f"
+  type = "system_over"
+  [nodes.config]
+  [nodes.position]
+    x = 80.0
+    y = 480.0
+
+[[edges]]
+  [edges.from]
+    node = "96678ba8-5505-40ba-9a9a-90ff32643a2d"
+    port = "exec_out"
+  [edges.to]
+    node = "ffb8ae79-5c38-4e77-ba01-53c3d39642db"
+    port = "exec_in"
+
+[[edges]]
+  [edges.from]
+    node = "ffb8ae79-5c38-4e77-ba01-53c3d39642db"
+    port = "exec_out"
+  [edges.to]
+    node = "a8a274e4-1c1a-439b-ad91-84d1165c2884"
+    port = "exec_in"
+
+[[edges]]
+  [edges.from]
+    node = "ffb8ae79-5c38-4e77-ba01-53c3d39642db"
+    port = "client"
+  [edges.to]
+    node = "a8a274e4-1c1a-439b-ad91-84d1165c2884"
+    port = "client"

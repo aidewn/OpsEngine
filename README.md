@@ -6,13 +6,13 @@
 
 - **  全新页面 **
 
-![alt text](image-10.png)
+![alt text](docs/assets/image-10.png)
 
 - **  全新页面 **
 自动生成工作流
-![alt text](image-11.png)
-![alt text](image-12.png)
-![alt text](image-13.png)
+![alt text](docs/assets/image-11.png)
+![alt text](docs/assets/image-12.png)
+![alt text](docs/assets/image-13.png)
 ## 技术栈
 
 | 层级 | 技术 |

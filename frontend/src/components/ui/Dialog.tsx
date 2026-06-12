@@ -47,21 +47,23 @@ export function Dialog({
             'fixed left-1/2 top-1/2 z-50 w-full -translate-x-1/2 -translate-y-1/2',
             'rounded-lg border border-ops-border-subtle bg-ops-elevated p-6 text-ops-primary shadow-2xl',
             'focus:outline-none',
+            // 整体限高 + 纵向 flex：标题/底栏固定，内容区内部滚动，长表单不再把弹窗撑出视口
+            'flex max-h-[calc(100vh-64px)] flex-col',
             sizeClass[size],
             contentClassName,
           )}
         >
-          <RadixDialog.Title className="text-lg font-semibold text-ops-primary">
+          <RadixDialog.Title className="shrink-0 text-lg font-semibold text-ops-primary">
             {title}
           </RadixDialog.Title>
           {description && (
-            <RadixDialog.Description className="mt-1 text-sm text-ops-secondary">
+            <RadixDialog.Description className="mt-1 shrink-0 text-sm text-ops-secondary">
               {description}
             </RadixDialog.Description>
           )}
-          <div className="mt-4">{children}</div>
+          <div className="mt-4 min-h-0 flex-1 overflow-y-auto">{children}</div>
           {footer && (
-            <div className="mt-6 flex justify-end gap-2">{footer}</div>
+            <div className="mt-4 flex shrink-0 justify-end gap-2">{footer}</div>
           )}
         </RadixDialog.Content>
       </RadixDialog.Portal>

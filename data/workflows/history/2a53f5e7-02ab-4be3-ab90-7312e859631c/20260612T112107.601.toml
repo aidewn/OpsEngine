@@ -1,0 +1,46 @@
+id = "2a53f5e7-02ab-4be3-ab90-7312e859631c"
+name = "1"
+description = ""
+variables = []
+
+[[nodes]]
+  id = "eb09bd09-cdaf-4fdd-93a2-66e2475fb9dd"
+  type = "system_ready"
+  [nodes.config]
+  [nodes.position]
+    x = 80.0
+    y = 80.0
+
+[[nodes]]
+  id = "ed86b176-2a03-4f4c-92b3-c77d2264dfd2"
+  type = "system_update"
+  [nodes.config]
+    delta_seconds = 60.0
+    delta_type = "interval"
+  [nodes.position]
+    x = 80.0
+    y = 280.0
+
+[[nodes]]
+  id = "d425ddb8-a3bf-4e26-9ee6-10d539cf05d3"
+  type = "system_over"
+  [nodes.config]
+  [nodes.position]
+    x = 80.0
+    y = 480.0
+
+[[nodes]]
+  id = "6d8135b7-5829-4f2e-a6d4-ac32a583616c"
+  type = "print"
+  [nodes.config]
+  [nodes.position]
+    x = 339.0
+    y = 120.5
+
+[[edges]]
+  [edges.from]
+    node = "eb09bd09-cdaf-4fdd-93a2-66e2475fb9dd"
+    port = "exec_out"
+  [edges.to]
+    node = "6d8135b7-5829-4f2e-a6d4-ac32a583616c"
+    port = "exec_in"
