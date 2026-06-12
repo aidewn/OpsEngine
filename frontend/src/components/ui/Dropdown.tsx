@@ -24,7 +24,11 @@ export function Dropdown({ trigger, children, align = 'end' }: DropdownProps) {
         <DropdownMenu.Content
           align={align}
           sideOffset={6}
-          className="z-50 min-w-52 rounded-md border border-ops-border-subtle bg-ops-elevated p-1 text-sm text-ops-primary shadow-2xl"
+          className={cn(
+            'z-50 min-w-52 rounded-md border border-ops-border-subtle bg-ops-elevated p-1 text-sm text-ops-primary shadow-2xl',
+            'data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:slide-in-from-top-2 data-[state=open]:duration-base',
+            'data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:duration-fast',
+          )}
         >
           {children}
         </DropdownMenu.Content>
@@ -43,7 +47,7 @@ export function DropdownItem({
     <DropdownMenu.Item
       disabled={disabled}
       className={cn(
-        'cursor-default select-none rounded px-2 py-1.5 outline-none transition-colors',
+        'cursor-default select-none rounded px-2 py-1.5 outline-none transition-colors duration-fast ease-ops',
         'data-[highlighted]:bg-ops-surface data-[highlighted]:text-ops-primary',
         'data-[disabled]:text-ops-tertiary',
         className,

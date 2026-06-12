@@ -152,7 +152,30 @@
       "Bash(sed -n '78,92p' internal/agent/runtime/execfix_test.go)",
       "Bash(sed -n '60,80p' internal/agent/runtime/pending_test.go)",
       "Bash(gofmt -w internal/agent/runtime/execfix_test.go internal/agent/runtime/pending_test.go)",
-      "Bash(grep -E \"--- |FAIL|ok\")"
+      "Bash(grep -E \"--- |FAIL|ok\")",
+      "mcp__visualize__read_me",
+      "mcp__visualize__show_widget",
+      "Bash(node -e \"require.resolve\\('tailwindcss-animate'\\); console.log\\('resolved'\\)\")",
+      "Bash(sed -n '110,140p' pages/ExecutionDetailPage.tsx)",
+      "Bash(sed -n '55,120p' features/workflow/WorkflowCanvas.tsx)",
+      "Bash(gofmt -w internal/agent/runtime/events.go internal/core/ai_session.go)",
+      "Bash(gofmt -w ai.go)",
+      "Bash(gofmt -w internal/agent/tools/builtin/hostview.go)",
+      "Bash(sed -n '15,60p' types/ai.ts)",
+      "Bash(sed -n '116,150p' types/ai.ts)",
+      "Bash(sed -n '1125,1140p' features/ai/AIAssistantDialog.tsx)",
+      "Bash(sed -n '1210,1232p' features/ai/AIAssistantDialog.tsx)",
+      "Bash(echo \"ALL:$?\")",
+      "Bash(grep -n \"onOpenWorkflow\\\\|onOpenExecution\\\\|navigate\\(\\\\`/executions\\\\|const sendMessage\\\\|sendMessage\\(\" features/ai/AIAssistantDialog.tsx)",
+      "Bash(cat)",
+      "Bash(sed -i 's/toolCtxStub\\(\\)/tools.ToolContext{}/g' internal/agent/tools/builtin/diagram_test.go)",
+      "Bash(sed -i 's|\"encoding/json\"|\"encoding/json\"\\\\n\\\\t\"strconv\"|' internal/agent/tools/builtin/diagram_test.go)",
+      "Bash(gofmt -w internal/agent/tools/builtin/diagram_test.go)",
+      "Bash(sed -n '330,355p' internal/agent/runtime/toolloop.go)",
+      "Bash(sed -n '/func \\(s \\\\*AISessionStore\\) Save/,/^}/p' internal/store/ai_session_store.go)",
+      "Bash(gofmt -w internal/store/ai_session_store.go internal/agent/tools/types.go internal/agent/runtime/toolloop.go)",
+      "Bash(cd \"C:/Users/m1832/GolandProjects/OpsEngine/frontend/src\" && grep -n \"解析 AI 会话失败\\\\|useAISession\\\\|session.*error\\\\|更新会话上下文失败\" features/ai/AIAssistantDialog.tsx api/ai.ts | head; echo \"=== loadLocked 错误前缀:\"; grep -n \"解析\\\\|TOML\\\\|Decode\" \"../../internal/store/ai_session_store.go\" 2>/dev/null | head)",
+      "Bash(gofmt -w internal/store/ai_session_store.go)"
     ]
   }
 }

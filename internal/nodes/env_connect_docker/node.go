@@ -99,7 +99,7 @@ func (Node) Execute(ctx engine.ExecContext) (engine.Outputs, error) {
 		}, nil
 	}
 
-	if mode != "over_ssh" {
+	if mode != "ssh_cli" && mode != "over_ssh" {
 		return nil, fmt.Errorf("不支持的 Docker mode=%s（仅支持 local / over_ssh）", mode)
 	}
 
@@ -121,7 +121,11 @@ func (Node) Execute(ctx engine.ExecContext) (engine.Outputs, error) {
 	if socketPath == "" {
 		socketPath = defaultSocketPath
 	}
-	ctx.Info("正在通过 SSH %s@%s 拨号到 Docker socket %s", sshDial.User, addr, socketPath)
+	if mode == "ssh_cli" {
+		ctx.Info("正在通过 SSH %s@%s 启动 docker system dial-stdio", sshDial.User, addr)
+	} else {
+		ctx.Info("正在通过 SSH %s@%s 拨号到 Docker socket %s", sshDial.User, addr, socketPath)
+	}
 
 	linuxClient, err := sshDial.Dial()
 	if err != nil {
@@ -130,7 +134,12 @@ func (Node) Execute(ctx engine.ExecContext) (engine.Outputs, error) {
 
 	// DockerClient 取得底层 ssh.Client 的所有权（Close 会一起关）
 	// 因此不再调用 linuxClient.Close，避免双重关闭
-	dockerClient, err := clients.NewDockerClientOverSSH(linuxClient.Client(), sshDial.Host, sshDial.Port, sshDial.User, socketPath)
+	var dockerClient *clients.DockerClient
+	if mode == "ssh_cli" {
+		dockerClient, err = clients.NewDockerClientOverSSHCLI(linuxClient.Client(), sshDial.Host, sshDial.Port, sshDial.User)
+	} else {
+		dockerClient, err = clients.NewDockerClientOverSSH(linuxClient.Client(), sshDial.Host, sshDial.Port, sshDial.User, socketPath)
+	}
 	if err != nil {
 		// 包装失败时手动关闭 SSH，避免泄漏
 		_ = linuxClient.Close()

@@ -8,6 +8,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"strings"
@@ -111,7 +112,59 @@ func NewDockerClientOverSSH(sshClient *ssh.Client, host string, port int, user, 
 	}, nil
 }
 
-// API 返回底层 Docker SDK 客户端，供后续 docker_* 操作节点使用
+// NewDockerClientOverSSHCLI 通过远端 docker CLI 的 dial-stdio 子命令连接 Docker daemon。
+// 该模式不依赖 SSH streamlocal 转发，也不直接读取远端 docker.sock。
+func NewDockerClientOverSSHCLI(sshClient *ssh.Client, host string, port int, user string) (*DockerClient, error) {
+	if sshClient == nil {
+		return nil, fmt.Errorf("SSH 连接为空")
+	}
+	httpClient := &http.Client{
+		Transport: &http.Transport{
+			DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+				session, err := sshClient.NewSession()
+				if err != nil {
+					return nil, fmt.Errorf("创建 SSH 会话失败: %w", err)
+				}
+				stdin, err := session.StdinPipe()
+				if err != nil {
+					_ = session.Close()
+					return nil, fmt.Errorf("打开 docker CLI stdin 失败: %w", err)
+				}
+				stdout, err := session.StdoutPipe()
+				if err != nil {
+					_ = session.Close()
+					return nil, fmt.Errorf("打开 docker CLI stdout 失败: %w", err)
+				}
+				stderr := &limitedBuffer{limit: 4096}
+				session.Stderr = stderr
+				if err := session.Start("docker system dial-stdio"); err != nil {
+					_ = session.Close()
+					return nil, fmt.Errorf("启动 docker system dial-stdio 失败: %w", err)
+				}
+				return newDockerSSHCLIConn(session, stdin, stdout, stderr, host), nil
+			},
+		},
+	}
+	api, err := dockerclient.NewClientWithOpts(
+		dockerclient.WithHTTPClient(httpClient),
+		dockerclient.WithHost("http://docker"),
+		dockerclient.WithAPIVersionNegotiation(),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("构造 SSH CLI Docker 客户端失败: %w", err)
+	}
+	return &DockerClient{
+		api:         api,
+		sshClient:   sshClient,
+		Host:        host,
+		Port:        port,
+		User:        user,
+		SocketPath:  "ssh_cli:docker system dial-stdio",
+		ConnectedAt: time.Now(),
+	}, nil
+}
+
+// API 返回底层 Docker SDK 客户端，供后续 docker_* 操作节点使用。
 func (c *DockerClient) API() *dockerclient.Client {
 	if c == nil {
 		return nil
@@ -128,7 +181,113 @@ func (c *DockerClient) Ping(ctx context.Context) error {
 	return err
 }
 
-// Close 关闭 Docker 客户端 + SSH 隧道
+// dockerSSHCLIConn 把 SSH session 的 stdin/stdout 包装成 net.Conn，供 Docker HTTP Transport 使用。
+type dockerSSHCLIConn struct {
+	session *ssh.Session
+	stdin   io.WriteCloser
+	stdout  io.Reader
+	stderr  *limitedBuffer
+	remote  net.Addr
+	done    chan error
+
+	closeOnce sync.Once
+	closeErr  error
+}
+
+func newDockerSSHCLIConn(session *ssh.Session, stdin io.WriteCloser, stdout io.Reader, stderr *limitedBuffer, host string) *dockerSSHCLIConn {
+	conn := &dockerSSHCLIConn{
+		session: session,
+		stdin:   stdin,
+		stdout:  stdout,
+		stderr:  stderr,
+		remote:  dockerAddr("ssh-cli:" + host),
+		done:    make(chan error, 1),
+	}
+	go func() {
+		conn.done <- session.Wait()
+	}()
+	return conn
+}
+
+func (c *dockerSSHCLIConn) Read(p []byte) (int, error) {
+	n, err := c.stdout.Read(p)
+	if err != nil && err != io.EOF {
+		return n, c.wrapStdioError(err)
+	}
+	return n, err
+}
+
+func (c *dockerSSHCLIConn) Write(p []byte) (int, error) {
+	n, err := c.stdin.Write(p)
+	if err != nil {
+		return n, c.wrapStdioError(err)
+	}
+	return n, nil
+}
+
+func (c *dockerSSHCLIConn) Close() error {
+	c.closeOnce.Do(func() {
+		_ = c.stdin.Close()
+		_ = c.session.Close()
+		select {
+		case err := <-c.done:
+			c.closeErr = err
+		case <-time.After(2 * time.Second):
+		}
+	})
+	return c.closeErr
+}
+
+func (c *dockerSSHCLIConn) LocalAddr() net.Addr { return dockerAddr("opsengine") }
+
+func (c *dockerSSHCLIConn) RemoteAddr() net.Addr { return c.remote }
+
+func (c *dockerSSHCLIConn) SetDeadline(time.Time) error { return nil }
+
+func (c *dockerSSHCLIConn) SetReadDeadline(time.Time) error { return nil }
+
+func (c *dockerSSHCLIConn) SetWriteDeadline(time.Time) error { return nil }
+
+func (c *dockerSSHCLIConn) wrapStdioError(err error) error {
+	if msg := strings.TrimSpace(c.stderr.String()); msg != "" {
+		return fmt.Errorf("%w: %s", err, msg)
+	}
+	return err
+}
+
+type dockerAddr string
+
+func (a dockerAddr) Network() string { return "docker-ssh-cli" }
+
+func (a dockerAddr) String() string { return string(a) }
+
+// limitedBuffer 保存远端 docker CLI 的 stderr 尾部，避免错误信息无限增长。
+type limitedBuffer struct {
+	mu    sync.Mutex
+	limit int
+	data  []byte
+}
+
+func (b *limitedBuffer) Write(p []byte) (int, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.data = append(b.data, p...)
+	if b.limit > 0 && len(b.data) > b.limit {
+		b.data = b.data[len(b.data)-b.limit:]
+	}
+	return len(p), nil
+}
+
+func (b *limitedBuffer) String() string {
+	if b == nil {
+		return ""
+	}
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return string(b.data)
+}
+
+// Close 关闭 Docker 客户端 + SSH 隧道。
 func (c *DockerClient) Close() error {
 	if c == nil {
 		return nil

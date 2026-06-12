@@ -25,8 +25,8 @@ import {
   type GraphDef,
   type RfNodeData,
   graphToRf,
-  toRfEdge,
-} from './canvasMapping';
+  toRfEdge, applyExecutionEdgeStyle } from './canvasMapping';
+import { useExecutionFrameStates } from './nodes/useNodeExecState';
 import { resolveGraphPort } from './resolveGraphPort';
 import { buildDefaultConfig, portTypesConnectable } from '@/types/nodeType';
 import { newUUID } from '@/lib/uuid';
@@ -102,6 +102,14 @@ export function WorkflowCanvas<T extends GraphDef>({
     initial.nodes,
   );
   const [edges, setEdges, onEdgesChange] = useEdgesState(initial.edges);
+
+  // 执行详情页（readOnly）按节点状态渲染"电流边"：执行中流动、成功点亮、失败标红
+  // 编辑画布 frameStates 为 null，原样返回
+  const frameStates = useExecutionFrameStates();
+  const displayEdges = useMemo(() => {
+    if (!readOnly || !frameStates) return edges;
+    return edges.map((e) => applyExecutionEdgeStyle(e, frameStates));
+  }, [edges, frameStates, readOnly]);
 
   // 端口右键菜单状态：null = 不显示
   const [portMenu, setPortMenu] = useState<PortContextMenuState | null>(null);
@@ -452,7 +460,7 @@ export function WorkflowCanvas<T extends GraphDef>({
     >
       <ReactFlow
       nodes={nodes}
-      edges={edges}
+      edges={displayEdges}
       onNodesChange={readOnly ? undefined : onNodesChange}
       onEdgesChange={readOnly ? undefined : onEdgesChange}
       onConnect={readOnly ? undefined : onConnect}

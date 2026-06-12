@@ -1,0 +1,95 @@
+id = "d0afb0e2-8e6e-4a50-a0f7-e82dc5cb56db"
+name = "123"
+description = ""
+
+[[variables]]
+  name = "SSH"
+  var_type = "LinuxSshConnection"
+
+[[nodes]]
+  id = "0e24de42-7789-4daa-9013-9d0398772d9e"
+  type = "system_ready"
+  [nodes.config]
+  [nodes.position]
+    x = 80.0
+    y = 80.0
+
+[[nodes]]
+  id = "4a837593-bb63-46f8-91f7-87d41fe87a83"
+  type = "system_update"
+  [nodes.config]
+    delta_seconds = 5.0
+    delta_type = "interval"
+  [nodes.position]
+    x = 80.0
+    y = 280.0
+
+[[nodes]]
+  id = "d5502499-02be-4bd1-b7c6-6535e414dfc6"
+  type = "system_over"
+  [nodes.config]
+  [nodes.position]
+    x = 80.0
+    y = 480.0
+
+[[nodes]]
+  id = "a423cbd3-18e7-4bd4-8ed9-2f97a7ad16d9"
+  type = "env_connect_ssh"
+  [nodes.config]
+    config_id = "cc951b78-46bc-4777-ac8f-41b7f560bec9"
+    environment_id = "1638a7ba-e778-4267-b296-1afba582fea6"
+  [nodes.position]
+    x = 317.17404821003606
+    y = 81.5
+
+[[nodes]]
+  id = "86ac3f2c-5393-4da3-abd0-50f7e88b6669"
+  type = "var_set"
+  [nodes.config]
+    var_name = "SSH"
+    var_type = "LinuxSshConnection"
+  [nodes.position]
+    x = 562.5473346191678
+    y = 81.45852373231868
+
+[[nodes]]
+  id = "822259ac-dc9d-4e8d-bc3d-4edcba2852d7"
+  type = "linux_exec_command"
+  [nodes.config]
+    fail_on_error = true
+    timeout_seconds = 60.0
+  [nodes.position]
+    x = 807.8641774565529
+    y = 82.04806652879849
+
+[[edges]]
+  [edges.from]
+    node = "0e24de42-7789-4daa-9013-9d0398772d9e"
+    port = "exec_out"
+  [edges.to]
+    node = "a423cbd3-18e7-4bd4-8ed9-2f97a7ad16d9"
+    port = "exec_in"
+
+[[edges]]
+  [edges.from]
+    node = "a423cbd3-18e7-4bd4-8ed9-2f97a7ad16d9"
+    port = "client"
+  [edges.to]
+    node = "86ac3f2c-5393-4da3-abd0-50f7e88b6669"
+    port = "value"
+
+[[edges]]
+  [edges.from]
+    node = "a423cbd3-18e7-4bd4-8ed9-2f97a7ad16d9"
+    port = "exec_out"
+  [edges.to]
+    node = "86ac3f2c-5393-4da3-abd0-50f7e88b6669"
+    port = "exec_in"
+
+[[edges]]
+  [edges.from]
+    node = "86ac3f2c-5393-4da3-abd0-50f7e88b6669"
+    port = "exec_out"
+  [edges.to]
+    node = "822259ac-dc9d-4e8d-bc3d-4edcba2852d7"
+    port = "exec_in"

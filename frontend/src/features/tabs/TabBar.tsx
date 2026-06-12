@@ -50,7 +50,7 @@ export function TabBar() {
               if (!isActive) navigate(routeFor(tab));
             }}
             className={cn(
-              'group flex h-9 cursor-pointer items-center gap-1.5 border-b-2 px-3 text-xs transition-colors',
+              'group flex h-9 cursor-pointer items-center gap-1.5 border-b-2 px-3 text-xs transition-colors duration-fast ease-ops',
               isActive
                 ? 'border-blue-500 bg-slate-50 font-medium text-slate-900'
                 : 'border-transparent text-slate-500 hover:bg-ops-elevated',

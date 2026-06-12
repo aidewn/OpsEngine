@@ -82,6 +82,7 @@ func (K8sListPods) Execute(ctx tools.ToolContext, args map[string]any) (tools.Re
 	return tools.Result{
 		Output:         tools.TruncateOutput(string(data)),
 		DisplaySummary: fmt.Sprintf("k8s_list_pods @ %s（%d 个）", env.Name, len(entries)),
+		View:           listView("k8s_pods", fmt.Sprintf("Pod · %s（%d）", env.Name, len(entries)), string(data)),
 	}, nil
 }
 
@@ -148,6 +149,7 @@ func (K8sListWorkloads) Execute(ctx tools.ToolContext, args map[string]any) (too
 	return tools.Result{
 		Output:         tools.TruncateOutput(string(data)),
 		DisplaySummary: fmt.Sprintf("k8s_list_workloads @ %s（%d 个容器条目）", env.Name, len(entries)),
+		View:           listView("k8s_workloads", fmt.Sprintf("工作负载 · %s（%d）", env.Name, len(entries)), string(data)),
 	}, nil
 }
 

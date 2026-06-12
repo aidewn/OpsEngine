@@ -3,7 +3,7 @@
 // - 选中节点：Config / Logs / Info 三 tab
 // - 传入 executionID 时，Logs tab 从 ExecutionStore 读实时日志
 
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { NodeInstance, VariableDef } from '@/types/workflow';
 import type { ParamDef } from '@/types/assemble';
 import type { GraphDef } from './canvasMapping';
@@ -330,6 +330,24 @@ function LogsTab({
   framePath: string[];
 }) {
   const exec = useExecution(executionID);
+  const frame = frameAt(exec?.rootFrame, framePath);
+  const logs = frame?.node_logs[nodeID] ?? [];
+  const executing = frame?.node_states[nodeID] === 'Executing';
+
+  // 跟随滚动：贴近底部时新日志自动滚底；用户上滚后暂停并显示「回到底部」
+  const boxRef = useRef<HTMLDivElement>(null);
+  const [follow, setFollow] = useState(true);
+  useEffect(() => {
+    if (follow && boxRef.current) {
+      boxRef.current.scrollTop = boxRef.current.scrollHeight;
+    }
+  }, [logs.length, follow]);
+  const onScroll = () => {
+    const el = boxRef.current;
+    if (!el) return;
+    setFollow(el.scrollHeight - el.scrollTop - el.clientHeight < 24);
+  };
+
   if (!executionID) {
     return (
       <div className="text-xs text-slate-400">
@@ -337,29 +355,50 @@ function LogsTab({
       </div>
     );
   }
-  const frame = frameAt(exec?.rootFrame, framePath);
-  const logs = frame?.node_logs[nodeID] ?? [];
-  if (logs.length === 0) {
+  if (logs.length === 0 && !executing) {
     return <div className="text-xs text-slate-400">（无日志）</div>;
   }
   return (
-    <div className="space-y-1 font-mono text-[11px]">
-      {logs.map((log, i) => (
-        <div
-          key={i}
-          className={cn(
-            'whitespace-pre-wrap break-words',
-            log.level === 'error' && 'text-red-600',
-            log.level === 'warn' && 'text-amber-600',
-            log.level === 'info' && 'text-slate-700',
-          )}
+    <div className="relative">
+      <div
+        ref={boxRef}
+        onScroll={onScroll}
+        className="max-h-[420px] overflow-y-auto rounded-md border border-ops-border-subtle bg-ops-canvas p-2 font-mono text-[11px] leading-relaxed"
+      >
+        {logs.map((log, i) => (
+          <div
+            key={i}
+            className={cn(
+              'flex gap-2 whitespace-pre-wrap break-words',
+              'animate-in fade-in slide-in-from-left-1 duration-base',
+              log.level === 'error' && 'text-red-600',
+              log.level === 'warn' && 'text-amber-600',
+              log.level === 'info' && 'text-slate-700',
+            )}
+          >
+            <span className="select-none tabular-nums text-ops-tertiary">
+              {String(i + 1).padStart(3, ' ')}
+            </span>
+            <span className="tabular-nums text-slate-400">{formatTime(log.time)}</span>
+            <span className="min-w-0 flex-1">{log.message}</span>
+          </div>
+        ))}
+        {executing && (
+          <div className="flex gap-2">
+            <span className="select-none text-ops-tertiary">{String(logs.length + 1).padStart(3, ' ')}</span>
+            <span className="stream-cursor text-ops-primary">▍</span>
+          </div>
+        )}
+      </div>
+      {!follow && (
+        <button
+          type="button"
+          onClick={() => setFollow(true)}
+          className="absolute bottom-2 right-2 rounded-md border border-ops-border-subtle bg-ops-elevated px-2 py-1 text-2xs text-ops-secondary transition-colors duration-fast ease-ops hover:text-ops-primary"
         >
-          <span className="text-slate-400">
-            {formatTime(log.time)}{' '}
-          </span>
-          {log.message}
-        </div>
-      ))}
+          ↓ 回到底部
+        </button>
+      )}
     </div>
   );
 }

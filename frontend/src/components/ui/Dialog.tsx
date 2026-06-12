@@ -39,7 +39,8 @@ export function Dialog({
         <RadixDialog.Overlay
           className={cn(
             'fixed inset-0 z-40 bg-ops-overlay',
-            'data-[state=open]:animate-in data-[state=open]:fade-in-0',
+            'data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:duration-slow',
+            'data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:duration-base',
           )}
         />
         <RadixDialog.Content
@@ -47,6 +48,9 @@ export function Dialog({
             'fixed left-1/2 top-1/2 z-50 w-full -translate-x-1/2 -translate-y-1/2',
             'rounded-lg border border-ops-border-subtle bg-ops-elevated p-6 text-ops-primary shadow-2xl',
             'focus:outline-none',
+            // 进出场：开 320ms 缩放淡入，关 200ms 淡出（与 Overlay 同步）
+            'data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 data-[state=open]:duration-slow',
+            'data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=closed]:duration-base',
             // 整体限高 + 纵向 flex：标题/底栏固定，内容区内部滚动，长表单不再把弹窗撑出视口
             'flex max-h-[calc(100vh-64px)] flex-col',
             sizeClass[size],

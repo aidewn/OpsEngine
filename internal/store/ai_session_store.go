@@ -58,8 +58,25 @@ func (s *AISessionStore) List() ([]core.AISession, error) {
 // Get 按 ID 加载会话。
 func (s *AISessionStore) Get(id string) (core.AISession, error) {
 	s.mu.RLock()
-	defer s.mu.RUnlock()
-	return s.loadLocked(id)
+	session, err := s.loadLocked(id)
+	s.mu.RUnlock()
+	// 解析失败的会话文件已损坏：隔离它（改名 .corrupt），避免每次加载都反复报错。
+	// 隔离用独立写锁，与上面的读锁分离，避免锁内改文件的竞态。
+	if err != nil && strings.Contains(err.Error(), "解析 AI 会话失败") {
+		s.quarantineCorrupt(id)
+	}
+	return session, err
+}
+
+// quarantineCorrupt 把损坏的会话文件改名为 .corrupt（保留以备查），best-effort。
+func (s *AISessionStore) quarantineCorrupt(id string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	src := filepath.Join(s.baseDir, id+".toml")
+	if _, err := os.Stat(src); err != nil {
+		return // 已被处理或不存在
+	}
+	_ = os.Rename(src, src+".corrupt")
 }
 
 // Save 整体覆盖保存。调用方负责设置 UpdatedAt。
@@ -67,6 +84,9 @@ func (s *AISessionStore) Save(session core.AISession) error {
 	if strings.TrimSpace(session.ID) == "" {
 		return fmt.Errorf("会话 ID 不能为空")
 	}
+	// 兜底：清洗所有文本字段为合法 UTF-8，杜绝任何上游截断产生的半字符把 TOML 写坏，
+	// 导致整个会话文件下次加载失败（曾因进度文本按字节截断中文触发）。
+	sanitizeSessionUTF8(&session)
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	path := filepath.Join(s.baseDir, session.ID+".toml")
@@ -76,6 +96,24 @@ func (s *AISessionStore) Save(session core.AISession) error {
 	}
 	defer file.Close()
 	return toml.NewEncoder(file).Encode(session)
+}
+
+// sanitizeSessionUTF8 把会话消息中可能含非法 UTF-8 的文本字段就地替换为合法字符串。
+// 非法字节用替换符替换（strings.ToValidUTF8），既保证可写入又便于事后发现。
+func sanitizeSessionUTF8(session *core.AISession) {
+	clean := func(s string) string { return strings.ToValidUTF8(s, "�") }
+	for i := range session.Messages {
+		m := &session.Messages[i]
+		m.Content = clean(m.Content)
+		m.ChangeSummary = clean(m.ChangeSummary)
+		for j := range m.Progress {
+			m.Progress[j] = clean(m.Progress[j])
+		}
+		for j := range m.Views {
+			m.Views[j].Title = clean(m.Views[j].Title)
+			m.Views[j].Data = clean(m.Views[j].Data)
+		}
+	}
 }
 
 // Delete 删除会话文件。

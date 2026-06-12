@@ -12,8 +12,8 @@ interface EmptyStateProps {
 
 export function EmptyState({ title, description, icon, action, className }: EmptyStateProps) {
   return (
-    <div className={cn('rounded-md border border-dashed border-ops-border-subtle px-6 py-12 text-center', className)}>
-      {icon ? <div className="mb-3 flex justify-center text-ops-secondary">{icon}</div> : null}
+    <div className={cn('px-6 py-14 text-center', className)}>
+      {icon ? <div className="mb-3 flex justify-center text-ops-tertiary">{icon}</div> : null}
       <div className="text-sm font-medium text-ops-primary">{title}</div>
       {description ? <p className="mt-1 text-sm text-ops-secondary">{description}</p> : null}
       {action ? <div className="mt-4 flex justify-center">{action}</div> : null}

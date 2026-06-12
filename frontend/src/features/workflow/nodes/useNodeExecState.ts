@@ -12,11 +12,18 @@ import type { NodeState } from '@/types/execution';
 export const FramePathContext = createContext<string[]>([]);
 
 export function useNodeExecState(nodeID: string): NodeState | undefined {
+  return useExecutionFrameStates()?.[nodeID];
+}
+
+// useExecutionFrameStates 返回当前 frame 的全量节点状态表。
+// 非执行详情页（编辑画布）返回 null，调用方据此跳过执行态渲染。
+// 画布的"电流边"用它按两端状态给边上色/流动。
+export function useExecutionFrameStates(): Record<string, NodeState> | null {
   const location = useLocation();
   const active = activeTabFromPath(location.pathname);
   const execID = active?.kind === 'execution' ? active.id : undefined;
   const exec = useExecution(execID);
   const framePath = useContext(FramePathContext);
   const frame = frameAt(exec?.rootFrame, framePath);
-  return frame?.node_states[nodeID];
+  return frame?.node_states ?? null;
 }

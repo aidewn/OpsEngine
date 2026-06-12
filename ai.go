@@ -62,6 +62,7 @@ type AIAssistantEvent struct {
 	SessionID     string                 `json:"session_id,omitempty"`
 	Type          string                 `json:"type"`
 	Text          string                 `json:"text,omitempty"`
+	View          *core.AIViewPayload    `json:"view,omitempty"`
 	WorkflowID    string                 `json:"workflow_id,omitempty"`
 	WorkflowName  string                 `json:"workflow_name,omitempty"`
 	AssembleID    string                 `json:"assemble_id,omitempty"`
@@ -195,6 +196,62 @@ func (a *App) UpdateAISessionTitle(id, title string) error {
 	session.Title = title
 	session.UpdatedAt = time.Now()
 	return a.aiSessionStore.Save(session)
+}
+
+// UpdateAISessionContext 更新已有会话的环境和 SSH 目标。
+// 通用会话遇到巡检、排障等真实环境任务时，可先补选上下文再重试。
+func (a *App) UpdateAISessionContext(id, environmentID, configID string) error {
+	if a.aiSessionStore == nil {
+		return errors.New("会话存储未初始化")
+	}
+	id = strings.TrimSpace(id)
+	environmentID = strings.TrimSpace(environmentID)
+	configID = strings.TrimSpace(configID)
+	if id == "" {
+		return errors.New("session_id 不能为空")
+	}
+	scope := core.AISessionScopeGeneral
+	if environmentID != "" {
+		if err := a.validateEnvironment(environmentID); err != nil {
+			return err
+		}
+		scope = core.AISessionScopeEnvironment
+	}
+	if configID != "" {
+		if environmentID == "" {
+			return errors.New("选择 SSH 配置前请先选择环境")
+		}
+		if err := a.validateSSHConfig(environmentID, configID); err != nil {
+			return err
+		}
+		scope = core.AISessionScopeConfig
+	}
+	session, err := a.aiSessionStore.Get(id)
+	if err != nil {
+		return err
+	}
+	changed := session.EnvironmentID != environmentID || session.ConfigID != configID || session.Scope != scope
+	session.EnvironmentID = environmentID
+	session.ConfigID = configID
+	session.Scope = scope
+	if changed {
+		session.ContextPrefetched = false
+		session.Messages = dropHiddenSystemMessages(session.Messages)
+	}
+	session.UpdatedAt = time.Now()
+	return a.aiSessionStore.Save(session)
+}
+
+// dropHiddenSystemMessages 移除旧环境预取快照，避免切换上下文后继续把旧机器信息注入 LLM。
+func dropHiddenSystemMessages(messages []core.AISessionMessage) []core.AISessionMessage {
+	out := messages[:0]
+	for _, message := range messages {
+		if message.Role == core.AIMessageRoleSystem && message.Hidden {
+			continue
+		}
+		out = append(out, message)
+	}
+	return out
 }
 
 // DeleteAISession 删除会话。
@@ -407,6 +464,7 @@ func (a *App) emitRuntimeEvent(e runtime.Event) {
 		SessionID:     e.SessionID,
 		Type:          string(e.Type),
 		Text:          e.Text,
+		View:          e.View,
 		WorkflowID:    e.WorkflowID,
 		WorkflowName:  e.WorkflowName,
 		AssembleID:    e.AssembleID,

@@ -109,7 +109,7 @@ export function EnvironmentDetailPage({ backTo = '/', backLabel }: EnvironmentDe
       setTestResult({
         configID: item.id,
         ok: false,
-        message: err instanceof Error ? err.message : '连接失败',
+        message: err instanceof Error ? err.message : String(err || '连接失败'),
       });
     }
   }

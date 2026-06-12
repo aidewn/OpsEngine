@@ -80,11 +80,12 @@ func (r *Runtime) runConversationTurn(req Request, session core.AISession, opts 
 
 	assistant := strings.Builder{}
 	var artifact *proposalArtifact
+	views := []core.AIViewPayload{}
 	if r.Tools != nil && !r.Tools.IsEmpty() {
 		// 启用工具时走流式工具循环：runChatToolLoop 内部对每轮 LLM 调用
 		// 走 ChatWithToolsStream 并把 content delta 直接 Emit，所以这里
 		// 拿到的 text 已经被前端渲染过；只需累积进 assistant 用于落库。
-		text, proposed, err := r.runChatToolLoop(req, &session, messages, &progress, opts.ToolProfile)
+		text, proposed, err := r.runChatToolLoop(req, &session, messages, &progress, &views, opts.ToolProfile)
 		if err != nil {
 			r.emitTurnError(req, &session, err.Error(), progress, opts.IntentTag)
 			return
@@ -111,6 +112,7 @@ func (r *Runtime) runConversationTurn(req Request, session core.AISession, opts 
 		Content:   assistant.String(),
 		Progress:  progress,
 		Intent:    opts.IntentTag,
+		Views:     views,
 		CreatedAt: time.Now(),
 	}
 	applyProposalArtifactToMessage(&message, artifact)

@@ -9,6 +9,8 @@
 package tools
 
 import (
+	"unicode/utf8"
+
 	"OpsEngine/internal/core"
 )
 
@@ -46,9 +48,11 @@ type Spec struct {
 // Result 是工具执行结果。
 //   - Output 是返回给模型 + 展示给用户的文本（已截断到安全长度）
 //   - DisplaySummary 是前端短摘要（可选；缺省取 Output 前 N 字符）
+//   - View 是可选的前端可视化载荷：只给前端渲染，不回流模型上下文
 type Result struct {
 	Output         string
 	DisplaySummary string
+	View           *core.AIViewPayload
 }
 
 // ToolContext 是工具实现所需的外部依赖。
@@ -96,9 +100,14 @@ type Tool interface {
 const MaxOutputBytes = 4000
 
 // TruncateOutput 把工具输出截到 MaxOutputBytes 以内，超长时附加截断提示。
+// 在字节上限处回退到最近的 UTF-8 字符边界，避免切碎多字节字符（中文等）。
 func TruncateOutput(text string) string {
 	if len(text) <= MaxOutputBytes {
 		return text
 	}
-	return text[:MaxOutputBytes] + "\n... (输出已截断)"
+	cut := MaxOutputBytes
+	for cut > 0 && !utf8.RuneStart(text[cut]) {
+		cut--
+	}
+	return text[:cut] + "\n... (输出已截断)"
 }

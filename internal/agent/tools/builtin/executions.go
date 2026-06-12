@@ -4,11 +4,13 @@
 package builtin
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 
 	"OpsEngine/internal/agent/execsum"
 	"OpsEngine/internal/agent/tools"
+	"OpsEngine/internal/core"
 )
 
 // GetExecution 按 ID 返回执行摘要；失败执行附带失败节点的配置、日志尾部与变量快照。
@@ -38,8 +40,15 @@ func (GetExecution) Execute(ctx tools.ToolContext, args map[string]any) (tools.R
 	if err != nil {
 		return tools.Result{}, err
 	}
+	view := &core.AIViewPayload{Kind: "execution_summary", Title: "执行 · " + rec.Snapshot.Workflow.Name}
+	if raw, mErr := json.Marshal(execsum.BuildExecutionView(rec)); mErr == nil {
+		view.Data = string(raw)
+	} else {
+		view = nil
+	}
 	return tools.Result{
 		Output:         tools.TruncateOutput(execsum.Summary(rec)),
 		DisplaySummary: fmt.Sprintf("get_execution %s (%s)", rec.ID, rec.Status),
+		View:           view,
 	}, nil
 }

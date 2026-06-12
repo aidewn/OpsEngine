@@ -18,7 +18,10 @@ body {
     'PingFang SC',
     'Microsoft YaHei',
     sans-serif;
-  background: #1a1a19;
+  /* 页面级点阵网格：与画布 React Flow dots 呼应；表面色容器自然遮盖 */
+  background-color: #1a1a19;
+  background-image: radial-gradient(circle, #262624 1px, transparent 1px);
+  background-size: 24px 24px;
   color: #f5f4ed;
 }
 
@@ -27,9 +30,20 @@ body {
   scrollbar-width: thin;
 }
 
+/* 系统开启"减弱动态效果"时关闭全部动效（保留 0.01ms 让 transitionend 事件仍触发） */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
 *::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
+  width: 8px;
+  height: 8px;
 }
 
 *::-webkit-scrollbar-track {
@@ -242,6 +256,56 @@ a {
   transition:
     background-color 120ms ease,
     color 120ms ease;
+}
+
+/* ── 执行叙事动效（风格批 3）────────────────────────────── */
+
+/* 执行中节点：info 色辉光呼吸（唯一允许的无限循环动画语义） */
+@keyframes node-breath {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 1px rgba(96, 165, 250, 0.4),
+      0 0 12px rgba(96, 165, 250, 0.18);
+  }
+  50% {
+    box-shadow:
+      0 0 0 1px rgba(96, 165, 250, 0.15),
+      0 0 4px rgba(96, 165, 250, 0.05);
+  }
+}
+.animate-node-breath {
+  animation: node-breath 1.6s ease-in-out infinite;
+}
+
+/* 节点成功：一次性 600ms 辉光脉冲后归于静止 */
+@keyframes node-success-pulse {
+  0% {
+    box-shadow:
+      0 0 0 1px rgba(16, 185, 129, 0.5),
+      0 0 16px rgba(16, 185, 129, 0.3);
+  }
+  100% {
+    box-shadow: none;
+  }
+}
+.animate-node-success {
+  animation: node-success-pulse 600ms ease-out 1;
+}
+
+/* 流式输出/日志终端光标：步进闪烁 */
+@keyframes cursor-blink {
+  0%,
+  55% {
+    opacity: 1;
+  }
+  56%,
+  100% {
+    opacity: 0;
+  }
+}
+.stream-cursor {
+  animation: cursor-blink 1.1s step-end infinite;
 }
 
 /* 扩大 React Flow handle 的鼠标点击区域：在 handle 外加一圈透明区 */

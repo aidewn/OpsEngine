@@ -56,9 +56,12 @@ export function ProgressTimeline({
                 key={`${item}-${index}`}
                 className={cn(
                   'rounded border px-2 py-1',
+                  // live 模式下新步骤底部滑入；历史展开不重复入场（keyed 不重挂载）
+                  live && 'animate-in fade-in slide-in-from-bottom-1 duration-base',
                   isLatest
                     ? 'border-ops-accent/40 bg-ops-accent-soft text-ops-primary'
                     : 'border-ops-border-subtle bg-ops-input',
+                  'transition-colors duration-base ease-ops',
                   progressLineClass(item),
                 )}
               >

@@ -171,3 +171,44 @@ func truncate(s string, limit int) string {
 	}
 	return string(runes[:limit]) + "…(已截断)"
 }
+
+// ExecutionView 是 execution_summary 视图的结构化数据（与前端 ExecutionSummaryCard 对齐）。
+type ExecutionView struct {
+	ID           string              `json:"id"`
+	WorkflowID   string              `json:"workflow_id"`
+	WorkflowName string              `json:"workflow_name"`
+	Status       string              `json:"status"`
+	Error        string              `json:"error,omitempty"`
+	FailedNodes  []ExecutionViewNode `json:"failed_nodes,omitempty"`
+}
+
+// ExecutionViewNode 是失败节点的精简展示项。
+type ExecutionViewNode struct {
+	InstanceID string `json:"instance_id"`
+	TypeID     string `json:"type_id"`
+	FramePath  string `json:"frame_path"`
+	LastLog    string `json:"last_log,omitempty"`
+}
+
+// BuildExecutionView 把执行记录转成视图数据：状态 + 失败节点列表（每个带最后一条日志）。
+func BuildExecutionView(rec core.ExecutionRecord) ExecutionView {
+	v := ExecutionView{
+		ID:           rec.ID,
+		WorkflowID:   rec.WorkflowID,
+		WorkflowName: rec.Snapshot.Workflow.Name,
+		Status:       string(rec.Status),
+		Error:        rec.Error,
+	}
+	for _, fn := range CollectFailedNodes(rec) {
+		node := ExecutionViewNode{
+			InstanceID: fn.InstanceID,
+			TypeID:     fn.TypeID,
+			FramePath:  fn.FramePath,
+		}
+		if n := len(fn.Logs); n > 0 {
+			node.LastLog = truncate(fn.Logs[n-1].Message, maxLogLineLen)
+		}
+		v.FailedNodes = append(v.FailedNodes, node)
+	}
+	return v
+}

@@ -22,6 +22,7 @@ func TestRegisterAllBuiltinTools(t *testing.T) {
 		"node_catalog", "probe_catalog", "run_probe",
 		"list_workflows", "get_workflow", "list_assembles", "get_assemble", "get_execution",
 		"propose_workflow", "propose_update_workflow",
+		"render_diagram",
 		"ssh_inspect", "ssh_list_dir", "ssh_read_log", "ssh_read_file", "ssh_find_files", "ssh_process_list",
 		"docker_list_containers", "docker_container_logs", "docker_container_inspect", "docker_list_images",
 		"k8s_list_pods", "k8s_list_workloads", "k8s_describe_pod", "k8s_pod_logs",

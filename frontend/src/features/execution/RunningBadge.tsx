@@ -43,10 +43,10 @@ export function RunningBadge({ workflowID }: Props) {
         {runningCount > 0 ? (
           <>
             <span className="inline-block size-1.5 animate-pulse rounded-full bg-ops-info" />
-            <span className="text-slate-700">运行中 {runningCount}</span>
+            <span className="font-mono tabular-nums text-slate-700">运行中 {runningCount}</span>
           </>
         ) : (
-          <span className="text-slate-500">历史 {execs.length}</span>
+          <span className="font-mono tabular-nums text-slate-500">历史 {execs.length}</span>
         )}
         <span className="text-slate-400">▾</span>
       </button>
@@ -73,7 +73,7 @@ export function RunningBadge({ workflowID }: Props) {
                   <span className="font-mono text-slate-700">
                     #{e.id.slice(0, 6)}
                   </span>
-                  <span className="flex-1 truncate text-slate-500">
+                  <span className="flex-1 truncate font-mono tabular-nums text-slate-500">
                     {formatTime(e.started_at)}
                   </span>
                   <span className="text-[10px] text-slate-400">

@@ -1,0 +1,29 @@
+id = "d59e4cb4-8eb8-42ff-8274-8dcb06027512"
+title = "解释蓝绿部署和滚动更新区别"
+environment_id = ""
+scope = "general"
+config_id = ""
+context_prefetched = false
+created_at = 2026-06-12T16:21:06.2714419+08:00
+updated_at = 2026-06-12T16:21:43.6087806+08:00
+
+[[messages]]
+  id = "0f5fc8da-2b41-43ea-a5f5-1528f1b6a0e9"
+  role = "user"
+  content = "解释蓝绿部署和滚动更新区别"
+  node_count = 0
+  created_at = 2026-06-12T16:21:06.2863834+08:00
+
+[[messages]]
+  id = "19426c95-06fb-4b9f-8200-eee383b46adb"
+  role = "assistant"
+  content = "图已经把两种策略的核心流程和回滚路径画出来了。补充几个图中无法展开的关键对比维度：\n\n| 维度 | 蓝绿部署 | 滚动更新 |\n|------|---------|---------|\n| **资源** | 需要双倍基础设施 | 无需额外资源 |\n| **回滚速度** | 秒级（切路由即可） | 分钟~小时级（逐台退回） |\n| **版本共存** | 切换瞬间无共存 | 新旧版本短暂共存，需兼容 |\n| **适用场景** | 关键业务、需即时回滚 | 无状态微服务、K8s 原生 |\n\n一句话总结：**蓝绿是\"换环境\"，滚动是\"换实例\"**——选蓝绿图的是回滚快、风险低但成本高；选滚动图的是省资源、自动化但需要版本兼容。"
+  progress = ["正在思考…", "🔧 调用 render_diagram(spec={\"title\": \"蓝绿部署 vs 滚�...)", "✓ render_diagram「蓝绿部署 vs 滚动更新」(10 节点)", "正在基于工具结果继续推理…"]
+  intent = "chat"
+  node_count = 0
+  created_at = 2026-06-12T16:21:43.6087806+08:00
+
+  [[messages.views]]
+    kind = "diagram"
+    title = "蓝绿部署 vs 滚动更新"
+    data = "{\"title\":\"蓝绿部署 vs 滚动更新\",\"nodes\":[{\"id\":\"bg1\",\"label\":\"蓝环境运行 v1\\n（生产流量）\",\"kind\":\"fact\"},{\"id\":\"bg2\",\"label\":\"在空闲绿环境\\n部署 v2\",\"kind\":\"action\"},{\"id\":\"bg3\",\"label\":\"负载均衡/路由\\n一次性切到绿环境\",\"kind\":\"action\"},{\"id\":\"bg4\",\"label\":\"绿环境承载全部流量\\n蓝环境闲置备用\",\"kind\":\"fact\"},{\"id\":\"bg5\",\"label\":\"秒级回滚：\\n切回蓝环境即可\",\"kind\":\"suggestion\"},{\"id\":\"ru1\",\"label\":\"N 个实例\\n全部运行 v1\",\"kind\":\"fact\"},{\"id\":\"ru2\",\"label\":\"逐个（或分批）\\n停旧启新\",\"kind\":\"action\"},{\"id\":\"ru3\",\"label\":\"新旧版本\\n短暂共存\",\"kind\":\"fact\"},{\"id\":\"ru4\",\"label\":\"全部实例\\n更新为 v2\",\"kind\":\"fact\"},{\"id\":\"ru5\",\"label\":\"回滚需反向滚动：\\n逐台退回到 v1\",\"kind\":\"suggestion\"}],\"edges\":[{\"from\":\"bg1\",\"to\":\"bg2\",\"label\":\"准备发布\"},{\"from\":\"bg2\",\"to\":\"bg3\",\"label\":\"验证通过\"},{\"from\":\"bg3\",\"to\":\"bg4\",\"label\":\"切换完成\"},{\"from\":\"bg3\",\"to\":\"bg5\",\"label\":\"如需回滚\"},{\"from\":\"ru1\",\"to\":\"ru2\",\"label\":\"开始发布\"},{\"from\":\"ru2\",\"to\":\"ru3\",\"label\":\"滚动中\"},{\"from\":\"ru3\",\"to\":\"ru4\",\"label\":\"滚动完成\"},{\"from\":\"ru3\",\"to\":\"ru5\",\"label\":\"如需回滚\"}],\"groups\":[{\"label\":\"蓝绿部署 (Blue-Green)\",\"nodes\":[\"bg1\",\"bg2\",\"bg3\",\"bg4\",\"bg5\"]},{\"label\":\"滚动更新 (Rolling Update)\",\"nodes\":[\"ru1\",\"ru2\",\"ru3\",\"ru4\",\"ru5\"]}]}"

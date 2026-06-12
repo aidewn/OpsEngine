@@ -41,7 +41,7 @@ func dialDockerForTool(env core.EnvironmentDef, cfg core.EnvConfigItem) (*client
 	case "local":
 		// 空 socket_path 由 NewDockerClientLocal 自动探测（Windows npipe / Linux unix socket）
 		return clients.NewDockerClientLocal(socketPath)
-	case "over_ssh":
+	case "ssh_cli", "over_ssh":
 		if socketPath == "" {
 			socketPath = dockerDefaultSocket
 		}
@@ -74,7 +74,12 @@ func dialDockerForTool(env core.EnvironmentDef, cfg core.EnvConfigItem) (*client
 		if err != nil {
 			return nil, err
 		}
-		dockerClient, err := clients.NewDockerClientOverSSH(linuxClient.Client(), host, port, user, socketPath)
+		var dockerClient *clients.DockerClient
+		if mode == "ssh_cli" {
+			dockerClient, err = clients.NewDockerClientOverSSHCLI(linuxClient.Client(), host, port, user)
+		} else {
+			dockerClient, err = clients.NewDockerClientOverSSH(linuxClient.Client(), host, port, user, socketPath)
+		}
 		if err != nil {
 			_ = linuxClient.Close()
 			return nil, fmt.Errorf("构造 Docker 客户端失败: %w", err)
@@ -167,6 +172,7 @@ func (DockerListContainers) Execute(ctx tools.ToolContext, args map[string]any) 
 	return tools.Result{
 		Output:         tools.TruncateOutput(string(data)),
 		DisplaySummary: fmt.Sprintf("docker_list_containers @ %s（%d 个）", env.Name, len(entries)),
+		View:           listView("container_list", fmt.Sprintf("容器 · %s（%d）", env.Name, len(entries)), string(data)),
 	}, nil
 }
 

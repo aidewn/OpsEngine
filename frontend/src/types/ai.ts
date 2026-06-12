@@ -15,6 +15,14 @@ export interface AISettings {
   apply_mode: 'confirm' | 'auto';
 }
 
+// AIViewPayload 是 Agent 工具产出的可视化载荷（与后端 core.AIViewPayload 对齐）。
+// data 是视图专属 JSON 字符串，由 ViewRenderer 按 kind 解析渲染。
+export interface AIViewPayload {
+  kind: string;
+  title: string;
+  data: string;
+}
+
 // AISessionMessageRole 是会话消息的角色枚举。
 export type AISessionMessageRole = 'system' | 'user' | 'assistant';
 
@@ -41,6 +49,8 @@ export interface AISessionMessage {
   node_count?: number;
   /** 更新类消息的变更摘要 */
   change_summary?: string;
+  /** 本轮工具产出的可视化载荷，历史回放时按 kind 渲染 */
+  views?: AIViewPayload[];
   created_at: string;
 }
 
@@ -125,9 +135,12 @@ export interface AIAssistantEvent {
     | 'assemble'
     | 'doc'
     | 'target_select'
+    | 'workflow_pending'
+    | 'view'
     | 'done'
     | 'error';
   text?: string;
+  view?: AIViewPayload;
   workflow_id?: string;
   workflow_name?: string;
   assemble_id?: string;

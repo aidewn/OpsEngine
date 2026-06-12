@@ -10,6 +10,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
       ref={ref}
       className={cn(
         'h-9 w-full rounded-md border border-ops-border-strong bg-ops-input px-3 text-sm text-ops-primary',
+        'transition-[border-color,box-shadow] duration-fast ease-ops',
         'focus:border-ops-border-focus focus:outline-none focus:ring-1 focus:ring-ops-border-focus',
         'disabled:cursor-not-allowed disabled:text-ops-tertiary',
         className,

@@ -3,6 +3,7 @@
 
 import { type Node as RfNode, type Edge as RfEdge } from '@xyflow/react';
 import type { ParamDef } from '@/types/assemble';
+import type { NodeState } from '@/types/execution';
 import type { EdgeConfig, NodeInstance, VariableDef } from '@/types/workflow';
 import {
   isSystemNodeType,
@@ -51,6 +52,30 @@ export function toRfEdge(edge: EdgeConfig): RfEdge {
     target: edge.to.node,
     targetHandle: edge.to.port,
   };
+}
+
+// applyExecutionEdgeStyle 按目标节点的执行状态给边上"电流"视觉：
+//   - 目标执行中 → 虚线流动（RF animated）+ info 色
+//   - 目标成功   → success 色实线（流已通过）
+//   - 目标失败   → danger 色加粗
+//   - 未触达     → 弱化灰
+// 仅执行详情页生效；编辑画布不经过此函数。
+export function applyExecutionEdgeStyle(
+  edge: RfEdge,
+  states: Record<string, NodeState>,
+): RfEdge {
+  switch (states[edge.target]) {
+    case 'Executing':
+      return { ...edge, animated: true, style: { stroke: '#60A5FA', strokeWidth: 2 } };
+    case 'Success':
+      return { ...edge, style: { stroke: '#10B981', strokeWidth: 1.5, opacity: 0.75 } };
+    case 'Failed':
+      return { ...edge, style: { stroke: '#EF4444', strokeWidth: 2 } };
+    case 'Terminated':
+      return { ...edge, style: { stroke: '#EF4444', strokeWidth: 1.5, opacity: 0.6 } };
+    default:
+      return { ...edge, style: { stroke: '#4A4A45', strokeWidth: 1, opacity: 0.6 } };
+  }
 }
 
 // 通用转换：任何含 nodes + edges 的结构 → RF 数据

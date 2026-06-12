@@ -32,6 +32,8 @@ func Register(reg *tools.Registry, deps RegisterDeps) error {
 		ListAssembles{},
 		GetAssemble{},
 		GetExecution{},
+		// 可视化：模型主动画示意图
+		RenderDiagram{},
 		// 写工具（low_write）：草案提交，落盘前经完整校验
 		ProposeWorkflow{},
 		ProposeUpdateWorkflow{},
@@ -119,9 +121,12 @@ func (SSHInspect) Execute(ctx tools.ToolContext, _ map[string]any) (tools.Result
 	if err != nil {
 		return tools.Result{}, err
 	}
+	// __VIEW__ 之后是机器可读段：解析为 host_status 视图，文本部分不带它（模型不消费）
+	text, view := splitHostStatusView(out, envName)
 	return tools.Result{
-		Output:         out,
+		Output:         text,
 		DisplaySummary: fmt.Sprintf("ssh_inspect @ %s", envName),
+		View:           view,
 	}, nil
 }
 
@@ -135,6 +140,20 @@ echo "## 磁盘"; df -hT 2>/dev/null
 echo "## CPU 前 10 进程"; ps -eo pid,user,pcpu,pmem,comm --sort=-pcpu 2>/dev/null | head -11
 echo "## 网卡"; (ip -br addr 2>/dev/null) || (ifconfig 2>/dev/null | head -10)
 echo "## 监听端口"; (ss -tln 2>/dev/null | head -20) || (netstat -tln 2>/dev/null | head -20)
+echo "## __VIEW__"
+echo "hostname=$(hostname 2>/dev/null)"
+echo "os=$(. /etc/os-release 2>/dev/null && echo "$PRETTY_NAME")"
+echo "uptime_sec=$(cut -d. -f1 /proc/uptime 2>/dev/null)"
+echo "cores=$(nproc 2>/dev/null)"
+echo "loadavg=$(cut -d" " -f1-3 /proc/loadavg 2>/dev/null)"
+echo "stat1=$(head -1 /proc/stat 2>/dev/null)"
+sleep 0.5
+echo "stat2=$(head -1 /proc/stat 2>/dev/null)"
+echo "mem=$(free -b 2>/dev/null | awk '/^Mem:/{print $2","$3}')"
+echo "__DISK__"
+df -B1 -x tmpfs -x devtmpfs -x overlay -x squashfs 2>/dev/null | awk 'NR>1{print $6"|"$2"|"$3}'
+echo "__PROC__"
+ps -eo pid,user,pcpu,pmem,comm --sort=-pcpu 2>/dev/null | awk 'NR>1&&NR<=8{print $1"|"$2"|"$3"|"$4"|"$5}'
 `
 
 // ── ssh_list_dir ──────────────────────────────────────────────

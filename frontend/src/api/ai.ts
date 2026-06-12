@@ -6,7 +6,7 @@ import {
   useQueryClient,
   type UseMutationResult,
   type UseQueryResult,
-} from '@tanstack/react-query';
+} from "@tanstack/react-query";
 import {
   ApplyAIPendingDraft,
   CreateAISession,
@@ -19,21 +19,18 @@ import {
   SetAISessionActiveArtifact,
   StartAIAssistant,
   TestAISettings,
+  UpdateAISessionContext,
   UpdateAISessionTitle,
   UpdateAISettings,
-} from '@wails/go/main/App';
-import type {
-  AIAssistantRequest,
-  AISession,
-  AISettings,
-} from '@/types/ai';
-import type { WorkflowDef } from '@/types/workflow';
+} from "@wails/go/main/App";
+import type { AIAssistantRequest, AISession, AISettings } from "@/types/ai";
+import type { WorkflowDef } from "@/types/workflow";
 
 // KEY 统一管理 AI 缓存键。
 const KEY = {
-  settings: ['ai', 'settings'] as const,
-  sessions: ['ai', 'sessions'] as const,
-  session: (id: string) => ['ai', 'session', id] as const,
+  settings: ["ai", "settings"] as const,
+  sessions: ["ai", "sessions"] as const,
+  session: (id: string) => ["ai", "session", id] as const,
 };
 
 // useAISettings 读取 AI 设置。
@@ -79,7 +76,7 @@ export function useAISession(
   id: string | null | undefined,
 ): UseQueryResult<AISession> {
   return useQuery({
-    queryKey: KEY.session(id ?? ''),
+    queryKey: KEY.session(id ?? ""),
     queryFn: () => GetAISession(id as string) as Promise<AISession>,
     enabled: !!id,
   });
@@ -94,7 +91,11 @@ export function useCreateAISession(): UseMutationResult<
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ environment_id, config_id, title }) =>
-      CreateAISession(environment_id, config_id, title ?? '') as Promise<AISession>,
+      CreateAISession(
+        environment_id,
+        config_id,
+        title ?? "",
+      ) as Promise<AISession>,
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: KEY.sessions });
     },
@@ -117,6 +118,23 @@ export function useUpdateAISessionTitle(): UseMutationResult<
   });
 }
 
+// useUpdateAISessionContext 更新已有会话的环境/SSH 上下文。
+export function useUpdateAISessionContext(): UseMutationResult<
+  void,
+  Error,
+  { id: string; environment_id: string; config_id: string }
+> {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, environment_id, config_id }) =>
+      UpdateAISessionContext(id, environment_id, config_id),
+    onSuccess: (_data, vars) => {
+      qc.invalidateQueries({ queryKey: KEY.sessions });
+      qc.invalidateQueries({ queryKey: KEY.session(vars.id) });
+    },
+  });
+}
+
 // useDeleteAISession 删除会话。
 export function useDeleteAISession(): UseMutationResult<void, Error, string> {
   const qc = useQueryClient();
@@ -132,12 +150,22 @@ export function useDeleteAISession(): UseMutationResult<void, Error, string> {
 export function useSetAISessionActiveArtifact(): UseMutationResult<
   void,
   Error,
-  { sessionID: string; artifactType: 'workflow' | 'assemble'; artifactID: string; artifactName: string }
+  {
+    sessionID: string;
+    artifactType: "workflow" | "assemble";
+    artifactID: string;
+    artifactName: string;
+  }
 > {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ sessionID, artifactType, artifactID, artifactName }) =>
-      SetAISessionActiveArtifact(sessionID, artifactType, artifactID, artifactName),
+      SetAISessionActiveArtifact(
+        sessionID,
+        artifactType,
+        artifactID,
+        artifactName,
+      ),
     onSuccess: (_data, vars) => {
       qc.invalidateQueries({ queryKey: KEY.sessions });
       qc.invalidateQueries({ queryKey: KEY.session(vars.sessionID) });
@@ -146,7 +174,11 @@ export function useSetAISessionActiveArtifact(): UseMutationResult<
 }
 
 // useClearAISessionActiveArtifact 退出 artifact 编辑模式。
-export function useClearAISessionActiveArtifact(): UseMutationResult<void, Error, string> {
+export function useClearAISessionActiveArtifact(): UseMutationResult<
+  void,
+  Error,
+  string
+> {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (sessionID) => ClearAISessionActiveArtifact(sessionID),
@@ -167,8 +199,8 @@ export function useStartAIAssistant(): UseMutationResult<
   return useMutation({
     mutationFn: (request) => StartAIAssistant(request as never),
     onSuccess: (_data, vars) => {
-      qc.invalidateQueries({ queryKey: ['workflows'] });
-      qc.invalidateQueries({ queryKey: ['assembles'] });
+      qc.invalidateQueries({ queryKey: ["workflows"] });
+      qc.invalidateQueries({ queryKey: ["assembles"] });
       qc.invalidateQueries({ queryKey: KEY.sessions });
       qc.invalidateQueries({ queryKey: KEY.session(vars.session_id) });
     },
@@ -186,8 +218,8 @@ export function useApplyAIPendingDraft(): UseMutationResult<
     mutationFn: (sessionID) =>
       ApplyAIPendingDraft(sessionID) as Promise<WorkflowDef>,
     onSuccess: (wf, sessionID) => {
-      qc.setQueryData(['workflows', wf.id], wf);
-      qc.invalidateQueries({ queryKey: ['workflows'] });
+      qc.setQueryData(["workflows", wf.id], wf);
+      qc.invalidateQueries({ queryKey: ["workflows"] });
       qc.invalidateQueries({ queryKey: KEY.session(sessionID) });
     },
   });

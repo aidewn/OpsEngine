@@ -32,6 +32,15 @@ const (
 	AIMessageRoleAssistant AISessionMessageRole = "assistant"
 )
 
+// AIViewPayload 是 Agent 工具产出的前端可视化载荷（见 docs/agent-visual-output-plan.md）。
+// Data 是视图专属 JSON 字符串：协议层不解析，由前端按 Kind 选择渲染器消费；
+// 未知 Kind 由前端折叠展示原始 JSON 兜底。
+type AIViewPayload struct {
+	Kind  string `json:"kind"  toml:"kind"`  // host_status / topology / ...
+	Title string `json:"title" toml:"title"` // 卡片标题
+	Data  string `json:"data"  toml:"data"`
+}
+
 // AISessionMessage 是一条会话消息。
 type AISessionMessage struct {
 	ID           string               `json:"id"            toml:"id"`
@@ -53,12 +62,14 @@ type AISessionMessage struct {
 	// Intent 是 assistant 消息产生时的意图标签（"chat" / "troubleshoot" / "inspect_server" / ...）。
 	// 前端据此决定是否显示"保存为报告"按钮，后端 SaveAssistantMessageAsDoc 据此推断 OpsDoc.Kind。
 	// 旧消息没有此字段，按空字符串处理。
-	Intent    string    `json:"intent,omitempty" toml:"intent,omitempty"`
+	Intent string `json:"intent,omitempty" toml:"intent,omitempty"`
 	// NodeCount 工作流/集合消息附带的节点数量摘要，供前端 ActionCard 展示。
 	NodeCount int `json:"node_count,omitempty" toml:"node_count,omitempty"`
 	// ChangeSummary 更新类消息的结构变更摘要（如「节点 5→7」）。
 	ChangeSummary string `json:"change_summary,omitempty" toml:"change_summary,omitempty"`
-	CreatedAt time.Time `json:"created_at" toml:"created_at"`
+	// Views 是本轮工具产出的可视化载荷，历史会话打开时按 Kind 回放渲染。
+	Views     []AIViewPayload `json:"views,omitempty" toml:"views,omitempty"`
+	CreatedAt time.Time       `json:"created_at" toml:"created_at"`
 }
 
 // AISession 是一次完整的 AI 对话上下文。
@@ -72,7 +83,7 @@ type AISession struct {
 	// ConfigID 仅当 Scope=config 时有意义；环境级会话也可设置为"用户偏好的默认目标"。
 	ConfigID string `json:"config_id" toml:"config_id"`
 	// ContextPrefetched 标记是否已经预取过 SSH 服务器信息，避免每条消息重复采集。
-	ContextPrefetched bool               `json:"context_prefetched" toml:"context_prefetched"`
+	ContextPrefetched bool `json:"context_prefetched" toml:"context_prefetched"`
 	// ActiveArtifactType / ActiveArtifactID / ActiveArtifactName 是会话级「编辑模式」上下文。
 	// 对标 Claude Code 的 artifact 迭代：用户点「继续修改」后持久化，刷新不丢。
 	ActiveArtifactType string `json:"active_artifact_type,omitempty" toml:"active_artifact_type,omitempty"`

@@ -238,13 +238,14 @@ func Probe(env core.EnvironmentDef, configID string, nodeConfig map[string]any) 
 // dialDocker 按 mode 选择拨号路径，返回已就绪的 DockerClient
 //   - local    —— 直连本机 unix socket，不依赖 ssh 配置
 //   - over_ssh —— 解析 ssh_config_id → DialLinuxSsh → NewDockerClientOverSSH
+//
 // 不支持的 mode 直接报错
 func dialDocker(mode string, dockerCfg *core.EnvConfigItem, env core.EnvironmentDef, socketPath string) (*clients.DockerClient, error) {
 	switch mode {
 	case "local":
 		// 空 socket_path 由 NewDockerClientLocal 自动探测（Windows npipe / Linux unix socket）
 		return clients.NewDockerClientLocal(socketPath)
-	case "over_ssh":
+	case "ssh_cli", "over_ssh":
 		if socketPath == "" {
 			socketPath = defaultSocketPath
 		}
@@ -268,7 +269,12 @@ func dialDocker(mode string, dockerCfg *core.EnvConfigItem, env core.Environment
 		if err != nil {
 			return nil, err
 		}
-		dockerClient, err := clients.NewDockerClientOverSSH(linuxClient.Client(), host, port, user, socketPath)
+		var dockerClient *clients.DockerClient
+		if mode == "ssh_cli" {
+			dockerClient, err = clients.NewDockerClientOverSSHCLI(linuxClient.Client(), host, port, user)
+		} else {
+			dockerClient, err = clients.NewDockerClientOverSSH(linuxClient.Client(), host, port, user, socketPath)
+		}
 		if err != nil {
 			_ = linuxClient.Close()
 			return nil, fmt.Errorf("构造 Docker 客户端失败: %w", err)

@@ -59,6 +59,7 @@ func (JenkinsListJobs) Execute(ctx tools.ToolContext, args map[string]any) (tool
 	return tools.Result{
 		Output:         tools.TruncateOutput(string(data)),
 		DisplaySummary: fmt.Sprintf("jenkins_list_jobs @ %s（%d 个）", env.Name, len(entries)),
+		View:           listView("job_list", fmt.Sprintf("Jenkins Job · %s（%d）", env.Name, len(entries)), string(data)),
 	}, nil
 }
 

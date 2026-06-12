@@ -9,6 +9,7 @@
 package runtime
 
 import (
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -77,6 +78,21 @@ func (r *Runtime) handleArchitecture(req Request, session core.AISession) {
 		DocTitle: doc.Title,
 	})
 
+	// 拓扑视图：TopologyGraph 直接序列化给前端 React Flow 交互渲染（Mermaid 降级为文档内容）
+	var views []core.AIViewPayload
+	if graphJSON, err := json.Marshal(graph); err == nil {
+		view := core.AIViewPayload{
+			Kind:  "topology",
+			Title: fmt.Sprintf("环境架构 · %s", env.Name),
+			Data:  string(graphJSON),
+		}
+		views = append(views, view)
+		r.Emit.Emit(Event{
+			RequestID: req.RequestID, SessionID: session.ID,
+			Type: EventView, View: &view,
+		})
+	}
+
 	session.Messages = append(session.Messages, core.AISessionMessage{
 		ID:   uuid.New().String(),
 		Role: core.AIMessageRoleAssistant,
@@ -91,6 +107,7 @@ func (r *Runtime) handleArchitecture(req Request, session core.AISession) {
 		DocID:     doc.ID,
 		DocTitle:  doc.Title,
 		Intent:    "analyze_architecture",
+		Views:     views,
 		CreatedAt: time.Now(),
 	})
 	session.UpdatedAt = time.Now()

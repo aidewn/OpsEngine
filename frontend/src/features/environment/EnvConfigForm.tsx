@@ -4,6 +4,8 @@
 // 字段 id 必须与 app.go 各 test*Config 及对应 env_connect_* 节点读取的键一致
 
 import { cn } from '@/lib/cn';
+import { Input } from '@/components/ui/Input';
+import { Label } from '@/components/ui/Label';
 import { Select } from '@/components/ui/Select';
 import { ConfigForm } from '@/features/workflow/ConfigForm';
 import type { FieldSchema } from '@/types/nodeType';
@@ -151,8 +153,8 @@ const DOCKER_SCHEMA: FieldSchema[] = [
     type: 'select',
     id: 'mode',
     label: '连接模式',
-    options: ['local', 'over_ssh'],
-    default: 'local',
+    options: ['ssh_cli', 'local', 'over_ssh'],
+    default: 'ssh_cli',
     required: true,
   },
   {
@@ -211,7 +213,7 @@ export function EnvConfigForm({
       )}
       <ConfigForm schema={schema} value={value} onChange={onChange} />
       {/* Docker over_ssh 模式才需要绑定同环境的 SSH 配置；local 模式直连本机 socket */}
-      {kind === 'docker' && (value['mode'] ?? 'local') === 'over_ssh' && (
+      {kind === 'docker' && ['ssh_cli', 'over_ssh'].includes((value['mode'] ?? 'ssh_cli') as string) && (
         <SiblingConfigSelect
           label="SSH 引用"
           environment={environment}
@@ -221,7 +223,30 @@ export function EnvConfigForm({
           onChange={(v) => onChange({ ...value, ssh_config_id: v })}
         />
       )}
-      {kind === 'docker' && (value['mode'] ?? 'local') === 'local' && (
+      {kind === 'docker' && ['local', 'over_ssh'].includes((value['mode'] ?? 'ssh_cli') as string) && (
+        <div className="space-y-1">
+          <Label htmlFor="docker-socket-path" className="text-xs">
+            Docker socket 路径
+          </Label>
+          <Input
+            id="docker-socket-path"
+            value={(value['socket_path'] as string) ?? ''}
+            onChange={(e) => onChange({ ...value, socket_path: e.target.value })}
+            placeholder={
+              (value['mode'] ?? 'ssh_cli') === 'local'
+                ? '留空自动探测；支持 npipe:// / tcp:// / unix://'
+                : '留空默认 /var/run/docker.sock'
+            }
+          />
+        </div>
+      )}
+      {kind === 'docker' && (value['mode'] ?? 'ssh_cli') === 'ssh_cli' && (
+        <div className="rounded border border-ops-border-subtle bg-ops-elevated px-3 py-2 text-xs text-ops-secondary">
+          推荐远端模式：通过 SSH 执行 <code>docker system dial-stdio</code>，不直接依赖
+          docker.sock 或 SSH streamlocal 转发。
+        </div>
+      )}
+      {kind === 'docker' && (value['mode'] ?? 'ssh_cli') === 'local' && (
         <div className="rounded border border-slate-200 bg-white px-3 py-2 text-xs text-slate-600">
           local 模式直连本机 Docker，socket 路径<strong>留空即自动探测</strong>（优先
           DOCKER_HOST 环境变量；Windows 默认 <code>npipe:////./pipe/docker_engine</code>，

@@ -1,3 +1,5 @@
+import tailwindcssAnimate from 'tailwindcss-animate';
+
 /** @type {import('tailwindcss').Config} */
 export default {
   content: ['./index.html', './src/**/*.{ts,tsx}'],
@@ -17,7 +19,7 @@ export default {
           inverse: '#1A1A19',
           overlay: 'rgba(0,0,0,0.6)',
           border: {
-            subtle: '#3A3A36',
+            subtle: '#333331',
             strong: '#4A4A45',
             focus: '#D97757',
           },
@@ -59,7 +61,23 @@ export default {
         lg: ['18px', '26px'],
         xl: ['22px', '30px'],
       },
+      // motion token：fast=即时反馈（hover/focus），base=常规状态切换，slow=进出场
+      transitionDuration: {
+        fast: '120ms',
+        base: '200ms',
+        slow: '320ms',
+      },
+      // ease-out-quint：起速快收尾稳，交互反馈干脆利落
+      transitionTimingFunction: {
+        ops: 'cubic-bezier(0.22, 1, 0.36, 1)',
+      },
+      // 辉光 token：全站仅三个允许发光的语义（accent 交互强调 / info 执行中 / danger 危险确认）
+      boxShadow: {
+        'glow-accent': '0 0 0 1px rgba(217,119,87,0.4), 0 0 12px rgba(217,119,87,0.15)',
+        'glow-info': '0 0 0 1px rgba(96,165,250,0.4), 0 0 12px rgba(96,165,250,0.18)',
+        'glow-danger': '0 0 0 1px rgba(239,68,68,0.4), 0 0 12px rgba(239,68,68,0.15)',
+      },
     },
   },
-  plugins: [],
+  plugins: [tailwindcssAnimate],
 };

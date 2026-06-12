@@ -96,6 +96,7 @@ func (r *Runtime) runChatToolLoop(
 	session *core.AISession,
 	messages []clients.ChatMessage,
 	progress *[]string,
+	views *[]core.AIViewPayload,
 	toolProfile string,
 ) (string, *proposalArtifact, error) {
 	policy := buildToolPolicy(req, toolProfile)
@@ -181,7 +182,7 @@ func (r *Runtime) runChatToolLoop(
 		})
 		// 顺序执行所有工具调用并把结果追加为 role="tool" 消息
 		for _, call := range completion.ToolCalls {
-			toolMsg := r.executeToolCall(req, session.ID, toolCtx, call, policy.Allowed, progress)
+			toolMsg := r.executeToolCall(req, session.ID, toolCtx, call, policy.Allowed, progress, views)
 			messages = append(messages, toolMsg)
 		}
 		// 上下文预算：超出后把最旧的工具输出替换为占位符
@@ -222,6 +223,7 @@ func (r *Runtime) executeToolCall(
 	call clients.ToolCall,
 	allowed map[string]bool,
 	progress *[]string,
+	views *[]core.AIViewPayload,
 ) clients.ChatMessage {
 	name := call.Function.Name
 	args := parseToolArgs(call.Function.Arguments)
@@ -254,6 +256,16 @@ func (r *Runtime) executeToolCall(
 		summary = fmt.Sprintf("%s 完成", name)
 	}
 	r.emitProgress(req.RequestID, sessionID, "✓ "+summary, progress)
+	// 视图载荷：收集到本轮 assistant 消息（持久化回放）并实时推送；不回流模型上下文
+	if result.View != nil {
+		if views != nil {
+			*views = append(*views, *result.View)
+		}
+		r.Emit.Emit(Event{
+			RequestID: req.RequestID, SessionID: sessionID,
+			Type: EventView, View: result.View,
+		})
+	}
 	return clients.ChatMessage{Role: "tool", ToolCallID: call.ID, Content: result.Output}
 }
 
@@ -316,17 +328,15 @@ func parseToolArgs(raw string) map[string]any {
 }
 
 // summarizeArgs 把 args 拼成 "(k=v, k=v)" 形式短摘要，过长截断；用于进度文本。
+// 截断按 rune 计：参数值可能含中文（如 render_diagram 的 spec），按字节切会切碎
+// 多字节字符产生非法 UTF-8，进而把会话 TOML 写坏导致下次加载失败。
 func summarizeArgs(args map[string]any) string {
 	if len(args) == 0 {
 		return "()"
 	}
 	parts := []string{}
 	for k, v := range args {
-		s := fmt.Sprintf("%s=%v", k, v)
-		if len(s) > 40 {
-			s = s[:37] + "..."
-		}
-		parts = append(parts, s)
+		parts = append(parts, truncateRunes(fmt.Sprintf("%s=%v", k, v), 40))
 	}
 	joined := ""
 	for i, p := range parts {
@@ -335,10 +345,16 @@ func summarizeArgs(args map[string]any) string {
 		}
 		joined += p
 	}
-	if len(joined) > 80 {
-		joined = joined[:77] + "..."
+	return "(" + truncateRunes(joined, 80) + ")"
+}
+
+// truncateRunes 按 rune 截断字符串，保证不切碎多字节字符。
+func truncateRunes(s string, max int) string {
+	r := []rune(s)
+	if len(r) <= max {
+		return s
 	}
-	return "(" + joined + ")"
+	return string(r[:max-1]) + "…"
 }
 
 // buildToolContext 组装工具执行上下文，合并 Registry 注入与 Runtime 回调。

@@ -9,21 +9,21 @@ import {
   useMemo,
   useRef,
   useState,
-} from 'react';
-import { useNavigate } from 'react-router-dom';
-import { EventsOn } from '@wails/runtime/runtime';
-import { RotateCcw, ChevronDown, Sparkles } from 'lucide-react';
-import { Dialog } from '@/components/ui/Dialog';
-import { Button } from '@/components/ui/Button';
-import { ActionCard } from '@/components/ui/ActionCard';
-import { EmptyState } from '@/components/ui/EmptyState';
-import { Label } from '@/components/ui/Label';
-import { MarkdownView } from '@/components/ui/MarkdownView';
-import { ProgressTimeline } from '@/components/ui/ProgressTimeline';
-import { Select } from '@/components/ui/Select';
-import { Textarea } from '@/components/ui/Textarea';
-import { useQueryClient } from '@tanstack/react-query';
-import { useRunWorkflow } from '@/api/executions';
+} from "react";
+import { useNavigate } from "react-router-dom";
+import { EventsOn } from "@wails/runtime/runtime";
+import { RotateCcw, ChevronDown, Sparkles } from "lucide-react";
+import { Dialog } from "@/components/ui/Dialog";
+import { Button } from "@/components/ui/Button";
+import { ActionCard } from "@/components/ui/ActionCard";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { Label } from "@/components/ui/Label";
+import { MarkdownView } from "@/components/ui/MarkdownView";
+import { ProgressTimeline } from "@/components/ui/ProgressTimeline";
+import { Select } from "@/components/ui/Select";
+import { Textarea } from "@/components/ui/Textarea";
+import { useQueryClient } from "@tanstack/react-query";
+import { useRunWorkflow } from "@/api/executions";
 import {
   useAISession,
   useAISessions,
@@ -33,22 +33,23 @@ import {
   useApplyAIPendingDraft,
   useDiscardAIPendingDraft,
   useSetAISessionActiveArtifact,
+  useUpdateAISessionContext,
   useStartAIAssistant,
   useUpdateAISessionTitle,
-} from '@/api/ai';
-import { useEnvironments } from '@/api/environments';
-import { useSaveAssistantMessageAsDoc } from '@/api/opsDocs';
-import { cn } from '@/lib/cn';
-import { toast } from '@/lib/toast';
-import { hasWailsRuntime } from '@/lib/wailsRuntime';
-import { useTabs } from '@/features/tabs/TabsContext';
+} from "@/api/ai";
+import { useEnvironments } from "@/api/environments";
+import { useSaveAssistantMessageAsDoc } from "@/api/opsDocs";
+import { cn } from "@/lib/cn";
+import { toast } from "@/lib/toast";
+import { hasWailsRuntime } from "@/lib/wailsRuntime";
+import { useTabs } from "@/features/tabs/TabsContext";
 import type {
   AIAssistantEvent,
   AIPendingDraft,
   AITargetOption,
   AISession,
   AISessionMessage,
-} from '@/types/ai';
+} from "@/types/ai";
 
 interface AIAssistantDialogProps {
   open: boolean;
@@ -76,9 +77,9 @@ interface AIAssistantPanelProps {
 
 // 空会话时的快捷提问，点击后填入输入框
 const QUICK_PROMPTS = [
-  '分析一下这个环境目前的运行状态',
-  '帮我生成一个服务器巡检工作流',
-  '排查 Docker 容器启动失败的问题',
+  "分析一下这个环境目前的运行状态",
+  "帮我生成一个服务器巡检工作流",
+  "排查 Docker 容器启动失败的问题",
 ];
 
 // PendingTurn 是当前正在进行中的一轮对话的临时本地状态。
@@ -95,8 +96,8 @@ interface PendingTurn {
   workflowName?: string;
   assembleID?: string;
   assembleName?: string;
-  artifactType?: 'assemble' | 'workflow';
-  actionType?: 'create' | 'update';
+  artifactType?: "assemble" | "workflow";
+  actionType?: "create" | "update";
   docID?: string;
   docTitle?: string;
   nodeCount?: number;
@@ -109,7 +110,7 @@ interface PendingTurn {
 }
 
 interface EditingArtifact {
-  type: 'assemble' | 'workflow';
+  type: "assemble" | "workflow";
   id: string;
   name: string;
 }
@@ -162,20 +163,26 @@ export function AIAssistantPanel({
   const createSession = useCreateAISession();
   const deleteSession = useDeleteAISession();
   const renameSession = useUpdateAISessionTitle();
+  const updateSessionContext = useUpdateAISessionContext();
   const startAssistant = useStartAIAssistant();
   const setActiveArtifact = useSetAISessionActiveArtifact();
   const clearActiveArtifact = useClearAISessionActiveArtifact();
   const { openTab } = useTabs();
 
-  const [internalSelectedID, setInternalSelectedID] = useState<string | null>(null);
-  const selectedID = selectedSessionID !== undefined ? selectedSessionID : internalSelectedID;
+  const [internalSelectedID, setInternalSelectedID] = useState<string | null>(
+    null,
+  );
+  const selectedID =
+    selectedSessionID !== undefined ? selectedSessionID : internalSelectedID;
   const { data: session } = useAISession(selectedID);
 
   // 新会话表单状态。
-  const [draftEnvID, setDraftEnvID] = useState('');
-  const [draftConfigID, setDraftConfigID] = useState('');
+  const [draftEnvID, setDraftEnvID] = useState("");
+  const [draftConfigID, setDraftConfigID] = useState("");
+  const [sessionEnvID, setSessionEnvID] = useState("");
+  const [sessionConfigID, setSessionConfigID] = useState("");
 
-  const [input, setInput] = useState('');
+  const [input, setInput] = useState("");
   const [pending, setPending] = useState<PendingTurn | null>(null);
   const [stickToBottom, setStickToBottom] = useState(true);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
@@ -194,22 +201,31 @@ export function AIAssistantPanel({
         if (!prev) return prev;
         if (prev.errorText) return prev;
         if (prev.targetOptions?.length) return prev;
-        if (hasPendingArtifact(prev)) return { ...prev, completed: true, assistantHeartbeat: undefined };
+        if (hasPendingArtifact(prev))
+          return { ...prev, completed: true, assistantHeartbeat: undefined };
         return null;
       });
-      void queryClient.invalidateQueries({ queryKey: ['ai', 'session', sessionID] });
+      void queryClient.invalidateQueries({
+        queryKey: ["ai", "session", sessionID],
+      });
     },
     [queryClient],
   );
 
   const busy = pending !== null && !pending.errorText && !pending.completed;
   const waitingForTarget =
-    !!pending?.targetOptions?.length && !pending.errorText && !pending.selectingTargetID;
+    !!pending?.targetOptions?.length &&
+    !pending.errorText &&
+    !pending.selectingTargetID;
 
   // 从会话持久化的 active_artifact 推导编辑模式（Claude Code 式 artifact 上下文）。
   const editingArtifact = useMemo<EditingArtifact | null>(() => {
-    if (!session?.active_artifact_id || !session.active_artifact_type) return null;
-    if (session.active_artifact_type !== 'workflow' && session.active_artifact_type !== 'assemble') {
+    if (!session?.active_artifact_id || !session.active_artifact_type)
+      return null;
+    if (
+      session.active_artifact_type !== "workflow" &&
+      session.active_artifact_type !== "assemble"
+    ) {
       return null;
     }
     return {
@@ -221,8 +237,18 @@ export function AIAssistantPanel({
 
   const sshConfigs = useMemo(() => {
     const env = environments?.find((item) => item.id === draftEnvID);
-    return env?.configs.filter((config) => config.kind === 'ssh') ?? [];
+    return env?.configs.filter((config) => config.kind === "ssh") ?? [];
   }, [draftEnvID, environments]);
+
+  const sessionSshConfigs = useMemo(() => {
+    const env = environments?.find((item) => item.id === sessionEnvID);
+    return env?.configs.filter((config) => config.kind === "ssh") ?? [];
+  }, [sessionEnvID, environments]);
+
+  useEffect(() => {
+    setSessionEnvID(session?.environment_id ?? "");
+    setSessionConfigID(session?.config_id ?? "");
+  }, [session?.id, session?.environment_id, session?.config_id]);
 
   const setSelectedID = useCallback(
     (id: string | null) => {
@@ -238,7 +264,7 @@ export function AIAssistantPanel({
   useEffect(() => {
     if (!active) {
       setPending(null);
-      setInput('');
+      setInput("");
     } else if (initialMessage) {
       setInput(initialMessage);
     }
@@ -263,10 +289,10 @@ export function AIAssistantPanel({
     prevSelectedIDRef.current = selectedID;
     // 首条消息创建会话时 selectedID 会变，但 pending 仍属于同一会话，不能清掉
     if (pendingRef.current?.sessionID === selectedID) {
-      setInput('');
+      setInput("");
       return;
     }
-    setInput('');
+    setInput("");
     setPending(null);
     setStickToBottom(true);
   }, [selectedID]);
@@ -275,19 +301,30 @@ export function AIAssistantPanel({
   useEffect(() => {
     const el = inputRef.current;
     if (!el) return;
-    el.style.height = 'auto';
+    el.style.height = "auto";
     el.style.height = `${Math.min(el.scrollHeight, 160)}px`;
   }, [input]);
 
   // 消息或流式内容变化时，若用户未主动上滑则滚到底部。
   useEffect(() => {
     if (!stickToBottom) return;
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [session?.messages, pending?.assistantContent, pending?.assistantProgress, pending?.assistantHeartbeat, stickToBottom]);
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [
+    session?.messages,
+    pending?.assistantContent,
+    pending?.assistantProgress,
+    pending?.assistantHeartbeat,
+    stickToBottom,
+  ]);
 
   // 生成成功后 pending 卡片先保留；等会话消息刷新回来，再交给持久化消息展示。
   useEffect(() => {
-    if (!pending?.completed || !hasPendingArtifact(pending) || !session?.messages) return;
+    if (
+      !pending?.completed ||
+      !hasPendingArtifact(pending) ||
+      !session?.messages
+    )
+      return;
     if (sessionHasPendingArtifact(session.messages, pending)) {
       setPending(null);
     }
@@ -302,7 +339,7 @@ export function AIAssistantPanel({
 
   function scrollToBottom() {
     setStickToBottom(true);
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }
 
   function applyQuickPrompt(prompt: string) {
@@ -322,64 +359,67 @@ export function AIAssistantPanel({
   useEffect(() => {
     if (!hasWailsRuntime()) return undefined;
 
-    const off = EventsOn('ai:assistant', (event: AIAssistantEvent) => {
+    const off = EventsOn("ai:assistant", (event: AIAssistantEvent) => {
       const current = pendingRef.current;
       if (!current || current.requestID !== event.request_id) return;
 
-      if (event.type === 'delta') {
+      if (event.type === "delta") {
         setPending((prev) =>
           prev
             ? {
                 ...prev,
                 // 收到真实流式 token，清掉心跳，避免心跳与正文并存
                 assistantHeartbeat: undefined,
-                assistantContent: prev.assistantContent + (event.text ?? ''),
+                assistantContent: prev.assistantContent + (event.text ?? ""),
               }
             : prev,
         );
-      } else if (event.type === 'progress') {
+      } else if (event.type === "progress") {
         setPending((prev) =>
           prev
             ? {
                 ...prev,
-                assistantProgress: [...prev.assistantProgress, event.text ?? ''],
+                assistantProgress: [
+                  ...prev.assistantProgress,
+                  event.text ?? "",
+                ],
               }
             : prev,
         );
-      } else if (event.type === 'heartbeat') {
+      } else if (event.type === "heartbeat") {
         // 单行原地刷新，不进 progress 数组，避免持久化时堆积
         setPending((prev) =>
-          prev ? { ...prev, assistantHeartbeat: event.text ?? '' } : prev,
+          prev ? { ...prev, assistantHeartbeat: event.text ?? "" } : prev,
         );
-      } else if (event.type === 'workflow') {
+      } else if (event.type === "workflow") {
         setPending((prev) =>
           prev
             ? {
                 ...prev,
                 workflowID: event.workflow_id,
                 workflowName: event.workflow_name,
-                artifactType: 'workflow',
+                artifactType: "workflow",
                 actionType: event.action_type,
                 nodeCount: event.node_count,
                 changeSummary: event.change_summary,
               }
             : prev,
         );
-      } else if (event.type === 'assemble') {
+      } else if (event.type === "assemble") {
         setPending((prev) =>
           prev
             ? {
                 ...prev,
                 assembleID: event.assemble_id,
                 assembleName: event.assemble_name,
-                artifactType: 'assemble',
+                artifactType: "assemble",
                 actionType: event.action_type,
                 nodeCount: event.node_count,
                 changeSummary: event.change_summary,
               }
             : prev,
         );
-      } else if (event.type === 'doc') {
+      } else if (event.type === "doc") {
         setPending((prev) =>
           prev
             ? {
@@ -389,18 +429,18 @@ export function AIAssistantPanel({
               }
             : prev,
         );
-      } else if (event.type === 'target_select') {
+      } else if (event.type === "target_select") {
         setPending((prev) =>
           prev
             ? {
                 ...prev,
-                assistantContent: event.text ?? '请选择要使用的 SSH 配置。',
+                assistantContent: event.text ?? "请选择要使用的 SSH 配置。",
                 targetText: event.text,
                 targetOptions: event.target_options ?? [],
               }
             : prev,
         );
-      } else if (event.type === 'done') {
+      } else if (event.type === "done") {
         setPending((prev) =>
           prev && hasPendingArtifact(prev)
             ? { ...prev, completed: true, assistantHeartbeat: undefined }
@@ -408,17 +448,15 @@ export function AIAssistantPanel({
         );
         if (current.sessionID) {
           void queryClient.invalidateQueries({
-            queryKey: ['ai', 'session', current.sessionID],
+            queryKey: ["ai", "session", current.sessionID],
           });
         }
-      } else if (event.type === 'error') {
-        const errText = event.text ?? 'AI 调用失败';
-        setPending((prev) =>
-          prev ? { ...prev, errorText: errText } : prev,
-        );
+      } else if (event.type === "error") {
+        const errText = event.text ?? "AI 调用失败";
+        setPending((prev) => (prev ? { ...prev, errorText: errText } : prev));
         if (current.sessionID) {
           void queryClient.invalidateQueries({
-            queryKey: ['ai', 'session', current.sessionID],
+            queryKey: ["ai", "session", current.sessionID],
           });
         }
       }
@@ -431,7 +469,7 @@ export function AIAssistantPanel({
       if (busy) return;
       setSelectedID(id);
       setPending(null);
-      setInput('');
+      setInput("");
     },
     [busy],
   );
@@ -439,34 +477,48 @@ export function AIAssistantPanel({
   const handleNewSession = useCallback(() => {
     if (busy) return;
     setSelectedID(null);
-    setDraftEnvID('');
-    setDraftConfigID('');
+    setDraftEnvID("");
+    setDraftConfigID("");
     setPending(null);
-    setInput('');
+    setInput("");
   }, [busy]);
 
   async function handleDeleteSession(id: string) {
     if (busy) return;
-    if (!confirm('确认删除该会话？')) return;
+    if (!confirm("确认删除该会话？")) return;
     try {
       await deleteSession.mutateAsync(id);
       if (selectedID === id) {
         setSelectedID(null);
       }
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : '删除失败');
+      toast.error(err instanceof Error ? err.message : "删除失败");
     }
   }
 
   async function handleRenameSession(id: string, currentTitle: string) {
-    const next = prompt('会话名称', currentTitle);
+    const next = prompt("会话名称", currentTitle);
     if (next === null) return;
     const trimmed = next.trim();
     if (!trimmed || trimmed === currentTitle) return;
     try {
       await renameSession.mutateAsync({ id, title: trimmed });
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : '重命名失败');
+      toast.error(err instanceof Error ? err.message : "重命名失败");
+    }
+  }
+
+  async function handleApplySessionContext() {
+    if (!selectedID || busy) return;
+    try {
+      await updateSessionContext.mutateAsync({
+        id: selectedID,
+        environment_id: sessionEnvID,
+        config_id: sessionConfigID,
+      });
+      toast.success("会话上下文已更新");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "更新会话上下文失败");
     }
   }
 
@@ -496,7 +548,7 @@ export function AIAssistantPanel({
         sessionID,
         requestID,
         userContent: message,
-        assistantContent: '',
+        assistantContent: "",
         assistantProgress: [],
       });
 
@@ -506,12 +558,12 @@ export function AIAssistantPanel({
           request_id: requestID,
           session_id: sessionID,
           operation: fixID
-            ? 'fix_execution'
+            ? "fix_execution"
             : editingArtifact
-              ? editingArtifact.type === 'assemble'
-                ? 'update_assemble'
-                : 'update_workflow'
-              : 'auto',
+              ? editingArtifact.type === "assemble"
+                ? "update_assemble"
+                : "update_workflow"
+              : "auto",
           message,
           artifact_type: editingArtifact?.type,
           artifact_id: editingArtifact?.id,
@@ -524,7 +576,7 @@ export function AIAssistantPanel({
           prev
             ? {
                 ...prev,
-                errorText: err instanceof Error ? err.message : 'AI 调用失败',
+                errorText: err instanceof Error ? err.message : "AI 调用失败",
               }
             : prev,
         );
@@ -546,11 +598,11 @@ export function AIAssistantPanel({
     event.preventDefault();
     const message = input.trim();
     if (!message || busy) return;
-    setInput('');
+    setInput("");
     try {
       await sendMessage(message);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : '创建会话失败');
+      toast.error(err instanceof Error ? err.message : "创建会话失败");
     }
   }
 
@@ -563,7 +615,7 @@ export function AIAssistantPanel({
 
   function handleOpenWorkflow(workflowID: string) {
     openTab({
-      kind: 'workflow',
+      kind: "workflow",
       id: workflowID,
       name: findWorkflowName(session?.messages, pending, workflowID),
     });
@@ -573,7 +625,7 @@ export function AIAssistantPanel({
 
   function handleOpenAssemble(assembleID: string) {
     openTab({
-      kind: 'assemble',
+      kind: "assemble",
       id: assembleID,
       name: findAssembleName(session?.messages, pending, assembleID),
     });
@@ -591,7 +643,7 @@ export function AIAssistantPanel({
         artifactName: artifact.name,
       });
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : '进入编辑模式失败');
+      toast.error(err instanceof Error ? err.message : "进入编辑模式失败");
     }
   }
 
@@ -600,7 +652,7 @@ export function AIAssistantPanel({
     try {
       await clearActiveArtifact.mutateAsync(selectedID);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : '退出编辑模式失败');
+      toast.error(err instanceof Error ? err.message : "退出编辑模式失败");
     }
   }
 
@@ -612,7 +664,10 @@ export function AIAssistantPanel({
         ? {
             ...prev,
             selectingTargetID: configID,
-            assistantProgress: [...prev.assistantProgress, '已选择目标 SSH，继续生成巡检工作流'],
+            assistantProgress: [
+              ...prev.assistantProgress,
+              "已选择目标 SSH，继续生成巡检工作流",
+            ],
           }
         : prev,
     );
@@ -620,7 +675,7 @@ export function AIAssistantPanel({
       await startAssistant.mutateAsync({
         request_id: current.requestID,
         session_id: current.sessionID,
-        operation: 'auto',
+        operation: "auto",
         message: current.userContent,
         target_config_id: configID,
       });
@@ -631,7 +686,7 @@ export function AIAssistantPanel({
           ? {
               ...prev,
               selectingTargetID: undefined,
-              errorText: err instanceof Error ? err.message : 'AI 调用失败',
+              errorText: err instanceof Error ? err.message : "AI 调用失败",
             }
           : prev,
       );
@@ -639,29 +694,47 @@ export function AIAssistantPanel({
   }
 
   return (
-    <div className={cn('flex min-h-0 gap-4', className)}>
+    <div className={cn("flex min-h-0 gap-4", className)}>
       {showSessionSidebar ? (
         <SessionSidebar
-            sessions={sessions ?? []}
-            selectedID={selectedID}
-            busy={busy}
-            onSelect={handleSelectSession}
-            onNew={handleNewSession}
-            onDelete={handleDeleteSession}
-            onRename={handleRenameSession}
-          />
+          sessions={sessions ?? []}
+          selectedID={selectedID}
+          busy={busy}
+          onSelect={handleSelectSession}
+          onNew={handleNewSession}
+          onDelete={handleDeleteSession}
+          onRename={handleRenameSession}
+        />
       ) : null}
 
       <div
         className={cn(
-          'relative flex min-w-0 flex-1 flex-col',
+          "relative flex min-w-0 flex-1 flex-col",
           embedded
-            ? 'h-full min-h-0 bg-ops-canvas'
-            : 'rounded-md border border-ops-border-subtle bg-ops-surface',
+            ? "h-full min-h-0 bg-ops-canvas"
+            : "rounded-md border border-ops-border-subtle bg-ops-surface",
         )}
       >
         {selectedID && session ? (
-          <SessionHeader session={session} environments={environments ?? []} />
+          <>
+            <SessionHeader
+              session={session}
+              environments={environments ?? []}
+            />
+            <SessionContextEditor
+              environments={environments ?? []}
+              envID={sessionEnvID}
+              configID={sessionConfigID}
+              sshConfigs={sessionSshConfigs}
+              busy={busy || updateSessionContext.isPending}
+              onEnvChange={(value) => {
+                setSessionEnvID(value);
+                setSessionConfigID("");
+              }}
+              onConfigChange={setSessionConfigID}
+              onApply={handleApplySessionContext}
+            />
+          </>
         ) : (
           <NewSessionHeader
             environments={environments ?? []}
@@ -670,7 +743,7 @@ export function AIAssistantPanel({
             sshConfigs={sshConfigs}
             onEnvChange={(value) => {
               setDraftEnvID(value);
-              setDraftConfigID('');
+              setDraftConfigID("");
             }}
             onConfigChange={setDraftConfigID}
           />
@@ -715,7 +788,10 @@ export function AIAssistantPanel({
           />
         )}
 
-        <form onSubmit={handleSubmit} className="border-t border-ops-border-subtle bg-ops-surface p-3">
+        <form
+          onSubmit={handleSubmit}
+          className="border-t border-ops-border-subtle bg-ops-surface p-3"
+        >
           {waitingForTarget ? (
             <div className="mb-2 flex items-center gap-2 rounded-md border border-ops-warning bg-ops-warning-soft px-3 py-2 text-xs text-ops-warning">
               <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-ops-warning" />
@@ -725,11 +801,14 @@ export function AIAssistantPanel({
           {editingArtifact ? (
             <div className="mb-2 flex items-center justify-between rounded-md border border-ops-accent/40 bg-ops-accent-soft px-3 py-2 text-xs text-ops-secondary">
               <span>
-                编辑模式 ·{' '}
+                编辑模式 ·{" "}
                 <span className="text-ops-primary">
-                  {editingArtifact.type === 'workflow' ? '工作流' : '集合'}：{editingArtifact.name}
+                  {editingArtifact.type === "workflow" ? "工作流" : "集合"}：
+                  {editingArtifact.name}
                 </span>
-                <span className="ml-2 text-ops-tertiary">后续消息将迭代修改此资产</span>
+                <span className="ml-2 text-ops-tertiary">
+                  后续消息将迭代修改此资产
+                </span>
               </span>
               <button
                 type="button"
@@ -747,26 +826,33 @@ export function AIAssistantPanel({
             rows={1}
             placeholder={
               waitingForTarget
-                ? '请先在上方选择 SSH 目标…'
-                : '输入问题，Enter 发送，Shift+Enter 换行'
+                ? "请先在上方选择 SSH 目标…"
+                : "输入问题，Enter 发送，Shift+Enter 换行"
             }
             disabled={busy || waitingForTarget}
             className="max-h-40 min-h-[40px] resize-none"
             onKeyDown={(event) => {
-              if (event.key === 'Enter' && !event.shiftKey) {
+              if (event.key === "Enter" && !event.shiftKey) {
                 event.preventDefault();
                 if (!event.nativeEvent.isComposing) {
-                  (event.currentTarget.form as HTMLFormElement | null)?.requestSubmit();
+                  (
+                    event.currentTarget.form as HTMLFormElement | null
+                  )?.requestSubmit();
                 }
               }
             }}
           />
           <div className="mt-2 flex items-center justify-between gap-2">
             <span className="text-xs text-ops-tertiary">
-              {waitingForTarget ? '等待选择目标' : 'Enter 发送 · Shift+Enter 换行'}
+              {waitingForTarget
+                ? "等待选择目标"
+                : "Enter 发送 · Shift+Enter 换行"}
             </span>
-            <Button type="submit" disabled={busy || waitingForTarget || !input.trim()}>
-              {busy ? '处理中…' : '发送'}
+            <Button
+              type="submit"
+              disabled={busy || waitingForTarget || !input.trim()}
+            >
+              {busy ? "处理中…" : "发送"}
             </Button>
           </div>
         </form>
@@ -815,8 +901,8 @@ function SessionSidebar({
           <li
             key={s.id}
             className={cn(
-              'group flex cursor-pointer items-center justify-between gap-1 px-3 py-2 hover:bg-ops-elevated',
-              selectedID === s.id && 'bg-ops-elevated',
+              "group flex cursor-pointer items-center justify-between gap-1 px-3 py-2 hover:bg-ops-elevated",
+              selectedID === s.id && "bg-ops-elevated",
             )}
             onClick={() => onSelect(s.id)}
           >
@@ -920,25 +1006,34 @@ function SessionHeader({
   environments,
 }: {
   session: AISession;
-  environments: { id: string; name: string; configs: { id: string; name: string }[] }[];
+  environments: {
+    id: string;
+    name: string;
+    configs: { id: string; name: string }[];
+  }[];
 }) {
   const env = environments.find((e) => e.id === session.environment_id);
   const config = session.config_id
     ? env?.configs.find((c) => c.id === session.config_id)
     : undefined;
-  const scopeLabel = session.scope === 'general' ? '通用会话' : session.scope === 'environment' || !session.config_id ? '环境级' : 'SSH';
+  const scopeLabel =
+    session.scope === "general"
+      ? "通用会话"
+      : session.scope === "environment" || !session.config_id
+        ? "环境级"
+        : "SSH";
   return (
     <div className="flex items-center justify-between border-b border-ops-border-subtle px-3 py-2 text-xs text-ops-secondary">
       <div className="truncate">
         <span className="text-ops-primary">{session.title}</span>
         <span className="mx-2 text-ops-tertiary">·</span>
-        {session.scope === 'general' ? (
+        {session.scope === "general" ? (
           <>{scopeLabel} · 可生成/修改集合与工作流</>
         ) : (
           <>
             环境 {env?.name ?? session.environment_id}
             <span className="mx-1 text-ops-tertiary">/</span>
-            {scopeLabel} {config?.name ?? session.config_id ?? '全部配置'}
+            {scopeLabel} {config?.name ?? session.config_id ?? "全部配置"}
           </>
         )}
       </div>
@@ -947,6 +1042,67 @@ function SessionHeader({
           已采集服务器信息
         </span>
       )}
+    </div>
+  );
+}
+
+// SessionContextEditor 允许已创建的会话重新绑定环境/SSH。
+function SessionContextEditor({
+  environments,
+  envID,
+  configID,
+  sshConfigs,
+  busy,
+  onEnvChange,
+  onConfigChange,
+  onApply,
+}: {
+  environments: { id: string; name: string }[];
+  envID: string;
+  configID: string;
+  sshConfigs: { id: string; name: string }[];
+  busy: boolean;
+  onEnvChange: (value: string) => void;
+  onConfigChange: (value: string) => void;
+  onApply: () => void;
+}) {
+  return (
+    <div className="grid gap-2 border-b border-ops-border-subtle bg-ops-canvas px-3 py-2 text-xs md:grid-cols-[1fr_1fr_auto] md:items-end">
+      <div className="space-y-1">
+        <Label htmlFor="ai-session-environment">上下文环境</Label>
+        <Select
+          id="ai-session-environment"
+          value={envID}
+          onChange={(event) => onEnvChange(event.target.value)}
+          disabled={busy}
+        >
+          <option value="">不指定环境（通用资产生成）</option>
+          {environments.map((env) => (
+            <option key={env.id} value={env.id}>
+              {env.name}
+            </option>
+          ))}
+        </Select>
+      </div>
+      <div className="space-y-1">
+        <Label htmlFor="ai-session-ssh-config">SSH 配置</Label>
+        <Select
+          id="ai-session-ssh-config"
+          value={configID}
+          onChange={(event) => onConfigChange(event.target.value)}
+          disabled={!envID || busy}
+        >
+          <option value="">不指定（环境级会话）</option>
+          {sshConfigs.map((config) => (
+            <option key={config.id} value={config.id}>
+              {config.name}
+            </option>
+          ))}
+        </Select>
+      </div>
+      <Button type="button" size="sm" onClick={onApply} disabled={busy}>
+        应用
+      </Button>
     </div>
   );
 }
@@ -980,11 +1136,12 @@ function MessageList({
   const visible = useMemo(() => {
     if (!session) return [];
     return session.messages.filter(
-      (m) => !m.hidden && (m.role === 'user' || m.role === 'assistant'),
+      (m) => !m.hidden && (m.role === "user" || m.role === "assistant"),
     );
   }, [session]);
 
-  const showPending = pending && pending.sessionID === (session?.id ?? currentSessionID ?? '');
+  const showPending =
+    pending && pending.sessionID === (session?.id ?? currentSessionID ?? "");
 
   // Run() 一进入就把用户消息 append + save 到 session，invalidate 后 visible 立刻包含它。
   // 此时如果继续渲染 pending 的 user 气泡，用户消息会显示两次。
@@ -993,7 +1150,7 @@ function MessageList({
     if (!pending) return false;
     for (let i = visible.length - 1; i >= 0; i--) {
       const m = visible[i]!;
-      if (m.role === 'user') {
+      if (m.role === "user") {
         return m.content === pending.userContent;
       }
     }
@@ -1047,8 +1204,8 @@ function MessageList({
           {!pendingUserAlreadyPersisted ? (
             <Bubble
               message={{
-                id: pending.requestID + ':user',
-                role: 'user',
+                id: pending.requestID + ":user",
+                role: "user",
                 content: pending.userContent,
                 created_at: new Date().toISOString(),
               }}
@@ -1060,8 +1217,8 @@ function MessageList({
           ) : null}
           <Bubble
             message={{
-              id: pending.requestID + ':assistant',
-              role: 'assistant',
+              id: pending.requestID + ":assistant",
+              role: "assistant",
               content: pending.errorText
                 ? pending.errorText
                 : pending.assistantContent,
@@ -1081,7 +1238,11 @@ function MessageList({
               isError: !!pending.errorText,
               created_at: new Date().toISOString(),
             }}
-            streaming={!pending.errorText && !pending.completed && !pending.assistantContent}
+            streaming={
+              !pending.errorText &&
+              !pending.completed &&
+              !pending.assistantContent
+            }
             onOpenWorkflow={onOpenWorkflow}
             onOpenAssemble={onOpenAssemble}
             onContinueArtifact={onContinueArtifact}
@@ -1132,12 +1293,12 @@ function Bubble({
   onRetry?: () => void;
   activeArtifactID?: string;
 }) {
-  const isUser = message.role === 'user';
+  const isUser = message.role === "user";
   const isError =
     !!message.isError ||
     (!isUser &&
       (/^\[(配置错误|网络错误|模型响应错误)/.test(message.content) ||
-        message.content === 'AI 调用失败'));
+        message.content === "AI 调用失败"));
   const waitingForTarget =
     !isUser && !!message.target_options && message.target_options.length > 0;
   // 重发按钮：用户气泡 hover 时显示；用 group/group-hover 类做隐藏-显现切换。
@@ -1156,9 +1317,9 @@ function Bubble({
     !!message.id &&
     !message.workflow_id &&
     !message.assemble_id &&
-    (message.intent === 'troubleshoot' || message.intent === 'chat');
+    (message.intent === "troubleshoot" || message.intent === "chat");
   return (
-    <div className={cn('group flex', isUser ? 'justify-end' : 'justify-start')}>
+    <div className={cn("group flex", isUser ? "justify-end" : "justify-start")}>
       {/* 用户消息：hover 时左侧显示"重发"按钮。放在气泡外侧避免遮挡内容。 */}
       {canResend ? (
         <button
@@ -1173,31 +1334,38 @@ function Bubble({
       ) : null}
       <div
         className={cn(
-          'max-w-[82%] rounded-md px-3 py-2 text-sm leading-6',
+          "max-w-[82%] rounded-md px-3 py-2 text-sm leading-6",
           isUser
-            ? 'bg-ops-accent text-ops-inverse'
+            ? "bg-ops-accent text-ops-inverse"
             : waitingForTarget
-              ? 'border border-ops-warning bg-ops-warning-soft text-ops-primary shadow-[inset_3px_0_0_#F59E0B]'
+              ? "border border-ops-warning bg-ops-warning-soft text-ops-primary shadow-[inset_3px_0_0_#F59E0B]"
               : isError
-                ? 'border border-ops-danger bg-ops-danger-soft text-ops-danger'
-                : 'border border-ops-border-subtle bg-ops-surface text-ops-primary',
+                ? "border border-ops-danger bg-ops-danger-soft text-ops-danger"
+                : "border border-ops-border-subtle bg-ops-surface text-ops-primary",
         )}
       >
         {message.content ? (
           isUser || streaming || isError ? (
-            <div className={cn('whitespace-pre-wrap', isUser && 'text-ops-inverse')}>
+            <div
+              className={cn(
+                "whitespace-pre-wrap",
+                isUser && "text-ops-inverse",
+              )}
+            >
               {message.content}
             </div>
           ) : (
             <MarkdownView body={message.content} />
           )
         ) : null}
-        {!message.content && !isUser && !(message.progress && message.progress.length > 0) && (
-          <div className="flex items-center gap-2 text-ops-tertiary">
-            <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-ops-accent" />
-            正在处理…
-          </div>
-        )}
+        {!message.content &&
+          !isUser &&
+          !(message.progress && message.progress.length > 0) && (
+            <div className="flex items-center gap-2 text-ops-tertiary">
+              <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-ops-accent" />
+              正在处理…
+            </div>
+          )}
         {message.progress && message.progress.length > 0 && (
           <ProgressTimeline
             items={message.progress}
@@ -1213,47 +1381,56 @@ function Bubble({
         )}
         {message.workflow_id && (
           <ActionCard
-            title={message.workflow_name || 'AI 生成工作流'}
-            badge={artifactActionBadge(message, message.workflow_id, activeArtifactID, streaming)}
+            title={message.workflow_name || "AI 生成工作流"}
+            badge={artifactActionBadge(
+              message,
+              message.workflow_id,
+              activeArtifactID,
+              streaming,
+            )}
             description={artifactCardDescription(
               message.node_count,
               message.change_summary,
-              '可直接打开画布、运行一次，或进入编辑模式继续迭代。',
+              "可直接打开画布、运行一次，或进入编辑模式继续迭代。",
             )}
             tone="success"
             primaryAction={{
               label:
-                activeArtifactID === message.workflow_id ? '编辑中' : '继续修改',
+                activeArtifactID === message.workflow_id
+                  ? "编辑中"
+                  : "继续修改",
               disabled: activeArtifactID === message.workflow_id,
               onClick: () =>
                 onContinueArtifact({
-                  type: 'workflow',
+                  type: "workflow",
                   id: message.workflow_id!,
-                  name: message.workflow_name || 'AI 生成工作流',
+                  name: message.workflow_name || "AI 生成工作流",
                 }),
             }}
             secondaryAction={{
-              label: '打开工作流',
+              label: "打开工作流",
               onClick: () => onOpenWorkflow(message.workflow_id!),
             }}
             tertiaryAction={{
-              label: runWorkflow.isPending ? '启动中…' : '运行',
+              label: runWorkflow.isPending ? "启动中…" : "运行",
               disabled: runWorkflow.isPending,
               onClick: async () => {
                 const workflowID = message.workflow_id!;
                 try {
                   const execID = await runWorkflow.mutateAsync(workflowID);
                   openTab({
-                    kind: 'execution',
+                    kind: "execution",
                     id: execID,
-                    name: `${message.workflow_name || '工作流'} #${execID.slice(0, 4)}`,
+                    name: `${message.workflow_name || "工作流"} #${execID.slice(0, 4)}`,
                   });
-                  toast.info('已开始执行', {
-                    label: '查看进度',
+                  toast.info("已开始执行", {
+                    label: "查看进度",
                     onClick: () => navigate(`/executions/${execID}`),
                   });
                 } catch (err) {
-                  toast.error(err instanceof Error ? err.message : '启动执行失败');
+                  toast.error(
+                    err instanceof Error ? err.message : "启动执行失败",
+                  );
                 }
               },
             }}
@@ -1261,69 +1438,92 @@ function Bubble({
         )}
         {message.assemble_id && (
           <ActionCard
-            title={message.assemble_name || 'AI 生成集合'}
-            badge={artifactActionBadge(message, message.assemble_id, activeArtifactID, streaming)}
+            title={message.assemble_name || "AI 生成集合"}
+            badge={artifactActionBadge(
+              message,
+              message.assemble_id,
+              activeArtifactID,
+              streaming,
+            )}
             description={artifactCardDescription(
               message.node_count,
               message.change_summary,
-              '可复用集合已保存，进入编辑模式即可多轮迭代。',
+              "可复用集合已保存，进入编辑模式即可多轮迭代。",
             )}
             tone="success"
             primaryAction={{
-              label: activeArtifactID === message.assemble_id ? '编辑中' : '继续修改',
+              label:
+                activeArtifactID === message.assemble_id
+                  ? "编辑中"
+                  : "继续修改",
               disabled: activeArtifactID === message.assemble_id,
               onClick: () =>
                 onContinueArtifact({
-                  type: 'assemble',
+                  type: "assemble",
                   id: message.assemble_id!,
-                  name: message.assemble_name || 'AI 生成集合',
+                  name: message.assemble_name || "AI 生成集合",
                 }),
             }}
             secondaryAction={{
-              label: '打开集合',
+              label: "打开集合",
               onClick: () => onOpenAssemble(message.assemble_id!),
             }}
           />
         )}
         {message.doc_id && (
           <ActionCard
-            title={message.doc_title || 'AI 生成文档'}
+            title={message.doc_title || "AI 生成文档"}
             description={message.doc_id}
             tone="info"
             primaryAction={{
-              label: '查看文档',
+              label: "查看文档",
               onClick: () => navigate(`/?tab=reports&doc=${message.doc_id}`),
             }}
           />
         )}
-        {!isUser && message.target_options && message.target_options.length > 0 && (
-          <div className="mt-3 space-y-3">
-            <div className="text-sm font-medium text-ops-warning">请选择巡检目标</div>
-            <div className="text-xs text-ops-primary">
-              选择 SSH 配置后，Agent 会继续生成巡检工作流。
+        {!isUser &&
+          message.target_options &&
+          message.target_options.length > 0 && (
+            <div className="mt-3 space-y-3">
+              <div className="text-sm font-medium text-ops-warning">
+                请选择巡检目标
+              </div>
+              <div className="text-xs text-ops-primary">
+                选择 SSH 配置后，Agent 会继续生成巡检工作流。
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {message.target_options.map((option) => (
+                  <Button
+                    key={option.id}
+                    type="button"
+                    size="sm"
+                    variant="secondary"
+                    disabled={!onSelectTarget || !!selectingTargetID}
+                    onClick={() => onSelectTarget?.(option.id)}
+                  >
+                    {selectingTargetID === option.id
+                      ? "继续中…"
+                      : option.name || option.id}
+                  </Button>
+                ))}
+              </div>
             </div>
-            <div className="flex flex-wrap gap-2">
-              {message.target_options.map((option) => (
-                <Button
-                  key={option.id}
-                  type="button"
-                  size="sm"
-                  variant="secondary"
-                  disabled={!onSelectTarget || !!selectingTargetID}
-                  onClick={() => onSelectTarget?.(option.id)}
-                >
-                  {selectingTargetID === option.id ? '继续中…' : option.name || option.id}
-                </Button>
-              ))}
-            </div>
-          </div>
-        )}
+          )}
         {canSaveAsDoc && (
-          <SaveAsDocButton sessionID={sessionID!} messageID={message.id} intent={message.intent} />
+          <SaveAsDocButton
+            sessionID={sessionID!}
+            messageID={message.id}
+            intent={message.intent}
+          />
         )}
         {isError && onRetry ? (
           <div className="mt-2">
-            <Button type="button" size="sm" variant="secondary" onClick={onRetry}>
+            <Button
+              type="button"
+              size="sm"
+              variant="secondary"
+              onClick={onRetry}
+            >
               重试
             </Button>
           </div>
@@ -1355,12 +1555,13 @@ function SaveAsDocButton({
       toast.error(err instanceof Error ? err.message : String(err));
     }
   }
-  const label = intent === 'troubleshoot' ? '保存为排障报告' : '保存为报告';
+  const label = intent === "troubleshoot" ? "保存为排障报告" : "保存为报告";
   return (
     <div className="mt-3 flex items-center justify-end gap-2">
       {saved && (
         <span className="text-[11px] text-emerald-600">
-          已保存（ID: <span className="font-mono">{saved.id.slice(0, 8)}</span>）
+          已保存（ID: <span className="font-mono">{saved.id.slice(0, 8)}</span>
+          ）
         </span>
       )}
       <Button
@@ -1370,7 +1571,7 @@ function SaveAsDocButton({
         onClick={handleClick}
         disabled={save.isPending || !!saved}
       >
-        {save.isPending ? '保存中…' : saved ? '已保存' : `📄 ${label}`}
+        {save.isPending ? "保存中…" : saved ? "已保存" : `📄 ${label}`}
       </Button>
     </div>
   );
@@ -1378,7 +1579,7 @@ function SaveAsDocButton({
 
 // newID 生成前端请求和消息 ID。
 function newID() {
-  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
     return crypto.randomUUID();
   }
   return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
@@ -1391,10 +1592,10 @@ function artifactActionBadge(
   activeArtifactID?: string,
   inProgress?: boolean,
 ) {
-  if (inProgress) return '处理中';
-  if (activeArtifactID === artifactID) return '编辑中';
-  if (message.action_type === 'update') return '已更新';
-  if (message.action_type === 'create') return '已创建';
+  if (inProgress) return "处理中";
+  if (activeArtifactID === artifactID) return "编辑中";
+  if (message.action_type === "update") return "已更新";
+  if (message.action_type === "create") return "已创建";
   return undefined;
 }
 
@@ -1407,7 +1608,7 @@ function artifactCardDescription(
   const parts: string[] = [];
   if (nodeCount && nodeCount > 0) parts.push(`${nodeCount} 个节点`);
   if (changeSummary) parts.push(changeSummary);
-  if (parts.length > 0) return parts.join(' · ');
+  if (parts.length > 0) return parts.join(" · ");
   return fallback;
 }
 
@@ -1417,10 +1618,15 @@ function hasPendingArtifact(pending: PendingTurn) {
 }
 
 // sessionHasPendingArtifact 判断持久化消息是否已经接管同一个产物卡片。
-function sessionHasPendingArtifact(messages: AISessionMessage[], pending: PendingTurn) {
+function sessionHasPendingArtifact(
+  messages: AISessionMessage[],
+  pending: PendingTurn,
+) {
   return messages.some((message) => {
-    if (pending.workflowID && message.workflow_id === pending.workflowID) return true;
-    if (pending.assembleID && message.assemble_id === pending.assembleID) return true;
+    if (pending.workflowID && message.workflow_id === pending.workflowID)
+      return true;
+    if (pending.assembleID && message.assemble_id === pending.assembleID)
+      return true;
     if (pending.docID && message.doc_id === pending.docID) return true;
     return false;
   });
@@ -1432,8 +1638,11 @@ function findWorkflowName(
   pending: PendingTurn | null,
   workflowID: string,
 ) {
-  if (pending?.workflowID === workflowID && pending.workflowName) return pending.workflowName;
-  const message = messages?.find((item) => item.workflow_id === workflowID && item.workflow_name);
+  if (pending?.workflowID === workflowID && pending.workflowName)
+    return pending.workflowName;
+  const message = messages?.find(
+    (item) => item.workflow_id === workflowID && item.workflow_name,
+  );
   return message?.workflow_name || workflowID;
 }
 
@@ -1443,8 +1652,11 @@ function findAssembleName(
   pending: PendingTurn | null,
   assembleID: string,
 ) {
-  if (pending?.assembleID === assembleID && pending.assembleName) return pending.assembleName;
-  const message = messages?.find((item) => item.assemble_id === assembleID && item.assemble_name);
+  if (pending?.assembleID === assembleID && pending.assembleName)
+    return pending.assembleName;
+  const message = messages?.find(
+    (item) => item.assemble_id === assembleID && item.assemble_name,
+  );
   return message?.assemble_name || assembleID;
 }
 
@@ -1468,16 +1680,16 @@ function PendingDraftCard({
       const wf = await applyDraft.mutateAsync(sessionID);
       toast.success(`已应用修改草案「${wf.name}」`);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : '应用失败');
+      toast.error(err instanceof Error ? err.message : "应用失败");
     }
   }
 
   async function handleDiscard() {
     try {
       await discardDraft.mutateAsync(sessionID);
-      toast.success('已放弃修改草案');
+      toast.success("已放弃修改草案");
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : '放弃失败');
+      toast.error(err instanceof Error ? err.message : "放弃失败");
     }
   }
 
@@ -1495,13 +1707,16 @@ function PendingDraftCard({
               {draft.artifact_name}
             </button>
           </div>
-          <div className="mt-0.5 truncate text-xs text-ops-secondary" title={draft.change_summary}>
+          <div
+            className="mt-0.5 truncate text-xs text-ops-secondary"
+            title={draft.change_summary}
+          >
             {draft.change_summary}
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-2">
           <Button size="sm" disabled={busy} onClick={() => void handleApply()}>
-            {applyDraft.isPending ? '应用中...' : '应用'}
+            {applyDraft.isPending ? "应用中..." : "应用"}
           </Button>
           <Button
             size="sm"

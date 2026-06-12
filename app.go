@@ -496,6 +496,8 @@ func testDockerConfig(env core.EnvironmentDef, fields map[string]any) error {
 	switch mode {
 	case "local":
 		return testDockerConfigLocal(fields)
+	case "ssh_cli":
+		// 通过远端 docker CLI 建立 Docker API 通道，不依赖 SSH streamlocal。
 	case "over_ssh":
 		// 走下方既有逻辑
 	default:
@@ -532,7 +534,12 @@ func testDockerConfig(env core.EnvironmentDef, fields map[string]any) error {
 	if err != nil {
 		return err
 	}
-	dockerClient, err := clients.NewDockerClientOverSSH(linuxClient.Client(), sshDial.Host, sshDial.Port, sshDial.User, socketPath)
+	var dockerClient *clients.DockerClient
+	if mode == "ssh_cli" {
+		dockerClient, err = clients.NewDockerClientOverSSHCLI(linuxClient.Client(), sshDial.Host, sshDial.Port, sshDial.User)
+	} else {
+		dockerClient, err = clients.NewDockerClientOverSSH(linuxClient.Client(), sshDial.Host, sshDial.Port, sshDial.User, socketPath)
+	}
 	if err != nil {
 		_ = linuxClient.Close()
 		return fmt.Errorf("构造 Docker 客户端失败: %w", err)

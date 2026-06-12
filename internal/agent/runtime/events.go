@@ -4,6 +4,8 @@
 
 package runtime
 
+import "OpsEngine/internal/core"
+
 // EventType 是事件分类的字符串枚举。前端 ai 助手对话框按 Type 分流渲染。
 type EventType string
 
@@ -34,6 +36,8 @@ const (
 	EventArtifactMode EventType = "artifact_mode"
 	// EventWorkflowPending 确认模式下产生了等待用户应用的修改草案（diff 摘要在 ChangeSummary）。
 	EventWorkflowPending EventType = "workflow_pending"
+	// EventView 工具产出的可视化载荷（主机状态卡 / 拓扑图等），前端按 View.Kind 渲染。
+	EventView EventType = "view"
 )
 
 // TargetOption 是需要用户选择的目标配置候选项。
@@ -44,21 +48,22 @@ type TargetOption struct {
 
 // Event 是一条对外推送的事件。字段保持扁平方便序列化。
 type Event struct {
-	RequestID     string         `json:"request_id"`
-	SessionID     string         `json:"session_id,omitempty"`
-	Type          EventType      `json:"type"`
-	Text          string         `json:"text,omitempty"`
-	WorkflowID    string         `json:"workflow_id,omitempty"`
-	WorkflowName  string         `json:"workflow_name,omitempty"`
-	AssembleID    string         `json:"assemble_id,omitempty"`
-	AssembleName  string         `json:"assemble_name,omitempty"`
-	ArtifactType  string         `json:"artifact_type,omitempty"`
-	ActionType    string         `json:"action_type,omitempty"`
-	DocID         string         `json:"doc_id,omitempty"`
-	DocTitle      string         `json:"doc_title,omitempty"`
-	NodeCount     int            `json:"node_count,omitempty"`
-	ChangeSummary string         `json:"change_summary,omitempty"`
-	TargetOptions []TargetOption `json:"target_options,omitempty"`
+	RequestID     string              `json:"request_id"`
+	SessionID     string              `json:"session_id,omitempty"`
+	Type          EventType           `json:"type"`
+	Text          string              `json:"text,omitempty"`
+	View          *core.AIViewPayload `json:"view,omitempty"`
+	WorkflowID    string              `json:"workflow_id,omitempty"`
+	WorkflowName  string              `json:"workflow_name,omitempty"`
+	AssembleID    string              `json:"assemble_id,omitempty"`
+	AssembleName  string              `json:"assemble_name,omitempty"`
+	ArtifactType  string              `json:"artifact_type,omitempty"`
+	ActionType    string              `json:"action_type,omitempty"`
+	DocID         string              `json:"doc_id,omitempty"`
+	DocTitle      string              `json:"doc_title,omitempty"`
+	NodeCount     int                 `json:"node_count,omitempty"`
+	ChangeSummary string              `json:"change_summary,omitempty"`
+	TargetOptions []TargetOption      `json:"target_options,omitempty"`
 }
 
 // Emitter 把 Runtime 事件投递到外部传输层（Wails / WebSocket / 测试用 buffer）。

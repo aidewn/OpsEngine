@@ -1,0 +1,29 @@
+id = "24419877-7053-412f-be79-e70049489503"
+title = "解释蓝绿部署和滚动更新区别"
+environment_id = ""
+scope = "general"
+config_id = ""
+context_prefetched = false
+created_at = 2026-06-12T16:21:55.170759+08:00
+updated_at = 2026-06-12T16:22:20.5375058+08:00
+
+[[messages]]
+  id = "858c093a-ee38-4164-bf21-c2d1b6678a36"
+  role = "user"
+  content = "解释蓝绿部署和滚动更新区别"
+  node_count = 0
+  created_at = 2026-06-12T16:21:55.1850817+08:00
+
+[[messages]]
+  id = "35a413ba-f72a-4ef3-b95d-9f5ecb06f5db"
+  role = "assistant"
+  content = "图中两种策略的核心差异已经清晰了。总结几个关键对比维度：\n\n| 维度 | 🔵 蓝绿部署 | 🔄 滚动更新 |\n|------|------------|------------|\n| **资源需求** | 需要两套完整环境，成本翻倍 | 原地替换，无需额外资源 |\n| **切换速度** | 瞬时切换（改负载均衡指向） | 渐进式，耗时与实例数成正比 |\n| **回滚速度** | 秒级（切回旧环境即可） | 需要反向滚动，同样耗时 |\n| **风险面** | 切换瞬间影响全量用户 | 每次只影响一小部分用户 |\n| **版本共存** | 切换前后只有一个版本在线 | 更新期间新旧版本短暂共存 |\n\n**一句话选型指南**：对**有状态服务**或需要**瞬时回滚**的场景（如数据库、支付网关），蓝绿更合适；对**无状态微服务**且希望**零中断、逐步验证**，滚动更新是更经济的默认选择。"
+  progress = ["正在思考…", "🔧 调用 render_diagram(spec={\"title\": \"蓝绿部署 vs 滚�...)", "✓ render_diagram「蓝绿部署 vs 滚动更新」(10 节点)", "正在基于工具结果继续推理…"]
+  intent = "chat"
+  node_count = 0
+  created_at = 2026-06-12T16:22:20.5375058+08:00
+
+  [[messages.views]]
+    kind = "diagram"
+    title = "蓝绿部署 vs 滚动更新"
+    data = "{\"title\":\"蓝绿部署 vs 滚动更新\",\"nodes\":[{\"id\":\"lb\",\"label\":\"负载均衡器\",\"kind\":\"component\"},{\"id\":\"blue\",\"label\":\"Blue 环境 (v1)\\n全部实例\",\"kind\":\"fact\"},{\"id\":\"green\",\"label\":\"Green 环境 (v2)\\n全新部署的完整环境\",\"kind\":\"fact\"},{\"id\":\"switch\",\"label\":\"一键切换流量\\nBlue → Green\",\"kind\":\"judgment\"},{\"id\":\"done_bg\",\"label\":\"切换完成\\nv2 上线, v1 保留作回滚\",\"kind\":\"suggestion\"},{\"id\":\"lb2\",\"label\":\"负载均衡器\",\"kind\":\"component\"},{\"id\":\"ins1\",\"label\":\"实例 1: v1→v2\",\"kind\":\"fact\"},{\"id\":\"ins2\",\"label\":\"实例 2: v1→v2\",\"kind\":\"fact\"},{\"id\":\"ins3\",\"label\":\"实例 3: v1→v2\",\"kind\":\"fact\"},{\"id\":\"done_roll\",\"label\":\"逐步完成\\n所有实例变成 v2\",\"kind\":\"suggestion\"}],\"edges\":[{\"from\":\"lb\",\"to\":\"blue\",\"label\":\"100% 流量\"},{\"from\":\"blue\",\"to\":\"switch\",\"label\":\"部署 v2 到 Green\"},{\"from\":\"switch\",\"to\":\"green\",\"label\":\"流量切到 Green\"},{\"from\":\"green\",\"to\":\"done_bg\",\"label\":\"验证通过\"},{\"from\":\"lb2\",\"to\":\"ins1\",\"label\":\"流量分流\"},{\"from\":\"lb2\",\"to\":\"ins2\",\"label\":\"流量分流\"},{\"from\":\"lb2\",\"to\":\"ins3\",\"label\":\"流量分流\"},{\"from\":\"ins1\",\"to\":\"ins2\",\"label\":\"逐个替换\"},{\"from\":\"ins2\",\"to\":\"ins3\",\"label\":\"逐个替换\"},{\"from\":\"ins3\",\"to\":\"done_roll\",\"label\":\"全部替换完成\"}],\"groups\":[{\"label\":\"蓝绿部署 (Blue-Green)\",\"nodes\":[\"lb\",\"blue\",\"green\",\"switch\",\"done_bg\"]},{\"label\":\"滚动更新 (Rolling Update)\",\"nodes\":[\"lb2\",\"ins1\",\"ins2\",\"ins3\",\"done_roll\"]}]}"

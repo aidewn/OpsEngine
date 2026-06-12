@@ -78,6 +78,10 @@ export function BaseNode({
         'relative min-w-[140px] rounded-md border-2 bg-white shadow-sm transition-shadow',
         stateBorder ?? (selected ? t.selectedBorder : t.border),
         selected && 'shadow-md',
+        // 执行叙事：执行中辉光呼吸；成功瞬间一次性脉冲；失败常驻 danger 辉光
+        execState === 'Executing' && 'animate-node-breath',
+        execState === 'Success' && 'animate-node-success',
+        execState === 'Failed' && 'shadow-glow-danger',
       )}
     >
       {/* 标题区：icon + 名字 */}

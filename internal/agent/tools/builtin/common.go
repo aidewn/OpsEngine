@@ -95,3 +95,9 @@ func argStringOptional(args map[string]any, key string) string {
 	}
 	return strings.TrimSpace(s)
 }
+
+// listView 把已序列化的列表 JSON 包装成视图载荷，供 docker/k8s/jenkins 等列表类工具复用。
+// dataJSON 直接复用工具已构造的 entries JSON——不重复采集、不重复序列化。
+func listView(kind, title, dataJSON string) *core.AIViewPayload {
+	return &core.AIViewPayload{Kind: kind, Title: title, Data: dataJSON}
+}

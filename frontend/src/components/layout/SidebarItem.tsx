@@ -36,7 +36,7 @@ export function SidebarItem({
       role="button"
       tabIndex={0}
       className={cn(
-        'group relative flex w-full items-start gap-2 border-l-2 px-3 py-2 text-left transition-colors cursor-pointer outline-none',
+        'group relative flex w-full items-start gap-2 border-l-2 px-3 py-2 text-left transition-colors duration-fast ease-ops cursor-pointer outline-none',
         collapsed && 'justify-center px-0',
         selected
           ? 'border-ops-accent bg-ops-surface text-ops-primary'
