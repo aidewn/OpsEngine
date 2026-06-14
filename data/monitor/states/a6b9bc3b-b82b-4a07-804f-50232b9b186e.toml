@@ -1,0 +1,9 @@
+panel_id = "a6b9bc3b-b82b-4a07-804f-50232b9b186e"
+status = "normal"
+severity = "none"
+summary = "已确认恢复"
+last_checked_at = 2026-06-14T13:26:05.9355043+08:00
+last_report_id = "a2e0c9f7-4aac-4e8a-badf-ab8e11681672"
+has_history = false
+consecutive_abnormal = 0
+consecutive_normal = 8

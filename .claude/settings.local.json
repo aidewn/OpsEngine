@@ -175,7 +175,31 @@
       "Bash(sed -n '/func \\(s \\\\*AISessionStore\\) Save/,/^}/p' internal/store/ai_session_store.go)",
       "Bash(gofmt -w internal/store/ai_session_store.go internal/agent/tools/types.go internal/agent/runtime/toolloop.go)",
       "Bash(cd \"C:/Users/m1832/GolandProjects/OpsEngine/frontend/src\" && grep -n \"解析 AI 会话失败\\\\|useAISession\\\\|session.*error\\\\|更新会话上下文失败\" features/ai/AIAssistantDialog.tsx api/ai.ts | head; echo \"=== loadLocked 错误前缀:\"; grep -n \"解析\\\\|TOML\\\\|Decode\" \"../../internal/store/ai_session_store.go\" 2>/dev/null | head)",
-      "Bash(gofmt -w internal/store/ai_session_store.go)"
+      "Bash(gofmt -w internal/store/ai_session_store.go)",
+      "Bash(grep -n \"function handleOpenWorkflow\\\\|navigate\\(\\\\`/workflows\\\\|openTab\\\\|onNavigateAway\" features/ai/AIAssistantDialog.tsx)",
+      "Bash(awk 'NR>=710 && /^  \\\\\\);$/ {print NR\": \"$0; exit}' features/ai/AIAssistantDialog.tsx)",
+      "Bash(sed -n '826,838p' features/ai/AIAssistantDialog.tsx)",
+      "Bash(node -e \"require.resolve\\('@dagrejs/dagre'\\); console.log\\('resolved'\\)\")",
+      "Bash(awk '/^function NewSessionHeader/,/^}$/' features/ai/AIAssistantDialog.tsx)",
+      "Bash(sed -n '8,60p')",
+      "Bash(awk '/^function SessionHeader/,/^}$/' features/ai/AIAssistantDialog.tsx)",
+      "Bash(node_modules/.bin/tsc --noEmit)",
+      "Bash(gofmt -w internal/agent/runtime/chat.go)",
+      "Bash(node_modules/.bin/vite build *)",
+      "Bash(gofmt -l internal/core/monitor.go internal/store/monitor_store.go monitor.go)",
+      "Bash(gofmt -w internal/core/monitor.go)",
+      "Bash(gofmt -l internal/core/monitor.go)",
+      "Bash(node -e \"console.log\\(require\\('lucide-react/package.json'\\).version\\)\")",
+      "Bash(node -e \"const l=require\\('lucide-react'\\); console.log\\('Plus' in l ? 'YES' : 'NO'\\)\")",
+      "Bash(gofmt -l internal/monitor/)",
+      "Bash(gofmt -w internal/monitor/collector_test.go)",
+      "Bash(gofmt -l internal/monitor/ monitor.go)",
+      "Bash(gofmt -l internal/monitor/ internal/store/ internal/core/ monitor.go)",
+      "Bash(gofmt -l internal/monitor/ monitor.go internal/core/monitor.go internal/store/monitor_store.go internal/store/monitor_store_test.go)",
+      "Bash(gofmt -l internal/monitor/ monitor.go app.go)",
+      "Bash(gofmt -l internal/monitor/troubleshoot.go internal/monitor/evaluator.go monitor.go app.go)",
+      "Bash(OPSENGINE_E2E=1 go test . -run TestMonitorHTTPHealthE2E -v -timeout 240s)",
+      "Bash(gofmt -w monitor.go internal/core/monitor.go)"
     ]
   }
 }

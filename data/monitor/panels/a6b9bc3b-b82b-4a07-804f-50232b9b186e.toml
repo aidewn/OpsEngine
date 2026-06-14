@@ -1,0 +1,33 @@
+id = "a6b9bc3b-b82b-4a07-804f-50232b9b186e"
+environment_id = "1638a7ba-e778-4267-b296-1afba582fea6"
+group_id = "f95273c4-527c-444f-bb9a-cc21278bea19"
+name = "CPU"
+description = ""
+enabled = true
+abnormal_threshold = 1
+recovery_threshold = 1
+monitor_flow_summary = ""
+troubleshoot_flow_summary = ""
+created_at = 2026-06-13T17:51:44.0011102+08:00
+updated_at = 2026-06-14T12:19:57.270136+08:00
+
+[[requirements]]
+  target_id = "c3aa818e-a8c0-4362-9342-a9e5e61455a7"
+  kind = "host.basic"
+  [requirements.params]
+
+[[conditions]]
+  kind = "host.basic"
+  target_id = ""
+  field = "cpu_usage_percent"
+  op = ">"
+  value = 80.0
+  severity = "warning"
+
+[[conditions]]
+  kind = "host.basic"
+  target_id = ""
+  field = "cpu_usage_percent"
+  op = ">"
+  value = 90.0
+  severity = "critical"

@@ -1,0 +1,9 @@
+id = "94872b21-55b2-4372-86c9-6acbfdf4e667"
+environment_id = "1638a7ba-e778-4267-b296-1afba582fea6"
+group_id = "b9641cc1-5b04-48ce-a4c6-b9706676c63a"
+panel_id = "5e8899d2-df05-4d33-bcd0-b15406ca5173"
+status = "open"
+severity = "warning"
+title = "nginx 异常"
+evidence = ["http.health 采集失败: 请求失败: Get \"http://34.19.249.138:80\": context deadline exceeded"]
+started_at = 2026-06-14T12:26:07.6339954+08:00

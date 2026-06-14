@@ -1,0 +1,10 @@
+panel_id = "5e8899d2-df05-4d33-bcd0-b15406ca5173"
+status = "abnormal"
+severity = "warning"
+summary = "http.health 采集失败: 请求失败: Get \"http://34.19.249.138:80\": EOF"
+last_checked_at = 2026-06-14T13:26:05.9355043+08:00
+current_incident_id = "94872b21-55b2-4372-86c9-6acbfdf4e667"
+last_report_id = "88d95901-9fd1-4476-825b-20490ca91b27"
+has_history = true
+consecutive_abnormal = 56
+consecutive_normal = 0

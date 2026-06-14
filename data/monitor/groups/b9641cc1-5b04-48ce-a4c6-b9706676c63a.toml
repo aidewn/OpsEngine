@@ -1,0 +1,8 @@
+id = "b9641cc1-5b04-48ce-a4c6-b9706676c63a"
+environment_id = "1638a7ba-e778-4267-b296-1afba582fea6"
+name = "中间件"
+description = ""
+order = 0
+enabled = true
+created_at = 2026-06-14T12:22:21.9241538+08:00
+updated_at = 2026-06-14T12:22:21.9241538+08:00

@@ -13,15 +13,12 @@ import {
 import { useMemo, useState, type ReactNode } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useEnvironments } from '@/api/environments';
-import {
-  useAcknowledgePanelHistory,
-  useMonitorOverview,
-  useRunPanelDiagnosis,
-} from '@/api/monitor';
+import { useMonitorOverview, useRunPanelDiagnosis } from '@/api/monitor';
 import { Button } from '@/components/ui/Button';
 import { cn } from '@/lib/cn';
 import { errorMessage } from '@/lib/error';
 import { toast } from '@/lib/toast';
+import { AcknowledgeButton } from './AcknowledgeButton';
 import { CreateMonitorGroupDialog } from './CreateMonitorGroupDialog';
 import { CreateMonitorPanelDialog } from './CreateMonitorPanelDialog';
 import { MonitorConfigControl } from './MonitorConfigControl';
@@ -230,7 +227,12 @@ function EnvironmentOverview({
           </OverviewSection>
           <OverviewSection title="正常（有异常历史）" count={historyRows.length}>
             {historyRows.map((row) => (
-              <MonitorItemRow key={row.panel.id} row={row} onOpenPanel={onOpenPanel} />
+              <MonitorItemRow
+                key={row.panel.id}
+                row={row}
+                onOpenPanel={onOpenPanel}
+                action={<AcknowledgeButton panelID={row.panel.id} />}
+              />
             ))}
           </OverviewSection>
         </div>
@@ -361,7 +363,6 @@ function PanelDetail({
   const status = statusMeta(state?.status ?? 'normal');
 
   const diagnose = useRunPanelDiagnosis();
-  const acknowledge = useAcknowledgePanelHistory();
   const [reportOpen, setReportOpen] = useState(false);
   const [viewReport, setViewReport] = useState<MonitorReport | undefined>(undefined);
 
@@ -382,13 +383,6 @@ function PanelDetail({
   const canDiagnose = !!state?.current_incident_id && !diagnosing;
   const isHistory = state?.status === 'history';
 
-  function handleAcknowledge() {
-    acknowledge.mutate(panel.id, {
-      onSuccess: () => toast.success('已确认恢复'),
-      onError: (err) => toast.error(errorMessage(err, '确认失败')),
-    });
-  }
-
   return (
     <section className="space-y-4">
       <DetailToolbar title={panel.name} subtitle={panel.description} onBack={onBack} />
@@ -403,17 +397,7 @@ function PanelDetail({
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                {isHistory ? (
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    disabled={acknowledge.isPending}
-                    title="确认该异常已恢复并归档，回到正常"
-                    onClick={handleAcknowledge}
-                  >
-                    {acknowledge.isPending ? '确认中...' : '确认恢复'}
-                  </Button>
-                ) : null}
+                {isHistory ? <AcknowledgeButton panelID={panel.id} /> : null}
                 <Button
                   size="sm"
                   variant="secondary"

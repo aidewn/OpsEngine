@@ -1,0 +1,27 @@
+id = "5e8899d2-df05-4d33-bcd0-b15406ca5173"
+environment_id = "1638a7ba-e778-4267-b296-1afba582fea6"
+group_id = "b9641cc1-5b04-48ce-a4c6-b9706676c63a"
+name = "nginx"
+description = ""
+enabled = true
+abnormal_threshold = 1
+recovery_threshold = 1
+monitor_flow_summary = ""
+troubleshoot_flow_summary = ""
+created_at = 2026-06-14T12:22:28.3605291+08:00
+updated_at = 2026-06-14T12:24:25.0247059+08:00
+
+[[requirements]]
+  target_id = ""
+  kind = "http.health"
+  [requirements.params]
+    expect_status = 200.0
+    url = "http://34.19.249.138:80"
+
+[[conditions]]
+  kind = "http.health"
+  target_id = ""
+  field = "status_code"
+  op = "!="
+  value = 200.0
+  severity = "warning"

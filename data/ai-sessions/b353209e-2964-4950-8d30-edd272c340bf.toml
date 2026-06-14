@@ -1,0 +1,66 @@
+id = "b353209e-2964-4950-8d30-edd272c340bf"
+title = "你好"
+environment_id = "1638a7ba-e778-4267-b296-1afba582fea6"
+scope = "config"
+config_id = "c3aa818e-a8c0-4362-9342-a9e5e61455a7"
+context_prefetched = true
+created_at = 2026-06-14T13:38:49.2099657+08:00
+updated_at = 2026-06-14T13:41:37.0735096+08:00
+
+[[messages]]
+  id = "817f422f-d616-443b-8a72-8f37bbd53ffd"
+  role = "user"
+  content = "你好"
+  node_count = 0
+  created_at = 2026-06-14T13:38:49.2413959+08:00
+
+[[messages]]
+  id = "8cbdee1b-19ae-43ec-9ba1-87b4d5677ef7"
+  role = "assistant"
+  content = "你好！我是 OpsEngine 运维助手。当前会话已绑定目标环境，可以直接帮你排查问题、查看服务状态、分析日志等。有什么需要处理的？"
+  progress = ["正在思考…"]
+  intent = "chat"
+  node_count = 0
+  created_at = 2026-06-14T13:38:51.0809129+08:00
+
+[[messages]]
+  id = "ce67227d-ecbf-46cb-b526-bc299abe0d7b"
+  role = "user"
+  content = "检查一下这台机器"
+  node_count = 0
+  created_at = 2026-06-14T13:39:19.5829266+08:00
+
+[[messages]]
+  id = "82ea33bd-a2e4-4d5d-8923-077e79627e51"
+  role = "assistant"
+  content = "已生成巡检工作流「通用服务器巡检」，共 10 项检查，可以直接打开执行。"
+  progress = ["正在请求大模型生成巡检计划", "正在解析巡检计划", "正在选择巡检目标 SSH", "正在生成 10 项巡检工作流", "正在保存工作流"]
+  workflow_id = "c52b3d5c-ea42-4138-9059-60393e31b5ce"
+  workflow_name = "通用服务器巡检"
+  intent = "inspect_server"
+  node_count = 0
+  created_at = 2026-06-14T13:39:37.8527138+08:00
+
+[[messages]]
+  id = "f29c2938-da24-4068-acdf-ebdde2404905"
+  role = "user"
+  content = "分析一下这台机器的情况"
+  node_count = 0
+  created_at = 2026-06-14T13:41:22.0138219+08:00
+
+[[messages]]
+  id = "2771893d-67ab-441d-ba45-b4b945b39502"
+  role = "system"
+  content = "<!-- ops:ssh_snapshot -->\n以下是目标服务器（环境 test / 配置 c3aa818e-a8c0-4362-9342-a9e5e61455a7）当前的真实状态，回答用户问题时请优先参考这些数据：\n\n```\n## 系统信息\nLinux instance-20260614-035320 6.1.0-49-cloud-amd64 #1 SMP PREEMPT_DYNAMIC Debian 6.1.174-1 (2026-05-26) x86_64 GNU/Linux\nPRETTY_NAME=\"Debian GNU/Linux 12 (bookworm)\"\nNAME=\"Debian GNU/Linux\"\nVERSION_ID=\"12\"\nVERSION=\"12 (bookworm)\"\nVERSION_CODENAME=bookworm\nID=debian\nHOME_URL=\"https://www.debian.org/\"\nSUPPORT_URL=\"https://www.debian.org/support\"\nBUG_REPORT_URL=\"https://bugs.debian.org/\"\n\n## 运行时长与负载\n 05:41:24 up  1:25,  0 user,  load average: 0.00, 0.00, 0.00\n\n## CPU\nArchitecture:                            x86_64\nCPU op-mode(s):                          32-bit, 64-bit\nAddress sizes:                           52 bits physical, 57 bits virtual\nByte Order:                              Little Endian\nCPU(s):                                  4\nOn-line CPU(s) list:                     0-3\nVendor ID:                               GenuineIntel\nBIOS Vendor ID:                          Google\nModel name:                              Intel(R) Xeon(R) Platinum 8481C CPU @ 2.70GHz\nBIOS Model name:                           CPU @ 2.0GHz\nBIOS CPU family:                         1\nCPU family:                              6\nModel:                                   143\nThread(s) per core:                      2\nCore(s) per socket:                      2\n\n## 内存\n               total        used        free      shared  buff/cache   available\nMem:            15Gi       581Mi        14Gi       544Ki       750Mi        15Gi\nSwap:             0B          0B          0B\n\n## 磁盘\nFilesystem      Type      Size  Used Avail Use% Mounted on\nudev            devtmpfs  7.8G     0  7.8G   0% /dev\ntmpfs           tmpfs     1.6G  544K  1.6G   1% /run\n/dev/nvme0n1p1  ext4      9.7G  2.7G  6.5G  29% /\ntmpfs           tmpfs     7.9G     0  7.9G   0% /dev/shm\ntmpfs           tmpfs     5.0M     0  5.0M   0% /run/lock\n/dev/nvme0n1p15 vfat      124M   12M  113M  10% /boot/efi\ntmpfs           tmpfs     1.6G     0  1.6G   0% /run/user/0\n\n## CPU 占用前 10 进程\n    PID USER     %CPU %MEM COMMAND\n   8727 root      1.2  0.0 sshd\n   1072 root      0.5  0.2 fluent-bit\n   1044 root      0.4  0.9 otelopscol\n   8654 root      0.0  0.0 sshd\n    234 root      0.0  0.2 systemd-journal\n      1 root      0.0  0.0 systemd\n    499 root      0.0  0.1 google_guest_ag\n   1043 root      0.0  0.3 google_cloud_op\n    463 root      0.0  0.0 rsyslogd\n    815 root      0.0  0.1 core_plugin\n\n## 网卡地址\nlo               UNKNOWN        127.0.0.1/8 ::1/128 \nens3             UP             10.162.0.2/32 metric 100 fe80::4001:aff:fea2:2/64 \n\n## 监听端口\nState  Recv-Q Send-Q Local Address:Port  Peer Address:PortProcess\nLISTEN 0      128          0.0.0.0:20202      0.0.0.0:*          \nLISTEN 0      20         127.0.0.1:25         0.0.0.0:*          \nLISTEN 0      128          0.0.0.0:22         0.0.0.0:*          \nLISTEN 0      4096      127.0.0.54:53         0.0.0.0:*          \nLISTEN 0      4096         0.0.0.0:5355       0.0.0.0:*          \nLISTEN 0      4096   127.0.0.53%lo:53         0.0.0.0:*          \nLISTEN 0      4096               *:20201            *:*          \nLISTEN 0      20             [::1]:25            [::]:*          \nLISTEN 0      128             [::]:22            [::]:*          \nLISTEN 0      4096            [::]:5355          [::]:*          \n\n```"
+  hidden = true
+  node_count = 0
+  created_at = 2026-06-14T13:41:25.548138+08:00
+
+[[messages]]
+  id = "fa708c8c-cf0e-41d3-963f-505796b4186b"
+  role = "assistant"
+  content = "基于已有快照数据分析，这台机器状态总结如下：\n\n**整体判断：运行正常，无异常。**\n\n---\n\n### 资源使用\n- **CPU**：4 核，负载近乎为零（0.00/0.00/0.00），完全空闲\n- **内存**：15Gi 总量，仅用 ~580Mi，可用 15Gi，非常充裕\n- **磁盘**：根分区 9.7G，已用 2.7G（29%），空间充足\n- **Swap**：未配置，云主机常见做法，不影响\n\n### 运行服务\n| 进程 | 用途 |\n|------|------|\n| `sshd` | SSH 服务，正常 |\n| `fluent-bit` | 日志采集器 |\n| `otelopscol` | OpenTelemetry Collector，可观测性数据采集 |\n| `google_guest_agent` / `google_cloud_op` | GCP 云平台代理 |\n| `rsyslogd` | 系统日志 |\n\n### 端口监听\n- `22` — SSH（对外）\n- `20201` / `20202` — 推测为 OTel / Fluent Bit 的内部端口\n- `53` / `5355` — systemd-resolved DNS 解析\n- `25` — 本地 SMTP（仅 127.0.0.1）\n\n### 小结\n这是一台 **GCP Debian 12 VM**，充当可观测性数据采集节点（OTel + Fluent Bit），资源消耗极低，所有核心服务正常运行，无异常进程、无磁盘压力、无高负载。不需要任何干预。"
+  progress = ["正在采集服务器信息", "正在思考…"]
+  intent = "chat"
+  node_count = 0
+  created_at = 2026-06-14T13:41:37.0735096+08:00

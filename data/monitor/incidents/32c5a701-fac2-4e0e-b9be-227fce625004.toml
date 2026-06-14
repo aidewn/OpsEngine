@@ -1,0 +1,10 @@
+id = "32c5a701-fac2-4e0e-b9be-227fce625004"
+environment_id = "1638a7ba-e778-4267-b296-1afba582fea6"
+group_id = "f95273c4-527c-444f-bb9a-cc21278bea19"
+panel_id = "a6b9bc3b-b82b-4a07-804f-50232b9b186e"
+status = "open"
+severity = "critical"
+title = "CPU 异常"
+evidence = ["host.basic 采集失败: SSH 连接失败: ssh: handshake failed: EOF", "host.basic 采集失败: SSH 连接失败: ssh: handshake failed: EOF"]
+started_at = 2026-06-14T11:50:07.6821344+08:00
+report_id = "f96c6e6b-7955-4de5-bf49-d15a00238734"

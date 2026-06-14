@@ -1,0 +1,8 @@
+id = "88d95901-9fd1-4476-825b-20490ca91b27"
+environment_id = "1638a7ba-e778-4267-b296-1afba582fea6"
+incident_id = "826d8820-e30d-4a6a-9365-9a6c8d98f5ca"
+panel_id = "5e8899d2-df05-4d33-bcd0-b15406ca5173"
+title = "nginx 诊断报告"
+summary = "nginx 异常"
+content = "# nginx 诊断报告\n\n- 监控项：nginx\n- 严重级别：warning\n- 异常开始：2026-06-14T12:24:45+08:00\n\n## 异常触发证据\n\n- http.health 采集失败: 请求失败: Get \"http://34.19.249.138:80\": EOF\n\n## 当前采集数据\n\n### http.health（target: ）\n\n采集失败：请求失败: Get \"http://34.19.249.138:80\": context deadline exceeded\n\n## 诊断结论\n\n### 1. 最可能的根因\nNginx 所在主机 `34.19.249.138` 的网络不可达或服务已完全停止，导致健康检查从连接重置（EOF）恶化为请求超时（context deadline exceeded）。\n\n### 2. 置信度\n中\n\n### 3. 排查与修复建议\n- **网络连通性检查**：从监控采集器所在网络 ping `34.19.249.138`，检查是否存在丢包或路由不可达；同时测试端口连通性（如 `telnet 34.19.249.138 80` 或 `nc -vz`）。\n- **主机状态确认**：登录该主机或通过带外管理查看系统是否宕机、防火墙是否误拦截、网卡是否 down。\n- **Nginx 进程状态**：若主机可登录，检查 nginx 进程是否运行（`systemctl status nginx` 或 `ps aux | grep nginx`），并查看错误日志（通常位于 `/var/log/nginx/error.log`）是否有异常崩溃或资源耗尽记录。\n- **恢复措施**：若仅为 Nginx 停止，尝试启动并设置开机自启；若主机不可达，需联系基础设施团队恢复主机或切换流量。\n\n### 4. 风险提示\n- 服务已对健康检查无响应，存在完全中断风险，若该 Nginx 承载生产流量，用户请求可能已失败。\n- 当前仅凭采集器视角无法区分是网络分区、主机宕机还是服务崩溃，需尽快补充以下数据：主机系统负载与在线状态、Nginx 进程存活状态、网络设备日志。\n"
+created_at = 2026-06-14T12:25:14.523827+08:00
