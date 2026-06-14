@@ -45,7 +45,8 @@ func main() {
 			EnableFileDrop:     true,
 			DisableWebViewDrop: true,
 		},
-		OnStartup: app.startup,
+		OnStartup:  app.startup,
+		OnShutdown: app.shutdown,
 		Bind: []interface{}{
 			app,
 		},

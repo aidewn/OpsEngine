@@ -1,8 +1,14 @@
-// SidebarTabBar 组件：渲染侧栏顶部的三类主导航。
-import { FileText, GitBranch, MessageSquare, type LucideIcon } from 'lucide-react';
+// SidebarTabBar 组件：渲染侧栏顶部的一级导航。
+import {
+  Activity,
+  FileText,
+  GitBranch,
+  MessageSquare,
+  type LucideIcon,
+} from 'lucide-react';
 import { cn } from '@/lib/cn';
 
-export type SidebarTab = 'chat' | 'workflow' | 'reports';
+export type SidebarTab = 'chat' | 'workflow' | 'monitor' | 'reports';
 
 interface SidebarTabBarProps {
   activeTab: SidebarTab;
@@ -13,10 +19,15 @@ interface SidebarTabBarProps {
 const tabs: Array<{ value: SidebarTab; label: string; Icon: LucideIcon }> = [
   { value: 'chat', label: 'Chat', Icon: MessageSquare },
   { value: 'workflow', label: '工作流', Icon: GitBranch },
+  { value: 'monitor', label: '监控', Icon: Activity },
   { value: 'reports', label: '报告', Icon: FileText },
 ];
 
-export function SidebarTabBar({ activeTab, collapsed, onTabChange }: SidebarTabBarProps) {
+export function SidebarTabBar({
+  activeTab,
+  collapsed,
+  onTabChange,
+}: SidebarTabBarProps) {
   return (
     <nav className="space-y-1 p-2">
       {tabs.map((tab) => {

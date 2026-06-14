@@ -37,17 +37,28 @@ const toolProfileWorkflow = "workflow"
 // handleChat 处理 intent.KindChat。
 func (r *Runtime) handleChat(req Request, session core.AISession) {
 	r.runConversationTurn(req, session, turnOpts{
-		SystemKind: prompt.SystemPromptChat,
-		IntentTag:  "chat",
+		SystemKind:  prompt.SystemPromptChat,
+		IntentTag:   "chat",
+		ExtraSystem: modeHintSystem(req.ModeHint),
 	})
 }
 
 // handleTroubleshoot 处理 intent.KindTroubleshoot：与 chat 同结构，但 system 提示词强制"事实/判断/建议"。
 func (r *Runtime) handleTroubleshoot(req Request, session core.AISession) {
 	r.runConversationTurn(req, session, turnOpts{
-		SystemKind: prompt.SystemPromptTroubleshoot,
-		IntentTag:  "troubleshoot",
+		SystemKind:  prompt.SystemPromptTroubleshoot,
+		IntentTag:   "troubleshoot",
+		ExtraSystem: modeHintSystem(req.ModeHint),
 	})
+}
+
+// modeHintSystem 把 `/` 模式指令包装成 system 段；空时返回空字符串（不注入）。
+func modeHintSystem(hint string) string {
+	hint = strings.TrimSpace(hint)
+	if hint == "" {
+		return ""
+	}
+	return "【本轮模式要求】\n" + hint
 }
 
 // runConversationTurn 是 chat 和 troubleshoot 共享的执行体。

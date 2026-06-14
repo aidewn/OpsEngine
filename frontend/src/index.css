@@ -8,6 +8,12 @@ body,
   height: 100%;
 }
 
+/* 告知浏览器整体走暗色：原生控件（数字步进器、复选框、下拉、滚动条等）
+   随之用暗色调渲染，避免在暗色主题上出现浅色「白底」hover。 */
+:root {
+  color-scheme: dark;
+}
+
 body {
   font-family:
     ui-sans-serif,

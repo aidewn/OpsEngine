@@ -18,10 +18,12 @@ const maxDiagramNodes = 30
 
 // diagramSpec 是 render_diagram 的输入/输出结构（前端 DiagramView 直接消费）。
 type diagramSpec struct {
-	Title  string         `json:"title,omitempty"`
-	Nodes  []diagramNode  `json:"nodes"`
-	Edges  []diagramEdge  `json:"edges,omitempty"`
-	Groups []diagramGroup `json:"groups,omitempty"`
+	Title string `json:"title,omitempty"`
+	// Direction：TB 垂直流向（默认，适合流程/因果链）/ LR 水平。
+	Direction string         `json:"direction,omitempty"`
+	Nodes     []diagramNode  `json:"nodes"`
+	Edges     []diagramEdge  `json:"edges,omitempty"`
+	Groups    []diagramGroup `json:"groups,omitempty"`
 }
 
 type diagramNode struct {
@@ -48,14 +50,16 @@ type RenderDiagram struct{}
 func (RenderDiagram) Spec() tools.Spec {
 	return tools.Spec{
 		Name: "render_diagram",
-		Description: "把结构、流程、因果或对比关系画成示意图展示给用户（画图优先于长篇文字）。" +
-			"适用：排障时画\"事实→判断→建议\"因果链（节点 kind 用 fact/judgment/suggestion）；" +
-			"解释架构/部署流程/方案对比时画关系图。" +
-			"spec 为 JSON：{title, nodes:[{id,label,kind}], edges:[{from,to,label}], groups:[{label,nodes:[id...]}]}。" +
-			"节点 id 唯一、edges 端点必须存在、节点数≤30。调用后用一两句话点出图的结论即可，不要复述图里已有的内容。",
+		Description: "把流程、因果、结构或对比关系画成连线流程图展示给用户（画图优先于长篇文字）。" +
+			"适用：排障画\"事实→判断→建议\"因果链（kind=fact/judgment/suggestion）；解释部署/回滚流程、架构关系、方案对比。",
 		Tier: tools.TierRead,
 		Params: map[string]tools.ParamSpec{
-			"spec": {Type: "string", Description: "图的 JSON 描述（见上）。", Required: true},
+			"spec": {Type: "string", Required: true, Description: "图的 JSON 描述：" +
+				`{"title":"标题","direction":"TB或LR","nodes":[{"id":"n1","label":"短文字","kind":"default"}],"edges":[{"from":"n1","to":"n2","label":"可选"}],"groups":[{"label":"分组名","nodes":["n1"]}]}。` +
+				"【关键】edges 是流程图的灵魂，必须用 edges 把节点按执行/推导顺序连起来——没有 edges 就是一堆孤立方块，毫无意义。" +
+				"edges 的 from/to 必须是 nodes 里的 id（不是 label）。direction 默认 TB（自上而下，适合流程）。" +
+				"节点 label 控制在 15 字内、id 唯一、节点数≤30。画完用一两句话点结论，不要复述图中内容。",
+			},
 		},
 	}
 }

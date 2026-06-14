@@ -98,13 +98,17 @@ export interface AIAssistantRequest {
   request_id: string;
   /** 已存在的会话 ID。 */
   session_id: string;
-  /** 兼容字段；传 auto 时由后端根据输入判断行为。 */
+  /** 兼容字段；传 auto 时由后端根据输入判断行为。/ 模式可注入 troubleshoot 等 operation。 */
   operation?:
     | 'auto'
     | 'create_assemble'
     | 'update_assemble'
     | 'update_workflow'
-    | 'fix_execution';
+    | 'fix_execution'
+    | 'troubleshoot'
+    | 'inspect_server'
+    | 'analyze_architecture'
+    | 'generate_workflow';
   /** 用户输入内容。 */
   message: string;
   /** target_select 后用户选定的本轮目标配置。 */
@@ -115,6 +119,8 @@ export interface AIAssistantRequest {
   artifact_id?: string;
   /** 要修复的失败执行 ID，operation=fix_execution 时必填。 */
   execution_id?: string;
+  /** `/` 模式选择器注入的本轮行为指令（画图/计划/苏格拉底等）。 */
+  mode_hint?: string;
 }
 
 // AITargetOption 是后端要求用户选择目标配置时返回的候选项。

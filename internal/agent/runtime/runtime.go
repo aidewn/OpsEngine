@@ -40,6 +40,9 @@ type Request struct {
 	ArtifactID   string
 	// ExecutionID 指向要修复的失败执行，仅 operation=fix_execution 时有效。
 	ExecutionID string
+	// ModeHint 是 `/` 模式选择器注入的本轮行为指令（画图/计划/苏格拉底等），
+	// 仅对走对话路径（chat/troubleshoot）的请求生效，作为额外 system 段注入。
+	ModeHint string
 }
 
 // Runtime 持有完成一轮所需的全部依赖。

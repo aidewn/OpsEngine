@@ -3,7 +3,6 @@
 // 创建新会话时只需选择环境；SSH 配置是可选范围，环境级会话可用于整体分析。
 
 import {
-  FormEvent,
   useCallback,
   useEffect,
   useMemo,
@@ -17,11 +16,12 @@ import { Dialog } from "@/components/ui/Dialog";
 import { Button } from "@/components/ui/Button";
 import { ActionCard } from "@/components/ui/ActionCard";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { Label } from "@/components/ui/Label";
 import { MarkdownView } from "@/components/ui/MarkdownView";
 import { ProgressTimeline } from "@/components/ui/ProgressTimeline";
-import { Select } from "@/components/ui/Select";
-import { Textarea } from "@/components/ui/Textarea";
+import { ViewRenderer } from "./views/ViewRenderer";
+import { ViewActionsProvider } from "./views/ViewActions";
+import { Composer } from "./Composer";
+import type { ChatMode } from "./chatModes";
 import { useQueryClient } from "@tanstack/react-query";
 import { useRunWorkflow } from "@/api/executions";
 import {
@@ -45,10 +45,12 @@ import { hasWailsRuntime } from "@/lib/wailsRuntime";
 import { useTabs } from "@/features/tabs/TabsContext";
 import type {
   AIAssistantEvent,
+  AIAssistantRequest,
   AIPendingDraft,
   AITargetOption,
   AISession,
   AISessionMessage,
+  AIViewPayload,
 } from "@/types/ai";
 
 interface AIAssistantDialogProps {
@@ -90,6 +92,8 @@ interface PendingTurn {
   userContent: string;
   assistantContent: string;
   assistantProgress: string[];
+  // 工具产出的可视化载荷（render_diagram / host_status 等），实时追加
+  views: AIViewPayload[];
   // 瞬态心跳文本，每次替换不追加；done/delta 到来时清空
   assistantHeartbeat?: string;
   workflowID?: string;
@@ -183,6 +187,8 @@ export function AIAssistantPanel({
   const [sessionConfigID, setSessionConfigID] = useState("");
 
   const [input, setInput] = useState("");
+  // activeModes：`/` 选中的本轮模式 chip 列表（能力可叠加，流程独占）；发送后清空。
+  const [activeModes, setActiveModes] = useState<ChatMode[]>([]);
   const [pending, setPending] = useState<PendingTurn | null>(null);
   const [stickToBottom, setStickToBottom] = useState(true);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
@@ -190,6 +196,19 @@ export function AIAssistantPanel({
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const pendingRef = useRef<PendingTurn | null>(null);
   pendingRef.current = pending;
+  const activeModesRef = useRef<ChatMode[]>([]);
+  activeModesRef.current = activeModes;
+
+  // toggleMode：能力类切换进/出；选流程类时独占（清掉其他），再选取消。
+  const toggleMode = useCallback((mode: ChatMode) => {
+    setActiveModes((prev) => {
+      const has = prev.some((m) => m.id === mode.id);
+      if (has) return prev.filter((m) => m.id !== mode.id);
+      if (mode.group === "route") return [mode]; // 流程独占
+      // 能力类：加入前移除已有的流程类（流程与能力互斥）
+      return [...prev.filter((m) => m.group !== "route"), mode];
+    });
+  }, []);
 
   // finalizeAssistantTurn 在 RPC 返回后兜底结束本轮 UI（Wails 同步调用时 done 事件可能晚于 mutate  resolve）。
   const finalizeAssistantTurn = useCallback(
@@ -386,6 +405,14 @@ export function AIAssistantPanel({
               }
             : prev,
         );
+      } else if (event.type === "view") {
+        // 工具产出的可视化载荷：实时追加到本轮，落库后由 message.views 接管渲染
+        if (event.view) {
+          const incoming = event.view;
+          setPending((prev) =>
+            prev ? { ...prev, views: [...prev.views, incoming] } : prev,
+          );
+        }
       } else if (event.type === "heartbeat") {
         // 单行原地刷新，不进 progress 数组，避免持久化时堆积
         setPending((prev) =>
@@ -508,17 +535,40 @@ export function AIAssistantPanel({
     }
   }
 
-  async function handleApplySessionContext() {
+  // applySessionContext 用显式参数立即应用（避免 setState 异步拿到旧值）。
+  async function applySessionContext(environmentID: string, cfgID: string) {
     if (!selectedID || busy) return;
     try {
       await updateSessionContext.mutateAsync({
         id: selectedID,
-        environment_id: sessionEnvID,
-        config_id: sessionConfigID,
+        environment_id: environmentID,
+        config_id: cfgID,
       });
-      toast.success("会话上下文已更新");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "更新会话上下文失败");
+    }
+  }
+
+  // 统一上下文：新会话用 draft（创建时落到会话），已有会话用 session 状态并立即应用。
+  const ctxEnvID = selectedID ? sessionEnvID : draftEnvID;
+  const ctxConfigID = selectedID ? sessionConfigID : draftConfigID;
+  const ctxSshConfigs = selectedID ? sessionSshConfigs : sshConfigs;
+  function handleCtxEnvChange(id: string) {
+    if (selectedID) {
+      setSessionEnvID(id);
+      setSessionConfigID("");
+      void applySessionContext(id, "");
+    } else {
+      setDraftEnvID(id);
+      setDraftConfigID("");
+    }
+  }
+  function handleCtxConfigChange(id: string) {
+    if (selectedID) {
+      setSessionConfigID(id);
+      void applySessionContext(sessionEnvID, id);
+    } else {
+      setDraftConfigID(id);
     }
   }
 
@@ -550,26 +600,40 @@ export function AIAssistantPanel({
         userContent: message,
         assistantContent: "",
         assistantProgress: [],
+        views: [],
       });
 
       const fixID = fixExecutionRef.current;
+      // 模式收集：流程类（route）最多一个 → operation；能力类（capability）的 hint 合并 → mode_hint。
+      // 优先级：修复 > 编辑迭代 > 流程模式 operation > auto。
+      const modes = activeModesRef.current;
+      const routeMode = modes.find((m) => m.group === "route");
+      const hints = modes
+        .filter((m) => m.hint)
+        .map((m) => m.hint!)
+        .join("\n");
+      const baseOperation = fixID
+        ? "fix_execution"
+        : editingArtifact
+          ? editingArtifact.type === "assemble"
+            ? "update_assemble"
+            : "update_workflow"
+          : routeMode?.operation
+            ? routeMode.operation
+            : "auto";
       try {
         await startAssistant.mutateAsync({
           request_id: requestID,
           session_id: sessionID,
-          operation: fixID
-            ? "fix_execution"
-            : editingArtifact
-              ? editingArtifact.type === "assemble"
-                ? "update_assemble"
-                : "update_workflow"
-              : "auto",
+          operation: baseOperation as AIAssistantRequest["operation"],
           message,
           artifact_type: editingArtifact?.type,
           artifact_id: editingArtifact?.id,
           execution_id: fixID,
+          mode_hint: hints || undefined,
         });
         fixExecutionRef.current = undefined;
+        setActiveModes([]); // 本轮生效，发送后清空
         await finalizeAssistantTurn(sessionID);
       } catch (err) {
         setPending((prev) =>
@@ -594,10 +658,9 @@ export function AIAssistantPanel({
     ],
   );
 
-  async function handleSubmit(event: FormEvent) {
-    event.preventDefault();
+  async function handleSubmit() {
     const message = input.trim();
-    if (!message || busy) return;
+    if (!message || busy || waitingForTarget) return;
     setInput("");
     try {
       await sendMessage(message);
@@ -621,6 +684,16 @@ export function AIAssistantPanel({
     });
     onNavigateAway?.();
     navigate(`/workflows/${workflowID}`);
+  }
+
+  function handleOpenExecution(executionID: string) {
+    openTab({
+      kind: "execution",
+      id: executionID,
+      name: `执行 #${executionID.slice(0, 4)}`,
+    });
+    onNavigateAway?.();
+    navigate(`/executions/${executionID}`);
   }
 
   function handleOpenAssemble(assembleID: string) {
@@ -694,6 +767,12 @@ export function AIAssistantPanel({
   }
 
   return (
+    <ViewActionsProvider
+      value={{
+        openExecution: handleOpenExecution,
+        resend: (message: string) => void sendMessage(message),
+      }}
+    >
     <div className={cn("flex min-h-0 gap-4", className)}>
       {showSessionSidebar ? (
         <SessionSidebar
@@ -716,38 +795,8 @@ export function AIAssistantPanel({
         )}
       >
         {selectedID && session ? (
-          <>
-            <SessionHeader
-              session={session}
-              environments={environments ?? []}
-            />
-            <SessionContextEditor
-              environments={environments ?? []}
-              envID={sessionEnvID}
-              configID={sessionConfigID}
-              sshConfigs={sessionSshConfigs}
-              busy={busy || updateSessionContext.isPending}
-              onEnvChange={(value) => {
-                setSessionEnvID(value);
-                setSessionConfigID("");
-              }}
-              onConfigChange={setSessionConfigID}
-              onApply={handleApplySessionContext}
-            />
-          </>
-        ) : (
-          <NewSessionHeader
-            environments={environments ?? []}
-            envID={draftEnvID}
-            configID={draftConfigID}
-            sshConfigs={sshConfigs}
-            onEnvChange={(value) => {
-              setDraftEnvID(value);
-              setDraftConfigID("");
-            }}
-            onConfigChange={setDraftConfigID}
-          />
-        )}
+          <SessionHeader session={session} environments={environments ?? []} />
+        ) : null}
 
         <div
           ref={scrollContainerRef}
@@ -788,10 +837,7 @@ export function AIAssistantPanel({
           />
         )}
 
-        <form
-          onSubmit={handleSubmit}
-          className="border-t border-ops-border-subtle bg-ops-surface p-3"
-        >
+        <div className="border-t border-ops-border-subtle bg-ops-surface p-3">
           {waitingForTarget ? (
             <div className="mb-2 flex items-center gap-2 rounded-md border border-ops-warning bg-ops-warning-soft px-3 py-2 text-xs text-ops-warning">
               <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-ops-warning" />
@@ -819,45 +865,30 @@ export function AIAssistantPanel({
               </button>
             </div>
           ) : null}
-          <Textarea
-            ref={inputRef}
+          <Composer
             value={input}
-            onChange={(event) => setInput(event.target.value)}
-            rows={1}
+            onChange={setInput}
+            onSubmit={() => void handleSubmit()}
+            disabled={busy || waitingForTarget}
             placeholder={
               waitingForTarget
                 ? "请先在上方选择 SSH 目标…"
-                : "输入问题，Enter 发送，Shift+Enter 换行"
+                : "输入问题；/ 选流程，@ 加能力，Enter 发送"
             }
-            disabled={busy || waitingForTarget}
-            className="max-h-40 min-h-[40px] resize-none"
-            onKeyDown={(event) => {
-              if (event.key === "Enter" && !event.shiftKey) {
-                event.preventDefault();
-                if (!event.nativeEvent.isComposing) {
-                  (
-                    event.currentTarget.form as HTMLFormElement | null
-                  )?.requestSubmit();
-                }
-              }
-            }}
+            inputRef={inputRef}
+            environments={environments ?? []}
+            envID={ctxEnvID}
+            configID={ctxConfigID}
+            sshConfigs={ctxSshConfigs}
+            onEnvChange={handleCtxEnvChange}
+            onConfigChange={handleCtxConfigChange}
+            activeModes={activeModes}
+            onToggleMode={toggleMode}
           />
-          <div className="mt-2 flex items-center justify-between gap-2">
-            <span className="text-xs text-ops-tertiary">
-              {waitingForTarget
-                ? "等待选择目标"
-                : "Enter 发送 · Shift+Enter 换行"}
-            </span>
-            <Button
-              type="submit"
-              disabled={busy || waitingForTarget || !input.trim()}
-            >
-              {busy ? "处理中…" : "发送"}
-            </Button>
-          </div>
-        </form>
+        </div>
       </div>
     </div>
+    </ViewActionsProvider>
   );
 }
 
@@ -947,58 +978,6 @@ function SessionSidebar({
   );
 }
 
-// NewSessionHeader 渲染未选会话时的环境选择面板。
-function NewSessionHeader({
-  environments,
-  envID,
-  configID,
-  sshConfigs,
-  onEnvChange,
-  onConfigChange,
-}: {
-  environments: { id: string; name: string }[];
-  envID: string;
-  configID: string;
-  sshConfigs: { id: string; name: string }[];
-  onEnvChange: (value: string) => void;
-  onConfigChange: (value: string) => void;
-}) {
-  return (
-    <div className="grid gap-3 border-b border-ops-border-subtle p-3 sm:grid-cols-2">
-      <div className="space-y-1">
-        <Label htmlFor="ai-environment">上下文环境（可选）</Label>
-        <Select
-          id="ai-environment"
-          value={envID}
-          onChange={(event) => onEnvChange(event.target.value)}
-        >
-          <option value="">不指定环境（通用资产生成）</option>
-          {environments.map((env) => (
-            <option key={env.id} value={env.id}>
-              {env.name}
-            </option>
-          ))}
-        </Select>
-      </div>
-      <div className="space-y-1">
-        <Label htmlFor="ai-ssh-config">SSH 配置（可选）</Label>
-        <Select
-          id="ai-ssh-config"
-          value={configID}
-          onChange={(event) => onConfigChange(event.target.value)}
-          disabled={!envID}
-        >
-          <option value="">不指定（环境级会话）</option>
-          {sshConfigs.map((config) => (
-            <option key={config.id} value={config.id}>
-              {config.name}
-            </option>
-          ))}
-        </Select>
-      </div>
-    </div>
-  );
-}
 
 // SessionHeader 渲染当前会话的环境/配置只读信息。
 function SessionHeader({
@@ -1046,66 +1025,6 @@ function SessionHeader({
   );
 }
 
-// SessionContextEditor 允许已创建的会话重新绑定环境/SSH。
-function SessionContextEditor({
-  environments,
-  envID,
-  configID,
-  sshConfigs,
-  busy,
-  onEnvChange,
-  onConfigChange,
-  onApply,
-}: {
-  environments: { id: string; name: string }[];
-  envID: string;
-  configID: string;
-  sshConfigs: { id: string; name: string }[];
-  busy: boolean;
-  onEnvChange: (value: string) => void;
-  onConfigChange: (value: string) => void;
-  onApply: () => void;
-}) {
-  return (
-    <div className="grid gap-2 border-b border-ops-border-subtle bg-ops-canvas px-3 py-2 text-xs md:grid-cols-[1fr_1fr_auto] md:items-end">
-      <div className="space-y-1">
-        <Label htmlFor="ai-session-environment">上下文环境</Label>
-        <Select
-          id="ai-session-environment"
-          value={envID}
-          onChange={(event) => onEnvChange(event.target.value)}
-          disabled={busy}
-        >
-          <option value="">不指定环境（通用资产生成）</option>
-          {environments.map((env) => (
-            <option key={env.id} value={env.id}>
-              {env.name}
-            </option>
-          ))}
-        </Select>
-      </div>
-      <div className="space-y-1">
-        <Label htmlFor="ai-session-ssh-config">SSH 配置</Label>
-        <Select
-          id="ai-session-ssh-config"
-          value={configID}
-          onChange={(event) => onConfigChange(event.target.value)}
-          disabled={!envID || busy}
-        >
-          <option value="">不指定（环境级会话）</option>
-          {sshConfigs.map((config) => (
-            <option key={config.id} value={config.id}>
-              {config.name}
-            </option>
-          ))}
-        </Select>
-      </div>
-      <Button type="button" size="sm" onClick={onApply} disabled={busy}>
-        应用
-      </Button>
-    </div>
-  );
-}
 
 // MessageList 把会话历史与当前 pending 轮次合并渲染。
 function MessageList({
@@ -1223,6 +1142,7 @@ function MessageList({
                 ? pending.errorText
                 : pending.assistantContent,
               progress: pending.assistantProgress,
+              views: pending.views,
               heartbeat: pending.assistantHeartbeat,
               workflow_id: pending.workflowID,
               workflow_name: pending.workflowName,
@@ -1372,6 +1292,13 @@ function Bubble({
             live={streaming}
             defaultOpen={streaming}
           />
+        )}
+        {message.views && message.views.length > 0 && (
+          <div className="mt-2 space-y-2">
+            {message.views.map((view, i) => (
+              <ViewRenderer key={`${view.kind}-${i}`} view={view} />
+            ))}
+          </div>
         )}
         {message.heartbeat && (
           <div className="mt-1 flex items-center gap-1.5 text-[11px] italic text-ops-tertiary">

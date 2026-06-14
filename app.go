@@ -15,6 +15,7 @@ import (
 	"OpsEngine/internal/clients"
 	"OpsEngine/internal/core"
 	"OpsEngine/internal/engine"
+	"OpsEngine/internal/monitor"
 	_ "OpsEngine/internal/nodes" // 触发所有内置节点的 init() 注册（同时携带 probe 注册）
 	"OpsEngine/internal/probe"
 	"OpsEngine/internal/store"
@@ -36,8 +37,14 @@ type App struct {
 	environmentStore *store.EnvironmentStore
 	aiSessionStore   *store.AISessionStore
 	opsDocStore      *store.OpsDocStore
+	monitorStore     *store.MonitorStore
 	toolRegistry     *tools.Registry
 	engine           *engine.Engine
+	monitorScheduler *monitor.Scheduler
+	// monitorTickGuard 保证同一环境的 tick 同时只有一个在跑（后台调度 + 手动「立即检查」共用）。
+	monitorTickGuard *monitor.KeyedGuard
+	// monitorDiagnosisGuard 保证同一监控项的诊断（Troubleshoot Flow）同时只有一个在跑。
+	monitorDiagnosisGuard *monitor.KeyedGuard
 }
 
 // NewApp 创建应用实例
@@ -54,7 +61,7 @@ func (a *App) startup(ctx context.Context) {
 	zap.ReplaceGlobals(logger)
 
 	// 确保数据目录存在
-	for _, dir := range []string{"data/workflows", "data/assembles", "data/executions", "data/environments", "data/settings", "data/logs", "data/ai-sessions", "data/docs"} {
+	for _, dir := range []string{"data/workflows", "data/assembles", "data/executions", "data/environments", "data/settings", "data/logs", "data/ai-sessions", "data/docs", "data/monitor"} {
 		if err := os.MkdirAll(dir, 0755); err != nil {
 			zap.L().Fatal("创建目录失败", zap.Error(err))
 		}
@@ -66,6 +73,7 @@ func (a *App) startup(ctx context.Context) {
 	a.environmentStore = store.NewEnvironmentStore("data/environments")
 	a.aiSessionStore = store.NewAISessionStore("data/ai-sessions")
 	a.opsDocStore = store.NewOpsDocStore("data/docs")
+	a.monitorStore = store.NewMonitorStore("data/monitor")
 
 	// 注册内置 Agent 工具（只读 tier）。失败仅记日志，不影响其他功能。
 	a.toolRegistry = tools.NewRegistry()
@@ -88,6 +96,20 @@ func (a *App) startup(ctx context.Context) {
 		engine.NewWailsEmitter(ctx),
 	)
 
+	// 启动后台监控调度器：按各环境配置的间隔自动跑 tick（采集 + 判断 + 更新状态）。
+	// 基准节拍 10s 决定到期判定粒度；全局最多 2 个环境并发，避免环境多时资源尖峰；
+	// 只有开启监控的环境会被轮询。
+	a.monitorTickGuard = monitor.NewKeyedGuard()
+	a.monitorDiagnosisGuard = monitor.NewKeyedGuard()
+	a.monitorScheduler = monitor.NewScheduler(
+		a.monitorSchedules,
+		a.runScheduledTick,
+		10*time.Second,
+		2,
+		func(format string, args ...any) { zap.S().Warnf(format, args...) },
+	)
+	a.monitorScheduler.Start()
+
 	// Wails 拖拽文件回调：转发为前端事件 file:dropped，paths = []string
 	// 前端 file_path 字段在自身被打上 CSS 标记后，可监听该事件填值
 	wailsruntime.OnFileDrop(ctx, func(x, y int, paths []string) {
@@ -95,6 +117,13 @@ func (a *App) startup(ctx context.Context) {
 	})
 
 	zap.L().Info("OpsEngine 桌面应用启动完成")
+}
+
+// shutdown Wails 生命周期钩子，应用退出前调用：停止后台调度器。
+func (a *App) shutdown(ctx context.Context) {
+	if a.monitorScheduler != nil {
+		a.monitorScheduler.Stop()
+	}
 }
 
 // SelectFile 弹出原生文件选择对话框，返回用户选中的绝对路径

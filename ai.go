@@ -53,6 +53,8 @@ type AIAssistantRequest struct {
 	ArtifactID     string `json:"artifact_id,omitempty"`
 	// ExecutionID 指向要修复的失败执行，operation=fix_execution 时必填。
 	ExecutionID string `json:"execution_id,omitempty"`
+	// ModeHint 是 `/` 模式选择器注入的本轮行为指令（画图/计划/苏格拉底等）。
+	ModeHint string `json:"mode_hint,omitempty"`
 }
 
 // AIAssistantEvent 是后端推送给前端的 AI 助手事件。
@@ -386,6 +388,7 @@ func (a *App) StartAIAssistant(req AIAssistantRequest) error {
 		ArtifactType:   req.ArtifactType,
 		ArtifactID:     req.ArtifactID,
 		ExecutionID:    req.ExecutionID,
+		ModeHint:       req.ModeHint,
 	})
 }
 

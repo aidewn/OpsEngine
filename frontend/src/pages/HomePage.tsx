@@ -5,10 +5,11 @@ import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { Button } from '@/components/ui/Button';
 import { AIAssistantPanel } from '@/features/ai/AIAssistantDialog';
 import { CreateAssembleDialog } from '@/features/assemble/CreateAssembleDialog';
+import { MonitorOverview } from '@/features/monitor/MonitorOverview';
 import { OpsDocList } from '@/features/opsDocs/OpsDocList';
 import { CreateWorkflowDialog } from '@/features/workflow/CreateWorkflowDialog';
 
-type HomeTab = 'chat' | 'workflow' | 'reports';
+type HomeTab = 'chat' | 'workflow' | 'monitor' | 'reports';
 
 // HomePage 根据 query tab 展示三类主视图，保留刷新后的上下文。
 export function HomePage() {
@@ -19,6 +20,7 @@ export function HomePage() {
 
   const content = useMemo(() => {
     if (tab === 'workflow') return <WorkflowOverview />;
+    if (tab === 'monitor') return <MonitorOverview />;
     if (tab === 'reports') return <OpsDocList />;
     return (
       <AIAssistantPanel
@@ -76,6 +78,6 @@ function WorkflowOverview() {
 }
 
 function getHomeTab(tab: string | null): HomeTab {
-  if (tab === 'workflow' || tab === 'reports') return tab;
+  if (tab === 'workflow' || tab === 'monitor' || tab === 'reports') return tab;
   return 'chat';
 }
