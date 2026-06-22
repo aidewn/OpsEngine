@@ -2,7 +2,7 @@
 // kind 决定目标配置类型与参数表单（见 dataKinds.ts）；http.health 不依赖环境配置。
 import { useState } from 'react';
 import { useEnvironment } from '@/api/environments';
-import { useUpdateMonitorPanel } from '@/api/monitor';
+import { useMonitorSources, useUpdateMonitorPanel } from '@/api/monitor';
 import { errorMessage } from '@/lib/error';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -13,12 +13,25 @@ import { MONITOR_KINDS, kindDef } from './dataKinds';
 
 export function PanelRequirementsEditor({ panel }: { panel: MonitorPanel }) {
   const { data: environment } = useEnvironment(panel.environment_id);
+  const { data: sources } = useMonitorSources(panel.environment_id);
   const update = useUpdateMonitorPanel();
   const [reqs, setReqs] = useState<DataRequirement[]>(panel.requirements ?? []);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
 
   const configs = environment?.configs ?? [];
+  const sourceOptions = sources?.length
+    ? sources
+    : [
+        {
+          id: 'builtin',
+          environment_id: panel.environment_id,
+          name: '内置采集',
+          kind: 'builtin',
+          enabled: true,
+          config: {},
+        },
+      ];
   const busy = update.isPending;
 
   function patchReq(index: number, patch: Partial<DataRequirement>) {
@@ -29,6 +42,15 @@ export function PanelRequirementsEditor({ panel }: { panel: MonitorPanel }) {
   // 切换 kind 时清空目标与参数，避免残留上一类型的无效字段。
   function changeKind(index: number, kind: string) {
     patchReq(index, { kind, target_id: '', params: {} });
+  }
+
+  // 切换监控源时选择该源支持的第一个数据类型，避免源与 kind 不匹配。
+  function changeSource(index: number, sourceID: string) {
+    const source = sourceOptions.find((item) => item.id === sourceID);
+    const nextKind =
+      MONITOR_KINDS.find((item) => item.sourceKind === (source?.kind ?? 'builtin'))?.kind ??
+      'host.basic';
+    patchReq(index, { source_id: sourceID, kind: nextKind, target_id: '', params: {} });
   }
 
   function setParam(index: number, key: string, value: unknown) {
@@ -48,7 +70,12 @@ export function PanelRequirementsEditor({ panel }: { panel: MonitorPanel }) {
     setSaved(false);
     setReqs((prev) => [
       ...prev,
-      { target_id: '', kind: MONITOR_KINDS[0]?.kind ?? 'host.basic', params: {} },
+      {
+        source_id: 'builtin',
+        target_id: '',
+        kind: MONITOR_KINDS[0]?.kind ?? 'host.basic',
+        params: {},
+      },
     ]);
   }
 
@@ -84,6 +111,11 @@ export function PanelRequirementsEditor({ panel }: { panel: MonitorPanel }) {
         ) : (
           reqs.map((req, index) => {
             const def = kindDef(req.kind);
+            const sourceID = req.source_id || 'builtin';
+            const source = sourceOptions.find((item) => item.id === sourceID);
+            const kinds = MONITOR_KINDS.filter(
+              (item) => item.sourceKind === (source?.kind ?? 'builtin'),
+            );
             const targetOptions = def?.configKind
               ? configs.filter((c) => c.kind === def.configKind)
               : [];
@@ -92,7 +124,21 @@ export function PanelRequirementsEditor({ panel }: { panel: MonitorPanel }) {
                 key={index}
                 className="space-y-3 rounded-md border border-ops-border-subtle bg-ops-elevated p-3"
               >
-                <div className="grid gap-3 md:grid-cols-2">
+                <div className="grid gap-3 md:grid-cols-3">
+                  <div className="space-y-1">
+                    <Label>监控源</Label>
+                    <Select
+                      value={sourceID}
+                      onChange={(e) => changeSource(index, e.target.value)}
+                      disabled={busy}
+                    >
+                      {sourceOptions.map((item) => (
+                        <option key={item.id} value={item.id}>
+                          {item.name}
+                        </option>
+                      ))}
+                    </Select>
+                  </div>
                   <div className="space-y-1">
                     <Label>数据类型</Label>
                     <Select
@@ -100,7 +146,7 @@ export function PanelRequirementsEditor({ panel }: { panel: MonitorPanel }) {
                       onChange={(e) => changeKind(index, e.target.value)}
                       disabled={busy}
                     >
-                      {MONITOR_KINDS.map((k) => (
+                      {kinds.map((k) => (
                         <option key={k.kind} value={k.kind}>
                           {k.label}
                         </option>
@@ -111,7 +157,7 @@ export function PanelRequirementsEditor({ panel }: { panel: MonitorPanel }) {
                     <div className="space-y-1">
                       <Label>目标配置（{def.configKind}）</Label>
                       <Select
-                        value={req.target_id}
+                        value={req.target_id ?? ''}
                         onChange={(e) => patchReq(index, { target_id: e.target.value })}
                         disabled={busy}
                       >

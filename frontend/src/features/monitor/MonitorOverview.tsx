@@ -5,16 +5,31 @@ import {
   CheckCircle2,
   ClipboardList,
   DatabaseZap,
+  Pencil,
   FolderKanban,
   Plus,
+  Power,
+  PowerOff,
   RadioTower,
   Stethoscope,
+  Trash2,
 } from 'lucide-react';
-import { useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useEnvironments } from '@/api/environments';
-import { useMonitorOverview, useRunPanelDiagnosis } from '@/api/monitor';
+import {
+  useCreateMonitorSource,
+  useDeleteMonitorSource,
+  useMonitorOverview,
+  useRunPanelDiagnosis,
+  useTestMonitorSource,
+  useUpdateMonitorSource,
+} from '@/api/monitor';
 import { Button } from '@/components/ui/Button';
+import { Dialog } from '@/components/ui/Dialog';
+import { Input } from '@/components/ui/Input';
+import { Label } from '@/components/ui/Label';
+import { Select } from '@/components/ui/Select';
 import { cn } from '@/lib/cn';
 import { errorMessage } from '@/lib/error';
 import { toast } from '@/lib/toast';
@@ -32,6 +47,7 @@ import type {
   MonitorOverviewData,
   MonitorPanel,
   MonitorReport,
+  MonitorSource,
   MonitorStatus,
   PanelState,
 } from '@/types/monitor';
@@ -168,6 +184,8 @@ function EnvironmentOverview({
   const historyRows = rows.filter((row) => row.state.status === 'history');
   const [groupDialogOpen, setGroupDialogOpen] = useState(false);
   const [panelDialogOpen, setPanelDialogOpen] = useState(false);
+  const [sourceDialogOpen, setSourceDialogOpen] = useState(false);
+  const [editingSource, setEditingSource] = useState<MonitorSource | undefined>(undefined);
   const [reportOpen, setReportOpen] = useState(false);
   const [viewReport, setViewReport] = useState<MonitorReport | undefined>(undefined);
 
@@ -261,6 +279,18 @@ function EnvironmentOverview({
             </div>
           </div>
 
+          <MonitorSourcesCard
+            sources={overview.sources ?? []}
+            onCreate={() => {
+              setEditingSource(undefined);
+              setSourceDialogOpen(true);
+            }}
+            onEdit={(source) => {
+              setEditingSource(source);
+              setSourceDialogOpen(true);
+            }}
+          />
+
           <div className="rounded-lg border border-ops-border-subtle bg-ops-surface p-4">
             <div className="text-sm font-medium text-ops-primary">最近报告</div>
             <div className="mt-3 space-y-3 text-sm">
@@ -294,6 +324,12 @@ function EnvironmentOverview({
         onOpenChange={setPanelDialogOpen}
         environmentID={overview.environment_id}
         groups={overview.groups}
+      />
+      <MonitorSourceDialog
+        open={sourceDialogOpen}
+        onOpenChange={setSourceDialogOpen}
+        environmentID={overview.environment_id}
+        source={editingSource}
       />
       <MonitorReportDialog report={viewReport} open={reportOpen} onOpenChange={setReportOpen} />
     </>
@@ -628,6 +664,293 @@ function FlowCard({ title, description }: { title: string; description: string }
       </div>
       <p className="mt-3 text-sm text-ops-secondary">{description}</p>
     </div>
+  );
+}
+
+function MonitorSourcesCard({
+  sources,
+  onCreate,
+  onEdit,
+}: {
+  sources: MonitorSource[];
+  onCreate: () => void;
+  onEdit: (source: MonitorSource) => void;
+}) {
+  const update = useUpdateMonitorSource();
+  const remove = useDeleteMonitorSource();
+  const busy = update.isPending || remove.isPending;
+
+  async function toggleSource(source: MonitorSource) {
+    try {
+      await update.mutateAsync({ ...source, enabled: !source.enabled });
+      toast.success(source.enabled ? '监控源已禁用' : '监控源已启用');
+    } catch (err) {
+      toast.error(errorMessage(err, '更新监控源失败'));
+    }
+  }
+
+  async function deleteSource(source: MonitorSource) {
+    if (!window.confirm(`删除监控源「${source.name}」？`)) return;
+    try {
+      await remove.mutateAsync({ id: source.id, environmentID: source.environment_id });
+      toast.success('监控源已删除');
+    } catch (err) {
+      toast.error(errorMessage(err, '删除监控源失败'));
+    }
+  }
+
+  return (
+    <div className="rounded-lg border border-ops-border-subtle bg-ops-surface p-4">
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2 text-sm font-medium text-ops-primary">
+          <DatabaseZap size={16} />
+          <span>监控源</span>
+        </div>
+        <Button size="sm" variant="secondary" onClick={onCreate}>
+          <Plus size={14} />
+          新增
+        </Button>
+      </div>
+      <div className="mt-3 space-y-2">
+        {sources.length === 0 ? (
+          <div className="text-sm text-ops-tertiary">暂无监控源</div>
+        ) : (
+          sources.map((source) => {
+            const builtin = source.id === 'builtin';
+            return (
+              <div
+                key={source.id}
+                className="rounded-md border border-ops-border-subtle bg-ops-elevated px-3 py-2"
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="truncate text-sm text-ops-primary">{source.name}</div>
+                    <div className="mt-1 truncate text-xs text-ops-tertiary">
+                      {source.kind}
+                      {source.config?.endpoint ? ` · ${String(source.config.endpoint)}` : ''}
+                    </div>
+                  </div>
+                  <span
+                    className={cn(
+                      'shrink-0 text-xs',
+                      source.enabled ? 'text-ops-success' : 'text-ops-tertiary',
+                    )}
+                  >
+                    {source.enabled ? '启用' : '禁用'}
+                  </span>
+                </div>
+                {!builtin ? (
+                  <div className="mt-2 flex justify-end gap-1">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      title="编辑"
+                      aria-label="编辑监控源"
+                      disabled={busy}
+                      onClick={() => onEdit(source)}
+                    >
+                      <Pencil size={14} />
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      title={source.enabled ? '禁用' : '启用'}
+                      aria-label={source.enabled ? '禁用监控源' : '启用监控源'}
+                      disabled={busy}
+                      onClick={() => toggleSource(source)}
+                    >
+                      {source.enabled ? <PowerOff size={14} /> : <Power size={14} />}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      title="删除"
+                      aria-label="删除监控源"
+                      disabled={busy}
+                      onClick={() => deleteSource(source)}
+                    >
+                      <Trash2 size={14} />
+                    </Button>
+                  </div>
+                ) : null}
+              </div>
+            );
+          })
+        )}
+      </div>
+    </div>
+  );
+}
+
+function MonitorSourceDialog({
+  open,
+  onOpenChange,
+  environmentID,
+  source,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  environmentID: string;
+  source?: MonitorSource;
+}) {
+  const create = useCreateMonitorSource();
+  const update = useUpdateMonitorSource();
+  const test = useTestMonitorSource();
+  const editing = !!source?.id;
+  const [name, setName] = useState(source?.name ?? '生产 Prometheus');
+  const [endpoint, setEndpoint] = useState('');
+  const [authType, setAuthType] = useState('none');
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [token, setToken] = useState('');
+  const [timeout, setTimeoutValue] = useState(10);
+  const busy = create.isPending || update.isPending || test.isPending;
+
+  useEffect(() => {
+    if (!open) return;
+    const config = source?.config ?? {};
+    setName(source?.name ?? '生产 Prometheus');
+    setEndpoint(String(config.endpoint ?? ''));
+    setAuthType(String(config.auth_type ?? 'none'));
+    setUsername(String(config.username ?? ''));
+    setPassword(String(config.password ?? ''));
+    setToken(String(config.token ?? ''));
+    setTimeoutValue(Number(config.timeout_seconds ?? 10) || 10);
+  }, [open, source]);
+
+  function buildSource(): MonitorSource {
+    return {
+      id: '',
+      environment_id: environmentID,
+      name,
+      kind: 'prometheus',
+      enabled: true,
+      config: {
+        endpoint,
+        auth_type: authType,
+        username,
+        password,
+        token,
+        timeout_seconds: timeout,
+      },
+    };
+  }
+
+  async function handleTest() {
+    try {
+      await test.mutateAsync(buildSource());
+      toast.success('监控源连接正常');
+    } catch (err) {
+      toast.error(errorMessage(err, '监控源连接失败'));
+    }
+  }
+
+  async function handleCreate() {
+    try {
+      if (editing && source) {
+        await update.mutateAsync({
+          ...source,
+          name,
+          kind: 'prometheus',
+          config: buildSource().config,
+        });
+        toast.success('监控源已更新');
+      } else {
+        await create.mutateAsync({
+          environmentID,
+          name,
+          kind: 'prometheus',
+          config: buildSource().config,
+        });
+        toast.success('监控源已创建');
+      }
+      onOpenChange(false);
+    } catch (err) {
+      toast.error(errorMessage(err, editing ? '更新监控源失败' : '创建监控源失败'));
+    }
+  }
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={onOpenChange}
+      title={editing ? '编辑监控源' : '新增监控源'}
+      description="当前先支持 Prometheus 即时查询。"
+      footer={
+        <>
+          <Button variant="secondary" onClick={handleTest} disabled={busy}>
+            {test.isPending ? '测试中...' : '测试连接'}
+          </Button>
+          <Button onClick={handleCreate} disabled={busy}>
+            {create.isPending || update.isPending ? '保存中...' : '保存'}
+          </Button>
+        </>
+      }
+    >
+      <div className="space-y-3">
+        <div className="space-y-1">
+          <Label>名称</Label>
+          <Input value={name} disabled={busy} onChange={(e) => setName(e.target.value)} />
+        </div>
+        <div className="space-y-1">
+          <Label>Endpoint</Label>
+          <Input
+            value={endpoint}
+            placeholder="http://prometheus:9090"
+            disabled={busy}
+            onChange={(e) => setEndpoint(e.target.value)}
+          />
+        </div>
+        <div className="grid gap-3 md:grid-cols-2">
+          <div className="space-y-1">
+            <Label>认证方式</Label>
+            <Select value={authType} disabled={busy} onChange={(e) => setAuthType(e.target.value)}>
+              <option value="none">无</option>
+              <option value="basic">Basic</option>
+              <option value="bearer">Bearer Token</option>
+            </Select>
+          </div>
+          <div className="space-y-1">
+            <Label>超时（秒）</Label>
+            <Input
+              type="number"
+              min={1}
+              value={String(timeout)}
+              disabled={busy}
+              onChange={(e) => setTimeoutValue(Number(e.target.value) || 10)}
+            />
+          </div>
+        </div>
+        {authType === 'basic' ? (
+          <div className="grid gap-3 md:grid-cols-2">
+            <div className="space-y-1">
+              <Label>用户名</Label>
+              <Input value={username} disabled={busy} onChange={(e) => setUsername(e.target.value)} />
+            </div>
+            <div className="space-y-1">
+              <Label>密码</Label>
+              <Input
+                type="password"
+                value={password}
+                disabled={busy}
+                onChange={(e) => setPassword(e.target.value)}
+              />
+            </div>
+          </div>
+        ) : null}
+        {authType === 'bearer' ? (
+          <div className="space-y-1">
+            <Label>Token</Label>
+            <Input
+              type="password"
+              value={token}
+              disabled={busy}
+              onChange={(e) => setToken(e.target.value)}
+            />
+          </div>
+        ) : null}
+      </div>
+    </Dialog>
   );
 }
 

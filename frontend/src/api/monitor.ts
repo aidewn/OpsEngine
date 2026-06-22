@@ -11,18 +11,24 @@ import {
   AcknowledgePanelHistory,
   CreateMonitorGroup,
   CreateMonitorPanel,
+  CreateMonitorSource,
+  DeleteMonitorSource,
   GetMonitorConfig,
   GetMonitorOverview,
+  ListMonitorSources,
   RunMonitorTick,
   RunPanelDiagnosis,
   SetMonitorConfig,
+  TestMonitorSource,
   UpdateMonitorPanel,
+  UpdateMonitorSource,
 } from '@wails/go/main/App';
-import type { MonitorConfig, MonitorOverviewData, MonitorPanel } from '@/types/monitor';
+import type { MonitorConfig, MonitorOverviewData, MonitorPanel, MonitorSource } from '@/types/monitor';
 
 const KEY = {
   overview: (environmentID: string) => ['monitor', 'overview', environmentID] as const,
   config: (environmentID: string) => ['monitor', 'config', environmentID] as const,
+  sources: (environmentID: string) => ['monitor', 'sources', environmentID] as const,
 };
 
 // useMonitorOverview 返回当前环境的监控概览数据。
@@ -45,6 +51,17 @@ export function useMonitorConfig(
   return useQuery({
     queryKey: KEY.config(environmentID ?? ''),
     queryFn: () => GetMonitorConfig(environmentID!) as Promise<MonitorConfig>,
+    enabled: !!environmentID,
+  });
+}
+
+// useMonitorSources 返回环境下可用的监控源。
+export function useMonitorSources(
+  environmentID: string | undefined,
+): UseQueryResult<MonitorSource[]> {
+  return useQuery({
+    queryKey: KEY.sources(environmentID ?? ''),
+    queryFn: () => ListMonitorSources(environmentID!) as Promise<MonitorSource[]>,
     enabled: !!environmentID,
   });
 }
@@ -132,6 +149,62 @@ export function useUpdateMonitorPanel(): UseMutationResult<void, Error, MonitorP
     onSuccess: (_data, panel) => {
       qc.invalidateQueries({ queryKey: KEY.overview(panel.environment_id) });
     },
+  });
+}
+
+// 创建监控源入参。
+export interface CreateMonitorSourceInput {
+  environmentID: string;
+  name: string;
+  kind: string;
+  config: Record<string, unknown>;
+}
+
+// useCreateMonitorSource 在指定环境下创建监控源，成功后刷新概览和源列表。
+export function useCreateMonitorSource(): UseMutationResult<
+  string,
+  Error,
+  CreateMonitorSourceInput
+> {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input) =>
+      CreateMonitorSource(input.environmentID, input.name, input.kind, input.config),
+    onSuccess: (_id, input) => {
+      qc.invalidateQueries({ queryKey: KEY.sources(input.environmentID) });
+      qc.invalidateQueries({ queryKey: KEY.overview(input.environmentID) });
+    },
+  });
+}
+
+// useUpdateMonitorSource 整体覆盖更新监控源，成功后刷新对应环境缓存。
+export function useUpdateMonitorSource(): UseMutationResult<void, Error, MonitorSource> {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (source) => UpdateMonitorSource(source as never),
+    onSuccess: (_data, source) => {
+      qc.invalidateQueries({ queryKey: KEY.sources(source.environment_id) });
+      qc.invalidateQueries({ queryKey: KEY.overview(source.environment_id) });
+    },
+  });
+}
+
+// useDeleteMonitorSource 删除监控源，成功后刷新调用方指定环境缓存。
+export function useDeleteMonitorSource(): UseMutationResult<void, Error, { id: string; environmentID: string }> {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input) => DeleteMonitorSource(input.id),
+    onSuccess: (_data, input) => {
+      qc.invalidateQueries({ queryKey: KEY.sources(input.environmentID) });
+      qc.invalidateQueries({ queryKey: KEY.overview(input.environmentID) });
+    },
+  });
+}
+
+// useTestMonitorSource 测试监控源配置，不保存入参。
+export function useTestMonitorSource(): UseMutationResult<void, Error, MonitorSource> {
+  return useMutation({
+    mutationFn: (source) => TestMonitorSource(source as never),
   });
 }
 

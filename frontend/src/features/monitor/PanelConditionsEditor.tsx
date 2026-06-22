@@ -2,7 +2,7 @@
 // 每条条件从某类采集结果取一个数值字段，与阈值按运算符比较；任一命中即异常。
 // target 留空表示匹配该 kind 的任一采集结果（多数监控项每种数据只采一处）。
 import { useState } from 'react';
-import { useUpdateMonitorPanel } from '@/api/monitor';
+import { useMonitorSources, useUpdateMonitorPanel } from '@/api/monitor';
 import { errorMessage } from '@/lib/error';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -16,12 +16,25 @@ const SEVERITIES: MonitorCondition['severity'][] = ['warning', 'critical'];
 
 export function PanelConditionsEditor({ panel }: { panel: MonitorPanel }) {
   const update = useUpdateMonitorPanel();
+  const { data: sources } = useMonitorSources(panel.environment_id);
   const [conditions, setConditions] = useState<MonitorCondition[]>(panel.conditions ?? []);
   const [abnormalThreshold, setAbnormalThreshold] = useState(panel.abnormal_threshold || 1);
   const [recoveryThreshold, setRecoveryThreshold] = useState(panel.recovery_threshold || 1);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
   const busy = update.isPending;
+  const sourceOptions = sources?.length
+    ? sources
+    : [
+        {
+          id: 'builtin',
+          environment_id: panel.environment_id,
+          name: '内置采集',
+          kind: 'builtin',
+          enabled: true,
+          config: {},
+        },
+      ];
 
   function patch(index: number, p: Partial<MonitorCondition>) {
     setSaved(false);
@@ -34,12 +47,27 @@ export function PanelConditionsEditor({ panel }: { panel: MonitorPanel }) {
     patch(index, { kind, field });
   }
 
+  // 切换监控源时同步切到该源支持的第一个数据类型。
+  function changeSource(index: number, sourceID: string) {
+    const source = sourceOptions.find((item) => item.id === sourceID);
+    const kind =
+      MONITOR_KINDS.find((item) => item.sourceKind === (source?.kind ?? 'builtin'))?.kind ??
+      'host.basic';
+    patch(index, {
+      source_id: sourceID,
+      kind,
+      target_id: '',
+      field: kindDef(kind)?.conditionFields?.[0]?.value ?? '',
+    });
+  }
+
   function addCondition() {
     setSaved(false);
     const kind = MONITOR_KINDS[0]?.kind ?? 'host.basic';
     setConditions((prev) => [
       ...prev,
       {
+        source_id: 'builtin',
         kind,
         target_id: '',
         field: kindDef(kind)?.conditionFields?.[0]?.value ?? '',
@@ -92,12 +120,31 @@ export function PanelConditionsEditor({ panel }: { panel: MonitorPanel }) {
         ) : (
           conditions.map((cond, index) => {
             const def = kindDef(cond.kind);
+            const sourceID = cond.source_id || 'builtin';
+            const source = sourceOptions.find((item) => item.id === sourceID);
+            const kinds = MONITOR_KINDS.filter(
+              (item) => item.sourceKind === (source?.kind ?? 'builtin'),
+            );
             return (
               <div
                 key={index}
                 className="space-y-3 rounded-md border border-ops-border-subtle bg-ops-elevated p-3"
               >
-                <div className="grid gap-3 md:grid-cols-2">
+                <div className="grid gap-3 md:grid-cols-3">
+                  <div className="space-y-1">
+                    <Label>监控源</Label>
+                    <Select
+                      value={sourceID}
+                      onChange={(e) => changeSource(index, e.target.value)}
+                      disabled={busy}
+                    >
+                      {sourceOptions.map((item) => (
+                        <option key={item.id} value={item.id}>
+                          {item.name}
+                        </option>
+                      ))}
+                    </Select>
+                  </div>
                   <div className="space-y-1">
                     <Label>数据类型</Label>
                     <Select
@@ -105,7 +152,7 @@ export function PanelConditionsEditor({ panel }: { panel: MonitorPanel }) {
                       onChange={(e) => changeKind(index, e.target.value)}
                       disabled={busy}
                     >
-                      {MONITOR_KINDS.map((k) => (
+                      {kinds.map((k) => (
                         <option key={k.kind} value={k.kind}>
                           {k.label}
                         </option>

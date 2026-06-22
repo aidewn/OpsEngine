@@ -22,6 +22,7 @@ export interface FieldOption {
 export interface MonitorKindDef {
   kind: string;
   label: string;
+  sourceKind: 'builtin' | 'prometheus';
   configKind?: EnvConfigKind;
   params: ParamField[];
   conditionFields?: FieldOption[];
@@ -32,6 +33,7 @@ export const MONITOR_KINDS: MonitorKindDef[] = [
   {
     kind: 'host.basic',
     label: '主机基础指标（CPU/内存/负载）',
+    sourceKind: 'builtin',
     configKind: 'ssh',
     params: [],
     conditionFields: [
@@ -45,6 +47,7 @@ export const MONITOR_KINDS: MonitorKindDef[] = [
   {
     kind: 'host.disk',
     label: '磁盘水位',
+    sourceKind: 'builtin',
     configKind: 'ssh',
     params: [{ key: 'mount', label: '挂载点（可选）', type: 'text', placeholder: '/' }],
     conditionFields: [{ value: 'filesystems[].use_percent', label: '任一分区使用率(%)' }],
@@ -52,6 +55,7 @@ export const MONITOR_KINDS: MonitorKindDef[] = [
   {
     kind: 'docker.containers',
     label: 'Docker 容器',
+    sourceKind: 'builtin',
     configKind: 'docker',
     params: [
       { key: 'filter_name', label: '名称过滤（可选）', type: 'text' },
@@ -61,6 +65,7 @@ export const MONITOR_KINDS: MonitorKindDef[] = [
   {
     kind: 'k8s.workloads',
     label: 'K8s 工作负载',
+    sourceKind: 'builtin',
     configKind: 'k8s',
     params: [{ key: 'namespace', label: '命名空间（可选）', type: 'text' }],
     conditionFields: [
@@ -70,6 +75,7 @@ export const MONITOR_KINDS: MonitorKindDef[] = [
   {
     kind: 'http.health',
     label: 'HTTP 健康检查',
+    sourceKind: 'builtin',
     params: [
       { key: 'url', label: 'URL', type: 'text', placeholder: 'https://example.com/health' },
       { key: 'expect_status', label: '期望状态码（可选）', type: 'number' },
@@ -78,6 +84,13 @@ export const MONITOR_KINDS: MonitorKindDef[] = [
       { value: 'status_code', label: 'HTTP 状态码' },
       { value: 'latency_ms', label: '响应时间(ms)' },
     ],
+  },
+  {
+    kind: 'prometheus.query',
+    label: 'Prometheus 即时查询',
+    sourceKind: 'prometheus',
+    params: [{ key: 'query', label: 'PromQL', type: 'text', placeholder: 'up' }],
+    conditionFields: [{ value: 'value', label: '查询结果值' }],
   },
 ];
 

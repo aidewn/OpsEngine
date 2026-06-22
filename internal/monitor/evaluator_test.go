@@ -12,7 +12,7 @@ import (
 
 // 构造只含一条结果的 batch（kind+target 对应条件）。
 func batchWith(kind, target string, data any) Batch {
-	task := CollectionTask{TargetID: target, Kind: kind, key: collectionKey(target, kind, nil)}
+	task := CollectionTask{SourceID: core.MonitorBuiltinSourceID, TargetID: target, Kind: kind, key: collectionKey("", target, kind, nil)}
 	return Batch{task.key: CollectionResult{Task: task, Data: data}}
 }
 
@@ -80,7 +80,7 @@ func TestEvaluate_CollectErrorIsAbnormal(t *testing.T) {
 		Kind: KindHostBasic, Field: "cpu_usage_percent", Op: ">", Value: 80,
 		Severity: core.MonitorSeverityWarning,
 	})
-	task := CollectionTask{Kind: KindHostBasic, key: collectionKey("", KindHostBasic, nil)}
+	task := CollectionTask{SourceID: core.MonitorBuiltinSourceID, Kind: KindHostBasic, key: collectionKey("", "", KindHostBasic, nil)}
 	batch := Batch{task.key: CollectionResult{Task: task, Err: errTest}}
 	res := Evaluate(panel, batch)
 	if res.Status != core.MonitorStatusAbnormal {

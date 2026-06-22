@@ -12,16 +12,18 @@ import (
 
 // fakeDataSource 记录每个去重键被采集的次数，用于验证「合并采集只跑一次」。
 type fakeDataSource struct {
-	kind  string
-	calls map[string]int
-	err   error // 非空时所有采集返回该错误
+	sourceKind string
+	kind       string
+	calls      map[string]int
+	err        error // 非空时所有采集返回该错误
 }
 
 func newFakeDataSource(kind string) *fakeDataSource {
-	return &fakeDataSource{kind: kind, calls: map[string]int{}}
+	return &fakeDataSource{sourceKind: core.MonitorSourceKindBuiltin, kind: kind, calls: map[string]int{}}
 }
 
-func (f *fakeDataSource) Kind() string { return f.kind }
+func (f *fakeDataSource) SourceKind() string { return f.sourceKind }
+func (f *fakeDataSource) Kind() string       { return f.kind }
 
 func (f *fakeDataSource) Collect(_ context.Context, cc CollectContext) (any, error) {
 	f.calls[cc.Task.Key()]++
@@ -70,7 +72,7 @@ func TestBuildCollectionPlan_Dedup(t *testing.T) {
 
 // nil 参数与空 map 视为同一采集键，避免重复采集。
 func TestCollectionKey_NilAndEmptyParamsEqual(t *testing.T) {
-	if collectionKey("t", "k", nil) != collectionKey("t", "k", map[string]any{}) {
+	if collectionKey("", "t", "k", nil) != collectionKey("", "t", "k", map[string]any{}) {
 		t.Fatal("nil 参数与空 map 应产生相同去重键")
 	}
 }
@@ -88,10 +90,10 @@ func TestCollector_DedupAndDistribute(t *testing.T) {
 	p1 := panel("p1", true, shared)
 	p2 := panel("p2", true, shared)
 
-	batch := collector.RunCollection(context.Background(), core.EnvironmentDef{}, []core.MonitorPanel{p1, p2})
+	batch := collector.RunCollection(context.Background(), core.EnvironmentDef{}, nil, []core.MonitorPanel{p1, p2})
 
 	// 合并采集：同一目标同一数据只采一次
-	if got := ds.calls[collectionKey("web-01", "host.basic", nil)]; got != 1 {
+	if got := ds.calls[collectionKey("", "web-01", "host.basic", nil)]; got != 1 {
 		t.Fatalf("期望合并后只采集 1 次，实际 %d", got)
 	}
 	// 分发：每个监控项都能切片拿到自己的结果
@@ -113,8 +115,8 @@ func TestCollector_UnknownKind(t *testing.T) {
 	collector := NewCollector(NewRegistry())
 	p := panel("p1", true, req("web-01", "mystery.kind", nil))
 
-	batch := collector.RunCollection(context.Background(), core.EnvironmentDef{}, []core.MonitorPanel{p})
-	res, ok := batch[collectionKey("web-01", "mystery.kind", nil)]
+	batch := collector.RunCollection(context.Background(), core.EnvironmentDef{}, nil, []core.MonitorPanel{p})
+	res, ok := batch[collectionKey("", "web-01", "mystery.kind", nil)]
 	if !ok {
 		t.Fatal("未注册类型也应在 batch 中留下结果条目")
 	}
@@ -138,10 +140,10 @@ func TestCollector_PerTaskErrorIsolation(t *testing.T) {
 		req("web-01", "host.basic", nil),
 		req("web-01", "host.disk", nil),
 	)
-	batch := collector.RunCollection(context.Background(), core.EnvironmentDef{}, []core.MonitorPanel{p})
+	batch := collector.RunCollection(context.Background(), core.EnvironmentDef{}, nil, []core.MonitorPanel{p})
 
-	good := batch[collectionKey("web-01", "host.basic", nil)]
-	bad := batch[collectionKey("web-01", "host.disk", nil)]
+	good := batch[collectionKey("", "web-01", "host.basic", nil)]
+	bad := batch[collectionKey("", "web-01", "host.disk", nil)]
 	if good.Err != nil {
 		t.Fatalf("正常任务不应有错误: %v", good.Err)
 	}
@@ -170,13 +172,13 @@ func TestBatch_SliceFiltersUnrelated(t *testing.T) {
 
 	p1 := panel("p1", true, req("web-01", "host.basic", nil))
 	p2 := panel("p2", true, req("web-02", "host.basic", nil))
-	batch := collector.RunCollection(context.Background(), core.EnvironmentDef{}, []core.MonitorPanel{p1, p2})
+	batch := collector.RunCollection(context.Background(), core.EnvironmentDef{}, nil, []core.MonitorPanel{p1, p2})
 
 	slice := batch.Slice(p1.Requirements)
 	if len(slice) != 1 {
 		t.Fatalf("p1 切片应只含自己的 1 条结果，实际 %d", len(slice))
 	}
-	if _, ok := slice[collectionKey("web-02", "host.basic", nil)]; ok {
+	if _, ok := slice[collectionKey("", "web-02", "host.basic", nil)]; ok {
 		t.Fatal("切片不应包含其它监控项的结果")
 	}
 }

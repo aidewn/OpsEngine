@@ -14,6 +14,7 @@
 | [execution-ux-plan.md](./execution-ux-plan.md) | **执行体验改进**：白屏修复（已完成）、调用栈侧栏、详情页稳健性 | 前端 / 全栈 |
 | [environment-plan.md](./environment-plan.md) | **配置环境**：按项目集中凭证、连接/探测节点、编辑态 Probe 绑定变量 | 全栈 / 节点开发者 |
 | [monitoring-architecture-plan.md](./monitoring-architecture-plan.md) | **轻量监控体系**：环境级监控、分组、监控项、批量采集、异常诊断与报告闭环 | 产品 / 全栈 |
+| [monitoring-multi-source-plan.md](./monitoring-multi-source-plan.md) | **多监控源接入**：环境级监控源、Prometheus、DataRequirement 升级、采集去重与前端配置 | 产品 / 全栈 |
 | [web-deployment-refactor-plan.md](./web-deployment-refactor-plan.md) | **Docker 与 Web 部署改造**：双运行模式、服务层拆分、HTTP/WebSocket、Docker 化与安全加固 | 架构师 / 全栈 |
 | [plugin-platform.md](./plugin-platform.md) | **插件平台**：Lua 扩展节点、主题/连线/UI 定制、宿主 API、迭代路线图 | 架构师 / 插件开发者 |
 

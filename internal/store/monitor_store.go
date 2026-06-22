@@ -39,9 +39,92 @@ func (s *MonitorStore) statesDir() string    { return filepath.Join(s.baseDir, "
 func (s *MonitorStore) incidentsDir() string { return filepath.Join(s.baseDir, "incidents") }
 func (s *MonitorStore) reportsDir() string   { return filepath.Join(s.baseDir, "reports") }
 func (s *MonitorStore) configsDir() string   { return filepath.Join(s.baseDir, "configs") }
+func (s *MonitorStore) sourcesDir() string   { return filepath.Join(s.baseDir, "sources") }
 
 // defaultMonitorIntervalSeconds 是环境未配置时的默认采集间隔。
 const defaultMonitorIntervalSeconds = 60
+
+// BuiltinMonitorSource 返回环境的虚拟内置监控源。
+// 该源不落盘，用于兼容旧 target_id 监控项并统一前端选择体验。
+func BuiltinMonitorSource(environmentID string) core.MonitorSource {
+	return core.MonitorSource{
+		ID:            core.MonitorBuiltinSourceID,
+		EnvironmentID: environmentID,
+		Name:          "内置采集",
+		Kind:          core.MonitorSourceKindBuiltin,
+		Enabled:       true,
+		Config:        map[string]any{},
+	}
+}
+
+// ── 监控源 ──────────────────────────────────────────────
+
+// ListSources 列出指定环境下的监控源，并合成默认内置源。
+func (s *MonitorStore) ListSources(environmentID string) ([]core.MonitorSource, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	sources := []core.MonitorSource{BuiltinMonitorSource(environmentID)}
+	err := readTOMLDir(s.sourcesDir(), func(id string) error {
+		var src core.MonitorSource
+		if err := decodeTOMLFile(filepath.Join(s.sourcesDir(), id+".toml"), &src); err != nil {
+			return err
+		}
+		if src.EnvironmentID == environmentID {
+			sources = append(sources, src)
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	sort.SliceStable(sources, func(i, j int) bool {
+		if sources[i].ID == core.MonitorBuiltinSourceID {
+			return true
+		}
+		if sources[j].ID == core.MonitorBuiltinSourceID {
+			return false
+		}
+		return sources[i].Name < sources[j].Name
+	})
+	return sources, nil
+}
+
+// GetSource 按 ID 读取监控源；builtin 由调用方按环境通过 ListSources 获取。
+func (s *MonitorStore) GetSource(id string) (core.MonitorSource, error) {
+	if id == core.MonitorBuiltinSourceID {
+		return core.MonitorSource{}, fmt.Errorf("内置监控源需按环境合成")
+	}
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	var src core.MonitorSource
+	if err := decodeTOMLFile(filepath.Join(s.sourcesDir(), id+".toml"), &src); err != nil {
+		return core.MonitorSource{}, fmt.Errorf("监控源未找到: %s", id)
+	}
+	return src, nil
+}
+
+// SaveSource 整体覆盖保存监控源。
+func (s *MonitorStore) SaveSource(src core.MonitorSource) error {
+	if strings.TrimSpace(src.ID) == "" {
+		return fmt.Errorf("监控源 ID 不能为空")
+	}
+	if src.ID == core.MonitorBuiltinSourceID {
+		return fmt.Errorf("内置监控源不能保存")
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return encodeTOMLFile(s.sourcesDir(), src.ID, src)
+}
+
+// DeleteSource 删除监控源。
+func (s *MonitorStore) DeleteSource(id string) error {
+	if id == core.MonitorBuiltinSourceID {
+		return fmt.Errorf("内置监控源不能删除")
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return removeTOMLFile(s.sourcesDir(), id)
+}
 
 // ── 分组 ────────────────────────────────────────────────
 

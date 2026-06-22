@@ -2,6 +2,15 @@ package core
 
 import "time"
 
+// MonitorSourceKindBuiltin 是环境内置采集源，桥接现有 SSH/Docker/K8s/HTTP 能力。
+const MonitorSourceKindBuiltin = "builtin"
+
+// MonitorSourceKindPrometheus 是 Prometheus HTTP API 监控源。
+const MonitorSourceKindPrometheus = "prometheus"
+
+// MonitorBuiltinSourceID 是旧监控项和内置采集源使用的默认 source_id。
+const MonitorBuiltinSourceID = "builtin"
+
 // 监控领域模型（Phase 1：信息架构与静态管理）
 //
 // 设计取舍（对齐 docs/monitoring-architecture-plan.md）：
@@ -40,12 +49,26 @@ const (
 	IncidentStatusResolved   IncidentStatus = "resolved"
 )
 
+// MonitorSource 是环境级监控源配置。
+// 内置源可以虚拟合成；外部源（如 Prometheus）落盘保存。
+type MonitorSource struct {
+	ID            string         `json:"id"             toml:"id"`
+	EnvironmentID string         `json:"environment_id" toml:"environment_id"`
+	Name          string         `json:"name"           toml:"name"`
+	Kind          string         `json:"kind"           toml:"kind"`
+	Enabled       bool           `json:"enabled"        toml:"enabled"`
+	Config        map[string]any `json:"config"         toml:"config"`
+	CreatedAt     time.Time      `json:"created_at"     toml:"created_at"`
+	UpdatedAt     time.Time      `json:"updated_at"     toml:"updated_at"`
+}
+
 // DataRequirement 描述监控项依赖的一项采集数据（plan §8.3）
-// TargetID 引用环境内的配置（SSH/Docker/K8s 等），Kind 为数据类型（host.basic 等）。
+// SourceID 引用监控源；TargetID 在 builtin 源下引用环境内 SSH/Docker/K8s 等配置。
 type DataRequirement struct {
-	TargetID string         `json:"target_id" toml:"target_id"`
-	Kind     string         `json:"kind"      toml:"kind"`
-	Params   map[string]any `json:"params"    toml:"params"`
+	SourceID string         `json:"source_id"           toml:"source_id"`
+	TargetID string         `json:"target_id,omitempty" toml:"target_id,omitempty"`
+	Kind     string         `json:"kind"                toml:"kind"`
+	Params   map[string]any `json:"params"              toml:"params"`
 }
 
 // MonitorGroup 环境下的监控分组（plan §8.1）
@@ -90,12 +113,13 @@ type MonitorPanel struct {
 // 从某类采集结果（Kind，可选指定 TargetID）中按 Field 取数值，与 Value 按 Op 比较。
 // Field 支持单层数组展开，如 "filesystems[].use_percent"——任一元素命中即算命中。
 type MonitorCondition struct {
-	Kind     string          `json:"kind"      toml:"kind"`
-	TargetID string          `json:"target_id" toml:"target_id"`
-	Field    string          `json:"field"     toml:"field"`
-	Op       string          `json:"op"        toml:"op"` // > >= < <= == !=
-	Value    float64         `json:"value"     toml:"value"`
-	Severity MonitorSeverity `json:"severity"  toml:"severity"`
+	SourceID string          `json:"source_id"           toml:"source_id"`
+	Kind     string          `json:"kind"                toml:"kind"`
+	TargetID string          `json:"target_id,omitempty" toml:"target_id,omitempty"`
+	Field    string          `json:"field"               toml:"field"`
+	Op       string          `json:"op"                  toml:"op"` // > >= < <= == !=
+	Value    float64         `json:"value"               toml:"value"`
+	Severity MonitorSeverity `json:"severity"            toml:"severity"`
 }
 
 // PanelState 监控项当前状态与最近异常关联（plan §8.4）
@@ -153,6 +177,7 @@ type MonitorConfig struct {
 // MonitorOverview 聚合一个环境监控首页所需数据（plan §3）
 type MonitorOverview struct {
 	EnvironmentID string          `json:"environment_id"`
+	Sources       []MonitorSource `json:"sources"`
 	Groups        []MonitorGroup  `json:"groups"`
 	Panels        []MonitorPanel  `json:"panels"`
 	States        []PanelState    `json:"states"`

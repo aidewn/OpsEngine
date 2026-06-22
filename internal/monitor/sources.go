@@ -11,6 +11,7 @@ func RegisterDefaults(reg *Registry) error {
 		dockerContainersSource{},
 		k8sWorkloadsSource{},
 		newHTTPHealthSource(),
+		prometheusQuerySource{},
 	}
 	for _, ds := range sources {
 		if err := reg.Register(ds); err != nil {

@@ -34,7 +34,7 @@ func Evaluate(panel core.MonitorPanel, batch Batch) FlowResult {
 	var evidence []string
 	severity := core.MonitorSeverityNone
 	for _, cond := range panel.Conditions {
-		res, ok := findResult(batch, cond.Kind, cond.TargetID)
+		res, ok := findResult(batch, cond.SourceID, cond.Kind, cond.TargetID)
 		if !ok {
 			// 缺少该数据（无对应需求或目标）：无法判断本身就是问题，判为异常并说明。
 			evidence = append(evidence, fmt.Sprintf("%s 无采集数据，无法判断", cond.Kind))
@@ -149,9 +149,13 @@ func NextPanelState(prev core.PanelState, panelID string, result FlowResult, th 
 
 // ── 取值与比较 ──────────────────────────────────────────
 
-// findResult 在切片后的 batch 中查匹配 kind（可选 target）的结果。
-func findResult(batch Batch, kind, targetID string) (CollectionResult, bool) {
+// findResult 在切片后的 batch 中查匹配 source、kind（可选 target）的结果。
+func findResult(batch Batch, sourceID, kind, targetID string) (CollectionResult, bool) {
+	sourceID = normalizeSourceID(sourceID)
 	for _, res := range batch {
+		if normalizeSourceID(res.Task.SourceID) != sourceID {
+			continue
+		}
 		if res.Task.Kind != kind {
 			continue
 		}

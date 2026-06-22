@@ -199,7 +199,15 @@
       "Bash(gofmt -l internal/monitor/ monitor.go app.go)",
       "Bash(gofmt -l internal/monitor/troubleshoot.go internal/monitor/evaluator.go monitor.go app.go)",
       "Bash(OPSENGINE_E2E=1 go test . -run TestMonitorHTTPHealthE2E -v -timeout 240s)",
-      "Bash(gofmt -w monitor.go internal/core/monitor.go)"
+      "Bash(gofmt -w monitor.go internal/core/monitor.go)",
+      "Bash(xargs grep -l \"monitor\\\\|Monitor\")",
+      "Bash(sed -n '1,55p' internal/monitor/evaluator.go)",
+      "Bash(sed -n '1,40p' internal/monitor/troubleshoot.go)",
+      "mcp__blender__get_scene_info",
+      "mcp__blender__get_viewport_screenshot",
+      "mcp__blender__execute_blender_code",
+      "Bash(ffmpeg -version)",
+      "Bash(cd /c/Users/m1832/slime_pixel *)"
     ]
   }
 }

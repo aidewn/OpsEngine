@@ -30,6 +30,139 @@ const minMonitorIntervalSeconds = 10
 // errMonitorTickBusy 表示该环境已有一轮 tick 在执行，本次跳过（非错误，用于幂等）。
 var errMonitorTickBusy = errors.New("该环境正在检查中")
 
+// ── 监控源 CRUD ────────────────────────────────────────
+
+// ListMonitorSources 列出某环境下的监控源；敏感字段会脱敏返回。
+func (a *App) ListMonitorSources(environmentID string) ([]core.MonitorSource, error) {
+	if a.monitorStore == nil {
+		return []core.MonitorSource{}, nil
+	}
+	if err := a.assertEnvironmentExists(environmentID); err != nil {
+		return nil, err
+	}
+	sources, err := a.monitorStore.ListSources(environmentID)
+	if err != nil {
+		return nil, err
+	}
+	return sanitizeMonitorSources(sources), nil
+}
+
+// GetMonitorSource 按 ID 读取监控源；敏感字段会脱敏返回。
+func (a *App) GetMonitorSource(id string) (core.MonitorSource, error) {
+	if a.monitorStore == nil {
+		return core.MonitorSource{}, errors.New("监控存储未初始化")
+	}
+	source, err := a.monitorStore.GetSource(id)
+	if err != nil {
+		return core.MonitorSource{}, err
+	}
+	return sanitizeMonitorSource(source), nil
+}
+
+// CreateMonitorSource 在指定环境下创建监控源。
+func (a *App) CreateMonitorSource(environmentID, name, kind string, config map[string]any) (string, error) {
+	if a.monitorStore == nil {
+		return "", errors.New("监控存储未初始化")
+	}
+	if err := a.assertEnvironmentExists(environmentID); err != nil {
+		return "", err
+	}
+	name = strings.TrimSpace(name)
+	kind = strings.TrimSpace(kind)
+	if name == "" {
+		return "", errors.New("监控源名称不能为空")
+	}
+	if err := validateMonitorSourceKind(kind); err != nil {
+		return "", err
+	}
+	now := time.Now()
+	source := core.MonitorSource{
+		ID:            uuid.New().String(),
+		EnvironmentID: environmentID,
+		Name:          name,
+		Kind:          kind,
+		Enabled:       true,
+		Config:        normalizeSourceConfig(config),
+		CreatedAt:     now,
+		UpdatedAt:     now,
+	}
+	if err := a.monitorStore.SaveSource(source); err != nil {
+		return "", err
+	}
+	return source.ID, nil
+}
+
+// UpdateMonitorSource 整体覆盖更新监控源；脱敏占位符不会覆盖已保存密钥。
+func (a *App) UpdateMonitorSource(source core.MonitorSource) error {
+	if a.monitorStore == nil {
+		return errors.New("监控存储未初始化")
+	}
+	if source.ID == core.MonitorBuiltinSourceID {
+		return errors.New("内置监控源不能编辑")
+	}
+	existing, err := a.monitorStore.GetSource(source.ID)
+	if err != nil {
+		return err
+	}
+	if strings.TrimSpace(source.Name) == "" {
+		return errors.New("监控源名称不能为空")
+	}
+	if err := validateMonitorSourceKind(source.Kind); err != nil {
+		return err
+	}
+	source.EnvironmentID = existing.EnvironmentID
+	source.CreatedAt = existing.CreatedAt
+	source.UpdatedAt = time.Now()
+	source.Config = mergeSourceSecretConfig(existing.Config, normalizeSourceConfig(source.Config))
+	return a.monitorStore.SaveSource(source)
+}
+
+// DeleteMonitorSource 删除监控源；仍被监控项引用时拒绝删除。
+func (a *App) DeleteMonitorSource(id string) error {
+	if a.monitorStore == nil {
+		return errors.New("监控存储未初始化")
+	}
+	if id == core.MonitorBuiltinSourceID {
+		return errors.New("内置监控源不能删除")
+	}
+	source, err := a.monitorStore.GetSource(id)
+	if err != nil {
+		return err
+	}
+	panels, err := a.monitorStore.ListPanels(source.EnvironmentID, "")
+	if err != nil {
+		return err
+	}
+	for _, panel := range panels {
+		for _, req := range panel.Requirements {
+			if normalizeMonitorSourceID(req.SourceID) == id {
+				return fmt.Errorf("监控源仍被监控项引用: %s", panel.Name)
+			}
+		}
+		for _, cond := range panel.Conditions {
+			if normalizeMonitorSourceID(cond.SourceID) == id {
+				return fmt.Errorf("监控源仍被监控项引用: %s", panel.Name)
+			}
+		}
+	}
+	return a.monitorStore.DeleteSource(id)
+}
+
+// TestMonitorSource 测试监控源配置是否可用；不保存入参。
+func (a *App) TestMonitorSource(source core.MonitorSource) error {
+	if err := a.assertEnvironmentExists(source.EnvironmentID); err != nil {
+		return err
+	}
+	switch source.Kind {
+	case core.MonitorSourceKindPrometheus:
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		return monitor.TestPrometheusSource(ctx, source)
+	default:
+		return fmt.Errorf("不支持测试该监控源类型: %s", source.Kind)
+	}
+}
+
 // ── 分组 CRUD ───────────────────────────────────────────
 
 // ListMonitorGroups 列出某环境下的监控分组。
@@ -239,8 +372,13 @@ func (a *App) GetMonitorOverview(environmentID string) (core.MonitorOverview, er
 	if err != nil {
 		return core.MonitorOverview{}, err
 	}
+	sources, err := a.monitorStore.ListSources(environmentID)
+	if err != nil {
+		return core.MonitorOverview{}, err
+	}
 	return core.MonitorOverview{
 		EnvironmentID: environmentID,
+		Sources:       sanitizeMonitorSources(sources),
 		Groups:        groups,
 		Panels:        panels,
 		States:        states,
@@ -286,6 +424,10 @@ func (a *App) tickEnvironment(env core.EnvironmentDef) error {
 	if err != nil {
 		return err
 	}
+	sources, err := a.monitorStore.ListSources(env.ID)
+	if err != nil {
+		return err
+	}
 	registry, err := monitor.DefaultRegistry()
 	if err != nil {
 		return err
@@ -294,7 +436,7 @@ func (a *App) tickEnvironment(env core.EnvironmentDef) error {
 
 	ctx, cancel := context.WithTimeout(context.Background(), monitorCollectionTimeout)
 	defer cancel()
-	batch := collector.RunCollection(ctx, env, panels)
+	batch := collector.RunCollection(ctx, env, sources, panels)
 
 	now := time.Now()
 	for _, p := range panels {
@@ -483,10 +625,14 @@ func (a *App) diagnosePanel(env core.EnvironmentDef, panel core.MonitorPanel, in
 	if err != nil {
 		return err
 	}
+	sources, err := a.monitorStore.ListSources(env.ID)
+	if err != nil {
+		return err
+	}
 	collector := monitor.NewCollector(registry)
 	ctx, cancel := context.WithTimeout(context.Background(), monitorCollectionTimeout)
 	defer cancel()
-	batch := collector.RunCollection(ctx, env, []core.MonitorPanel{panel})
+	batch := collector.RunCollection(ctx, env, sources, []core.MonitorPanel{panel})
 
 	// AI 诊断器：复用 ops_doc 的 LLM 适配；未配置 API Key 时为 nil，报告降级为纯事实。
 	summarize := monitor.Summarizer(a.makeReportSummarizer())
@@ -588,4 +734,64 @@ func (a *App) assertEnvironmentExists(environmentID string) error {
 		return fmt.Errorf("环境不存在: %s", environmentID)
 	}
 	return nil
+}
+
+// validateMonitorSourceKind 校验当前支持的监控源类型。
+func validateMonitorSourceKind(kind string) error {
+	switch kind {
+	case core.MonitorSourceKindPrometheus:
+		return nil
+	case core.MonitorSourceKindBuiltin:
+		return errors.New("内置监控源由系统自动提供，不能手动创建")
+	default:
+		return fmt.Errorf("不支持的监控源类型: %s", kind)
+	}
+}
+
+// sanitizeMonitorSources 批量脱敏监控源配置。
+func sanitizeMonitorSources(sources []core.MonitorSource) []core.MonitorSource {
+	out := make([]core.MonitorSource, 0, len(sources))
+	for _, source := range sources {
+		out = append(out, sanitizeMonitorSource(source))
+	}
+	return out
+}
+
+// sanitizeMonitorSource 隐藏 token/password 等敏感字段，避免前端明文展示。
+func sanitizeMonitorSource(source core.MonitorSource) core.MonitorSource {
+	source.Config = normalizeSourceConfig(source.Config)
+	for _, key := range []string{"password", "token"} {
+		if strings.TrimSpace(fmt.Sprint(source.Config[key])) != "" {
+			source.Config[key] = "******"
+		}
+	}
+	return source
+}
+
+// normalizeSourceConfig 复制配置 map，避免直接修改调用方对象。
+func normalizeSourceConfig(config map[string]any) map[string]any {
+	out := map[string]any{}
+	for key, value := range config {
+		out[key] = value
+	}
+	return out
+}
+
+// mergeSourceSecretConfig 在编辑时保留未改动的敏感字段。
+func mergeSourceSecretConfig(existing, next map[string]any) map[string]any {
+	out := normalizeSourceConfig(next)
+	for _, key := range []string{"password", "token"} {
+		if strings.TrimSpace(fmt.Sprint(out[key])) == "******" {
+			out[key] = existing[key]
+		}
+	}
+	return out
+}
+
+// normalizeMonitorSourceID 为空时回落到内置源，兼容旧监控项。
+func normalizeMonitorSourceID(sourceID string) string {
+	if strings.TrimSpace(sourceID) == "" {
+		return core.MonitorBuiltinSourceID
+	}
+	return sourceID
 }

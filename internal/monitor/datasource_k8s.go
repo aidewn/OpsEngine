@@ -6,6 +6,7 @@ package monitor
 import (
 	"context"
 
+	"OpsEngine/internal/core"
 	probek8s "OpsEngine/internal/nodes/env_probe_k8s_workloads"
 	"OpsEngine/internal/probe"
 )
@@ -32,7 +33,8 @@ type K8sWorkloadsResult struct {
 
 type k8sWorkloadsSource struct{}
 
-func (k8sWorkloadsSource) Kind() string { return KindK8sWorkloads }
+func (k8sWorkloadsSource) SourceKind() string { return core.MonitorSourceKindBuiltin }
+func (k8sWorkloadsSource) Kind() string       { return KindK8sWorkloads }
 
 // Collect 参数：namespace（可选，覆盖配置默认命名空间）、include_*（默认全包含）。
 func (k8sWorkloadsSource) Collect(_ context.Context, cc CollectContext) (any, error) {

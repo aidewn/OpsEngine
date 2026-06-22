@@ -5,10 +5,13 @@ package monitor
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
+	"OpsEngine/internal/clients"
+	"OpsEngine/internal/core"
 	"OpsEngine/internal/probe"
 )
 
@@ -166,8 +169,53 @@ func TestRegisterDefaults(t *testing.T) {
 	for _, kind := range []string{
 		KindHostBasic, KindHostDisk, KindDockerContainers, KindK8sWorkloads, KindHTTPHealth,
 	} {
-		if _, ok := reg.Get(kind); !ok {
+		if _, ok := reg.Get("builtin", kind); !ok {
 			t.Fatalf("默认注册表缺少数据源: %s", kind)
 		}
+	}
+	if _, ok := reg.Get("prometheus", KindPrometheusQuery); !ok {
+		t.Fatalf("默认注册表缺少数据源: %s", KindPrometheusQuery)
+	}
+}
+
+func TestPrometheusQuerySource_Collect(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/v1/query" {
+			t.Fatalf("路径错误: %s", r.URL.Path)
+		}
+		if r.URL.Query().Get("query") != "up" {
+			t.Fatalf("query 参数错误: %s", r.URL.RawQuery)
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"status": "success",
+			"data": map[string]any{
+				"resultType": "vector",
+				"result": []any{
+					map[string]any{
+						"metric": map[string]string{"instance": "web-01"},
+						"value":  []any{float64(1710000000), "82.3"},
+					},
+				},
+			},
+		})
+	}))
+	defer srv.Close()
+
+	src := prometheusQuerySource{}
+	data, err := src.Collect(context.Background(), CollectContext{
+		Source: core.MonitorSource{
+			ID:      "prom",
+			Kind:    core.MonitorSourceKindPrometheus,
+			Enabled: true,
+			Config:  map[string]any{"endpoint": srv.URL},
+		},
+		Task: CollectionTask{SourceID: "prom", Kind: KindPrometheusQuery, Params: map[string]any{"query": "up"}},
+	})
+	if err != nil {
+		t.Fatalf("Collect 失败: %v", err)
+	}
+	res := data.(clients.PrometheusQueryResult)
+	if res.Value != 82.3 || len(res.Values) != 1 || res.Values[0].Metric["instance"] != "web-01" {
+		t.Fatalf("Prometheus 结果错误: %+v", res)
 	}
 }

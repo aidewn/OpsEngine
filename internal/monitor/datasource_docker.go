@@ -5,6 +5,7 @@ package monitor
 import (
 	"context"
 
+	"OpsEngine/internal/core"
 	probedocker "OpsEngine/internal/nodes/env_probe_docker_containers"
 	"OpsEngine/internal/probe"
 )
@@ -28,7 +29,8 @@ type DockerContainersResult struct {
 
 type dockerContainersSource struct{}
 
-func (dockerContainersSource) Kind() string { return KindDockerContainers }
+func (dockerContainersSource) SourceKind() string { return core.MonitorSourceKindBuiltin }
+func (dockerContainersSource) Kind() string       { return KindDockerContainers }
 
 // Collect 参数：all（含已停止容器，默认 false）、filter_name（子串过滤，可选）。
 func (dockerContainersSource) Collect(_ context.Context, cc CollectContext) (any, error) {

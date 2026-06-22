@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"net/http"
 	"time"
+
+	"OpsEngine/internal/core"
 )
 
 // KindHTTPHealth 是 http.health 的数据类型标识。
@@ -30,7 +32,8 @@ type httpHealthSource struct {
 // newHTTPHealthSource 构造数据源；client 为 nil 时按任务超时新建。
 func newHTTPHealthSource() *httpHealthSource { return &httpHealthSource{} }
 
-func (s *httpHealthSource) Kind() string { return KindHTTPHealth }
+func (s *httpHealthSource) SourceKind() string { return core.MonitorSourceKindBuiltin }
+func (s *httpHealthSource) Kind() string       { return KindHTTPHealth }
 
 // Collect 参数：url（必填）、method（默认 GET）、timeout_seconds（默认 10）、
 // expect_status（可选，指定则严格相等，否则按 2xx 判定 OK）。

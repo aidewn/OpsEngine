@@ -414,9 +414,13 @@ export function AIAssistantPanel({
           );
         }
       } else if (event.type === "heartbeat") {
-        // 单行原地刷新，不进 progress 数组，避免持久化时堆积
+        // 单行原地刷新，不进 progress 数组，避免持久化时堆积。
+        // 已完成的轮次不再接受心跳：心跳由 ticker 协程发出，可能在 done 之后到达，
+        // 若不挡掉会「复活」思考中提示，造成输出已完成却仍显示思考中。
         setPending((prev) =>
-          prev ? { ...prev, assistantHeartbeat: event.text ?? "" } : prev,
+          prev && !prev.completed
+            ? { ...prev, assistantHeartbeat: event.text ?? "" }
+            : prev,
         );
       } else if (event.type === "workflow") {
         setPending((prev) =>
@@ -1300,7 +1304,7 @@ function Bubble({
             ))}
           </div>
         )}
-        {message.heartbeat && (
+        {streaming && message.heartbeat && (
           <div className="mt-1 flex items-center gap-1.5 text-[11px] italic text-ops-tertiary">
             <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-ops-accent" />
             {message.heartbeat}

@@ -79,6 +79,36 @@ func TestMonitorStore_PanelRoundTrip(t *testing.T) {
 	}
 }
 
+// 监控源 Save → List/Get 往返，List 会合成 builtin 源。
+func TestMonitorStore_SourceRoundTrip(t *testing.T) {
+	store := NewMonitorStore(t.TempDir())
+	source := core.MonitorSource{
+		ID:            "prom-1",
+		EnvironmentID: "env-1",
+		Name:          "Prometheus",
+		Kind:          core.MonitorSourceKindPrometheus,
+		Enabled:       true,
+		Config:        map[string]any{"endpoint": "http://prometheus:9090"},
+	}
+	if err := store.SaveSource(source); err != nil {
+		t.Fatalf("SaveSource 失败: %v", err)
+	}
+	got, err := store.GetSource("prom-1")
+	if err != nil {
+		t.Fatalf("GetSource 失败: %v", err)
+	}
+	if got.Name != source.Name || got.Config["endpoint"] != "http://prometheus:9090" {
+		t.Fatalf("监控源字段不一致: %+v", got)
+	}
+	list, err := store.ListSources("env-1")
+	if err != nil {
+		t.Fatalf("ListSources 失败: %v", err)
+	}
+	if len(list) != 2 || list[0].ID != core.MonitorBuiltinSourceID || list[1].ID != "prom-1" {
+		t.Fatalf("ListSources 应包含 builtin 和 prom-1: %+v", list)
+	}
+}
+
 // ListGroups 只返回指定环境的分组，并按 Order 升序
 func TestMonitorStore_ListGroupsFilterAndSort(t *testing.T) {
 	store := NewMonitorStore(t.TempDir())

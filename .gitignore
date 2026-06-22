@@ -6,6 +6,14 @@
 /data/executions/
 /data/logs/
 /data/settings/
+/data/environments/
+/data/monitor/configs/
+/data/monitor/groups/
+/data/monitor/incidents/
+/data/monitor/panels/
+/data/monitor/reports/
+/data/monitor/sources/
+/data/monitor/states/
 
 # IDE
 .idea/

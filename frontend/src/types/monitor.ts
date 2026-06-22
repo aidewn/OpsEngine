@@ -6,7 +6,8 @@ export type MonitorStatus = 'normal' | 'abnormal' | 'diagnosing' | 'history';
 
 // DataRequirement 描述监控项依赖的采集数据。
 export interface DataRequirement {
-  target_id: string;
+  source_id?: string;
+  target_id?: string;
   kind: string;
   params?: Record<string, unknown>;
 }
@@ -25,8 +26,9 @@ export interface MonitorGroup {
 
 // MonitorCondition 是监控项的一条阈值判断（Monitor Flow）。
 export interface MonitorCondition {
+  source_id?: string;
   kind: string;
-  target_id: string;
+  target_id?: string;
   field: string;
   op: '>' | '>=' | '<' | '<=' | '==' | '!=';
   value: number;
@@ -98,9 +100,22 @@ export interface MonitorConfig {
   updated_at: string;
 }
 
+// MonitorSource 是环境级监控源配置。
+export interface MonitorSource {
+  id: string;
+  environment_id: string;
+  name: string;
+  kind: 'builtin' | 'prometheus' | string;
+  enabled: boolean;
+  config: Record<string, unknown>;
+  created_at?: string;
+  updated_at?: string;
+}
+
 // MonitorOverviewData 聚合一个环境的监控首页所需数据。
 export interface MonitorOverviewData {
   environment_id: string;
+  sources: MonitorSource[];
   groups: MonitorGroup[];
   panels: MonitorPanel[];
   states: PanelState[];

@@ -57,7 +57,8 @@ type HostDiskResult struct {
 
 type hostBasicSource struct{}
 
-func (hostBasicSource) Kind() string { return KindHostBasic }
+func (hostBasicSource) SourceKind() string { return core.MonitorSourceKindBuiltin }
+func (hostBasicSource) Kind() string       { return KindHostBasic }
 
 // basicCommand 一次性取 loadavg/uptime/meminfo 以及两次 /proc/stat（间隔 1s 算 CPU%）。
 const basicCommand = "echo __LOADAVG__; cat /proc/loadavg; " +
@@ -104,7 +105,8 @@ func parseHostBasic(out string) (HostBasicResult, error) {
 
 type hostDiskSource struct{}
 
-func (hostDiskSource) Kind() string { return KindHostDisk }
+func (hostDiskSource) SourceKind() string { return core.MonitorSourceKindBuiltin }
+func (hostDiskSource) Kind() string       { return KindHostDisk }
 
 func (hostDiskSource) Collect(ctx context.Context, cc CollectContext) (any, error) {
 	out, err := runSSHCommand(ctx, cc, "df -kP")
