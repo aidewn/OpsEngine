@@ -1,5 +1,5 @@
 # CLAUDE.md
-- 虽然这里面都是英文，但是代码的注释都得用中文，且所有文件头，变量，函数，接口，复杂实现等都要添加注释
+- 代码的注释用中文，且所有文件头，变量，函数，接口，复杂实现等都要添加注释
 - Behavioral guidelines to reduce common LLM coding mistakes. Merge with project-specific instructions as needed.
 - 不留冗余代码，代码保持简洁优雅，不要补丁式开发
   **Tradeoff:** These guidelines bias toward caution over speed. For trivial tasks, use judgment.
